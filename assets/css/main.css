@@ -437,6 +437,12 @@ img { max-width: 100%; height: auto; display: block; }
   padding: 2.5rem 2rem 4rem;
 }
 
+/* ---- Article Layout (with TOC) ---- */
+
+.article-layout {
+  position: relative;
+}
+
 /* ---- Article (single post) ---- */
 
 .article {
@@ -494,6 +500,7 @@ img { max-width: 100%; height: auto; display: block; }
   font-weight: 700;
   margin: 2.5rem 0 1rem;
   letter-spacing: -0.01em;
+  scroll-margin-top: 5rem;
 }
 
 .article-body h3 {
@@ -501,6 +508,7 @@ img { max-width: 100%; height: auto; display: block; }
   font-size: 1.25rem;
   font-weight: 700;
   margin: 2rem 0 0.75rem;
+  scroll-margin-top: 5rem;
 }
 
 .article-body p {
@@ -557,6 +565,68 @@ img { max-width: 100%; height: auto; display: block; }
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
+}
+
+/* ---- Table of Contents ---- */
+
+.toc {
+  position: fixed;
+  top: 5rem;
+  width: 200px;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+.toc-inner {
+}
+
+.toc-title {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-lighter);
+  margin-bottom: 1rem;
+}
+
+.toc nav > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1.5px solid var(--rule);
+}
+
+.toc nav ul ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.toc nav a {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--ink-lighter);
+  text-decoration: none;
+  padding: 0.3em 0 0.3em 1rem;
+  border-left: 1.5px solid transparent;
+  margin-left: -1.5px;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.toc nav ul ul a {
+  padding-left: 1.75rem;
+  font-size: 0.72rem;
+}
+
+.toc nav a:hover {
+  color: var(--ink);
+}
+
+.toc nav a.active {
+  color: var(--accent);
+  border-left-color: var(--accent);
 }
 
 /* ---- Article Footer Nav ---- */
@@ -872,6 +942,8 @@ img { max-width: 100%; height: auto; display: block; }
   }
 
   .post-item-date { padding-top: 0; }
+
+  .toc { display: none !important; }
 
   .article { padding: 0 1.5rem 3rem; }
   .article-header { padding: 3rem 0 2rem; }

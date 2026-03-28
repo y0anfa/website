@@ -1,4 +1,5 @@
 {{ define "main" }}
+<div class="article-layout">
 <article class="article">
   <header class="article-header">
     <div class="article-meta">
@@ -37,4 +38,64 @@
     </div>
   </footer>
 </article>
+
+{{ if .TableOfContents }}
+<aside class="toc">
+  <div class="toc-inner">
+    <span class="toc-title">Contents</span>
+    {{ .TableOfContents }}
+  </div>
+</aside>
+{{ end }}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var toc = document.querySelector('.toc');
+  var article = document.querySelector('.article');
+  var headings = document.querySelectorAll('.article-body h2, .article-body h3');
+  var tocLinks = document.querySelectorAll('.toc a');
+  if (!headings.length || !tocLinks.length) return;
+
+  // Position TOC to the right of the article
+  function positionToc() {
+    var rect = article.getBoundingClientRect();
+    var right = rect.right + 32;
+    // Hide if not enough room
+    if (right + 200 > window.innerWidth) {
+      toc.style.display = 'none';
+    } else {
+      toc.style.display = '';
+      toc.style.left = right + 'px';
+    }
+  }
+  positionToc();
+  window.addEventListener('resize', positionToc);
+
+  // Active heading tracking
+  var linkMap = {};
+  tocLinks.forEach(function (link) {
+    var id = link.getAttribute('href').slice(1);
+    linkMap[id] = link;
+  });
+
+  var currentId = null;
+
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        if (currentId && linkMap[currentId]) {
+          linkMap[currentId].classList.remove('active');
+        }
+        currentId = entry.target.id;
+        if (linkMap[currentId]) {
+          linkMap[currentId].classList.add('active');
+        }
+      }
+    });
+  }, { rootMargin: '-80px 0px -70% 0px' });
+
+  headings.forEach(function (h) { observer.observe(h); });
+});
+</script>
 {{ end }}
