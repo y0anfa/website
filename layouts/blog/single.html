@@ -12,7 +12,7 @@
     {{ end }}
     <div class="article-tags">
       {{ range .Params.tags }}
-        <a href="/tags/{{ . | urlize }}/" class="tag">{{ . }}</a>
+        <a href="/blog/#{{ . | urlize }}" class="tag">{{ . }}</a>
       {{ end }}
     </div>
   </header>

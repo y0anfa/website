@@ -29,6 +29,8 @@ paginate = 10
 [outputs]
   home = ["HTML"]
   section = ["HTML"]
+  taxonomy = []
+  term = []
 
 [menus]
   [[menus.main]]

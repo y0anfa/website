@@ -40,22 +40,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const buttons = document.querySelectorAll('.tag-btn');
   const posts = document.querySelectorAll('.post-item');
 
+  function filterByTag(tag) {
+    buttons.forEach(b => b.classList.toggle('active', b.dataset.tag === tag));
+    posts.forEach(post => {
+      if (tag === 'all') { post.style.display = ''; return; }
+      const postTags = post.dataset.tags.split(',');
+      post.style.display = postTags.includes(tag) ? '' : 'none';
+    });
+  }
+
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
-      buttons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const tag = btn.dataset.tag;
-
-      posts.forEach(post => {
-        if (tag === 'all') {
-          post.style.display = '';
-          return;
-        }
-        const postTags = post.dataset.tags.split(',');
-        post.style.display = postTags.includes(tag) ? '' : 'none';
-      });
+      filterByTag(btn.dataset.tag);
+      history.replaceState(null, '', btn.dataset.tag === 'all' ? '/blog/' : '#' + btn.dataset.tag);
     });
   });
+
+  // Activate tag from URL hash (e.g. /blog/#security)
+  const hash = window.location.hash.slice(1);
+  if (hash) filterByTag(hash);
 });
 </script>
 {{ end }}
