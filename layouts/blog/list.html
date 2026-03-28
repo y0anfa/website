@@ -1,0 +1,61 @@
+{{ define "main" }}
+<section class="page-header">
+  <h1 class="page-title">Blog</h1>
+  <p class="page-desc">Writing about security, software, and life.</p>
+</section>
+
+<section class="blog-index">
+  {{ $tags := .Site.Taxonomies.tags }}
+  {{ if $tags }}
+  <div class="tag-filter" id="tag-filter">
+    <button class="tag-btn active" data-tag="all">All</button>
+    {{ range $name, $taxonomy := $tags }}
+      <button class="tag-btn" data-tag="{{ $name }}">{{ $name }} <span class="tag-count">{{ len $taxonomy }}</span></button>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  <div class="post-list" id="post-list">
+    {{ range .Pages }}
+    <article class="post-item" data-tags="{{ delimit .Params.tags "," }}">
+      <div class="post-item-date">
+        <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "Jan 2006" }}</time>
+      </div>
+      <div class="post-item-content">
+        <h2 class="post-item-title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h2>
+        <p class="post-item-excerpt">{{ .Summary | plainify | truncate 200 }}</p>
+        <div class="post-item-tags">
+          {{ range .Params.tags }}
+            <span class="tag">{{ . }}</span>
+          {{ end }}
+        </div>
+      </div>
+    </article>
+    {{ end }}
+  </div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const buttons = document.querySelectorAll('.tag-btn');
+  const posts = document.querySelectorAll('.post-item');
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tag = btn.dataset.tag;
+
+      posts.forEach(post => {
+        if (tag === 'all') {
+          post.style.display = '';
+          return;
+        }
+        const postTags = post.dataset.tags.split(',');
+        post.style.display = postTags.includes(tag) ? '' : 'none';
+      });
+    });
+  });
+});
+</script>
+{{ end }}

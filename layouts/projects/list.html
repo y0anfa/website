@@ -1,0 +1,28 @@
+{{ define "main" }}
+<section class="page-header">
+  <h1 class="page-title">Projects</h1>
+  <p class="page-desc">Things I've built, contributed to, or am tinkering with.</p>
+</section>
+
+<section class="project-grid">
+  {{ range .Pages }}
+  <article class="project-card">
+    <div class="project-card-header">
+      <h2 class="project-card-title"><a href="{{ with .Params.link }}{{ . }}{{ else }}{{ .RelPermalink }}{{ end }}" {{ with .Params.link }}target="_blank" rel="noopener"{{ end }}>{{ .Title }}</a></h2>
+      {{ with .Params.status }}
+        <span class="project-status project-status-{{ . }}">{{ . }}</span>
+      {{ end }}
+    </div>
+    <p class="project-card-tagline">{{ .Params.tagline }}</p>
+    <div class="project-card-stack">
+      {{ range .Params.stack }}
+        <span class="stack-tag">{{ . }}</span>
+      {{ end }}
+    </div>
+    {{ with .Params.link }}
+      <a href="{{ . }}" target="_blank" rel="noopener" class="project-card-link">View project &rarr;</a>
+    {{ end }}
+  </article>
+  {{ end }}
+</section>
+{{ end }}

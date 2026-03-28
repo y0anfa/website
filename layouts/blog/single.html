@@ -1,0 +1,40 @@
+{{ define "main" }}
+<article class="article">
+  <header class="article-header">
+    <div class="article-meta">
+      <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "January 2, 2006" }}</time>
+      <span class="article-reading-time">{{ .ReadingTime }} min read</span>
+    </div>
+    <h1 class="article-title">{{ .Title }}</h1>
+    {{ with .Params.subtitle }}
+      <p class="article-subtitle">{{ . }}</p>
+    {{ end }}
+    <div class="article-tags">
+      {{ range .Params.tags }}
+        <a href="/tags/{{ . | urlize }}/" class="tag">{{ . }}</a>
+      {{ end }}
+    </div>
+  </header>
+
+  <div class="article-body">
+    {{ .Content }}
+  </div>
+
+  <footer class="article-footer">
+    <div class="article-nav">
+      {{ with .PrevInSection }}
+        <a href="{{ .RelPermalink }}" class="article-nav-link prev">
+          <span class="article-nav-label">&larr; Previous</span>
+          <span class="article-nav-title">{{ .Title }}</span>
+        </a>
+      {{ end }}
+      {{ with .NextInSection }}
+        <a href="{{ .RelPermalink }}" class="article-nav-link next">
+          <span class="article-nav-label">Next &rarr;</span>
+          <span class="article-nav-title">{{ .Title }}</span>
+        </a>
+      {{ end }}
+    </div>
+  </footer>
+</article>
+{{ end }}

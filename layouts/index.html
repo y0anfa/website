@@ -1,0 +1,51 @@
+{{ define "main" }}
+<section class="hero">
+  <div class="hero-inner">
+    <h1 class="hero-title">
+      <span class="hero-line hero-line-1">Yoan</span>
+      <span class="hero-line hero-line-2">Faure</span>
+    </h1>
+    <p class="hero-subtitle">{{ .Site.Params.description }}</p>
+    <div class="hero-rule"></div>
+  </div>
+</section>
+
+<section class="home-section">
+  <div class="section-header">
+    <h2 class="section-title">Latest Writing</h2>
+    <a href="/blog/" class="section-link">All posts &rarr;</a>
+  </div>
+  <div class="post-grid">
+    {{ range first 4 (where .Site.RegularPages "Section" "blog") }}
+    <article class="post-card">
+      <div class="post-card-meta">
+        <time datetime="{{ .Date.Format "2006-01-02" }}">{{ .Date.Format "Jan 2, 2006" }}</time>
+        {{ with .Params.tags }}
+          {{ range first 2 . }}
+            <span class="tag">{{ . }}</span>
+          {{ end }}
+        {{ end }}
+      </div>
+      <h3 class="post-card-title"><a href="{{ .RelPermalink }}">{{ .Title }}</a></h3>
+      <p class="post-card-excerpt">{{ .Summary | plainify | truncate 140 }}</p>
+    </article>
+    {{ end }}
+  </div>
+</section>
+
+<section class="home-section">
+  <div class="section-header">
+    <h2 class="section-title">Projects</h2>
+    <a href="/projects/" class="section-link">View all &rarr;</a>
+  </div>
+  <div class="project-list-home">
+    {{ range first 3 (where .Site.RegularPages "Section" "projects") }}
+    <a href="{{ .RelPermalink }}" class="project-row">
+      <span class="project-row-name">{{ .Title }}</span>
+      <span class="project-row-desc">{{ .Params.tagline }}</span>
+      <span class="project-row-arrow">&rarr;</span>
+    </a>
+    {{ end }}
+  </div>
+</section>
+{{ end }}

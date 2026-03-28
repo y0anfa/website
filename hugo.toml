@@ -1,0 +1,41 @@
+baseURL = "https://yoanfau.re/"
+languageCode = "en"
+title = "Yoan Faure"
+paginate = 10
+
+[params]
+  description = "Security Engineer. Writing about security, software, and everything in between."
+  author = "Yoan Faure"
+  role = "Security Engineer"
+  github = "https://github.com/y0anfa"
+  linkedin = "https://linkedin.com/in/yoan-faure"
+
+[taxonomies]
+  tag = "tags"
+
+[markup]
+  [markup.highlight]
+    style = "monokailight"
+    lineNos = false
+    guessSyntax = true
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+
+[outputs]
+  home = ["HTML"]
+  section = ["HTML"]
+
+[menus]
+  [[menus.main]]
+    name = "Blog"
+    url = "/blog/"
+    weight = 1
+  [[menus.main]]
+    name = "Projects"
+    url = "/projects/"
+    weight = 2
+  [[menus.main]]
+    name = "Resume"
+    url = "/resume/"
+    weight = 3
