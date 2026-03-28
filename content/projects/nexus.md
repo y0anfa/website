@@ -1,6 +1,6 @@
 ---
 title: "nexus"
-tagline: "Documentat generation CLI. Markdown to PDF with custom theming."
+tagline: "Document generation CLI. Markdown to PDF with custom theming."
 stack: ["Python", "Markdown", "CLI"]
 status: "wip"
 link: "https://github.com/y0anfa/nexus"
