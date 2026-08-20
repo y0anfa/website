@@ -268,7 +268,7 @@ img { max-width: 100%; height: auto; display: block; }
 /* ---- Project Rows (home) ---- */
 
 .project-list-home {
-  border-top: 1px solid var(--rule);
+  margin-top: -0.5rem;
 }
 
 .project-row {
@@ -294,6 +294,7 @@ img { max-width: 100%; height: auto; display: block; }
   font-size: 1.1rem;
   color: var(--ink);
   white-space: nowrap;
+  flex: 0 0 8rem;
 }
 
 .project-row-desc {
@@ -956,6 +957,8 @@ img { max-width: 100%; height: auto; display: block; }
   .article-nav { flex-direction: column; }
   .article-nav-link { max-width: 100%; }
   .article-nav-link.next { text-align: left; }
+
+  .project-row-name { flex-basis: 6rem; }
 
   .footer-inner { flex-direction: column; gap: 0.75rem; text-align: center; }
 }
