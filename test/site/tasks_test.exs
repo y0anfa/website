@@ -33,7 +33,7 @@ defmodule Site.TasksTest do
     test "--drafts includes drafts" do
       out = Path.join(tmp_dir(), "dist")
       Mix.Tasks.Site.Build.run(["--drafts", "--content", fixture_copy(), "--out", out])
-      assert File.exists?(Path.join(out, "essays/an-unfinished-draft/index.html"))
+      assert File.exists?(Path.join(out, "an-unfinished-draft/index.html"))
     end
 
     test "content errors become a Mix error listing the problems" do

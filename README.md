@@ -14,7 +14,7 @@ Personal site of Yoan Faure. A static site built by a small Elixir generator and
 ```sh
 mix deps.get       # fetch dependencies
 mix site.serve     # build and serve at http://localhost:4000 (--port to change)
-mix site.build     # write the site to dist/
+mix site.build     # write the site to dist/ (pages, assets, _headers, _redirects, robots.txt)
 mix site.verify    # build twice into temporary directories and compare; fails on any difference
 mix test           # run the test suite
 ```
@@ -23,7 +23,7 @@ mix test           # run the test suite
 
 The field is a quiet backdrop on every page. Its preset is chosen with a query parameter: `?field=topo` (the default, topographic contour lines) or `?field=water`, e.g. `http://localhost:4000/?field=water`. The choice is kept for the session, so it holds as you navigate.
 
-`mix site.serve` applies the headers from `dist/_headers`, so a Content Security Policy violation shows locally in the same way it does in production.
+`mix site.serve` applies the headers from `dist/_headers`, so a Content Security Policy violation shows locally in the same way it does in production. It does not apply `dist/_redirects`: the old Hugo URLs only redirect on Cloudflare.
 
 ## Content
 
@@ -31,21 +31,28 @@ All words live in `content/`. The full model is in [SPEC.md §5](SPEC.md#5-conte
 
 | Path | Holds |
 |---|---|
-| `content/home.md` | home intro |
+| `content/home.md` | the home intro |
 | `content/essays/*.md` | essays |
 | `content/notes/*.md` | notes |
 | `content/projects/*.md` | projects |
-| `content/uses.md`, `content/cv.md` | the uses and cv pages |
 
-A slug is the filename without `.md` and without a leading `YYYY-MM-DD-` prefix. Dates come from the `date` field, not the filename.
+There is one log, on the home, and it lists every essay, note and project. The folder an entry lives in sets its type, which shows as a label in the log and in the entry's meta line. It does not set the URL: every entry lives at `/<slug>/`, for example `/threat-modeling-with-claude-code/` or `/rhino/`.
+
+A slug is the filename without `.md` and without a leading `YYYY-MM-DD-` prefix. Dates come from the `date` field, not the filename. Slugs are unique across **all** types, so an essay and a note cannot share one. A few are reserved because they would collide with a site path or a legacy redirect: `assets`, `404`, `404.html`, `index`, `index.html`, `robots.txt`, `_headers`, `_redirects`, `blog`, `projects` and `resume`.
 
 Frontmatter sits between `---` lines.
 
 - **essays, notes:** `title` and `date` (required, `YYYY-MM-DD`). `description` is optional and falls back to the first paragraph, cut to 160 characters. `draft: true` keeps the entry out of the build unless you run `mix site.build --drafts`.
 - **projects:** `title`, `date`, `tagline` and `status` (required; `active`, `wip` or `archived`). `link` and `stack` are optional.
-- **home.md, uses.md, cv.md:** `title` and `description` (required).
+- **home.md:** `title` and `description` (required), `tagline` (optional).
 
-Markdown uses GitHub-flavoured extensions: tables, strikethrough, autolinks, footnotes and heading ids. Raw HTML is not rendered. The build fails on a missing required field, a bad date, or a duplicate slug within a type.
+Markdown uses GitHub-flavoured extensions: tables, strikethrough, autolinks, footnotes and heading ids. Raw HTML is not rendered. The build fails on a missing required field, a bad date, a duplicate slug (it names both files) or a reserved slug.
+
+The old Hugo URLs are redirected by `dist/_redirects`, which the build writes: `/blog/*` and `/projects/*` go to `/:splat`, and `/resume` and `/resume/` go to `/`. The rules are in `Site.Config.redirects/0`.
+
+## Fonts
+
+Text is Inter (variable, `assets/fonts/InterVariable.woff2` and `InterVariable-Italic.woff2`). JetBrains Mono (400 only) is used for code, the log's hash and date, and the backdrop field. Both are self-hosted, and their licences sit next to them (`Inter-OFL.txt`, `JetBrainsMono-OFL.txt`).
 
 ## Deploy
 

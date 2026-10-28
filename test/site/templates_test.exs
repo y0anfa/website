@@ -4,13 +4,14 @@ defmodule Site.TemplatesTest do
   # Every `<%= expr %>` in a template must be one of:
   #   * escape(...)                       interpolating a value
   #   * raw(@content | @head_js | @doc.html | @entry.html)   already-safe HTML
-  #   * header(...) | footer(...) | log(...) | meta(...)    partials (linted themselves)
+  #   * header() | footer(...) | log(...) | meta(...)    partials (linted themselves)
   #   * a block opener: for / if / cond / case / unless
   # Anything else would put an unescaped value into a page.
   @allowed [
     ~r/\Aescape\(.+\)\z/s,
     ~r/\Araw\(@(content|head_js|doc\.html|entry\.html)\)\z/,
-    ~r/\A(header|footer|log|meta)\(%\{[^}]*\}\)\z/,
+    ~r/\Aheader\(\)\z/,
+    ~r/\A(footer|log|meta)\(%\{[^}]*\}\)\z/,
     ~r/\A(for|if|cond|case|unless)\s/
   ]
 
@@ -112,6 +113,44 @@ defmodule Site.TemplatesTest do
     refute File.read!("templates/home.html.eex") =~ "raw(@doc.title)"
   end
 
+  test "there are no list or page templates, and no nav in the shell" do
+    refute File.exists?("templates/list.html.eex")
+    refute File.exists?("templates/page.html.eex")
+    refute Map.has_key?(Map.new(Site.Templates.files()), :list)
+    refute Map.has_key?(Map.new(Site.Templates.files()), :page)
+
+    header = File.read!("templates/_header.html.eex")
+    refute header =~ "<nav"
+    refute header =~ "site-nav"
+    refute header =~ "aria-current"
+    assert header =~ ~S(<a class="brand" href="/">yoan faure</a>)
+    assert header =~ ~S(<button class="theme-toggle" type="button" aria-label="Toggle theme">)
+  end
+
+  test "entries link back to the log, not to a section" do
+    for file <- ["templates/article.html.eex", "templates/project.html.eex"] do
+      source = File.read!(file)
+      assert source =~ ~S(<p class="back"><a href="/">← log</a></p>), file
+      refute source =~ "@section", file
+    end
+  end
+
+  test "the 404 terminal is made of pre lines, so every line is mono" do
+    source = File.read!("templates/404.html.eex")
+    assert length(Regex.scan(~r/<pre class="terminal/, source)) == 2
+    refute source =~ ~r/<p[\s>]/
+  end
+
+  test "the layout preloads the Inter variable font and has no script flag for modules" do
+    layout = File.read!("templates/layout.html.eex")
+
+    assert layout =~
+             ~S(<link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>)
+
+    refute layout =~ "JetBrainsMono"
+    refute layout =~ ".module"
+  end
+
   test "a hostile title cannot break out of a template" do
     entry = %Site.Entry{
       type: :note,
@@ -126,12 +165,7 @@ defmodule Site.TemplatesTest do
     assert html =~ "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"
     refute html =~ "<script>"
 
-    article =
-      Site.Templates.article(%{
-        entry: entry,
-        section: "notes",
-        meta: Site.View.article_meta(entry)
-      })
+    article = Site.Templates.article(%{entry: entry, meta: Site.View.article_meta(entry)})
 
     refute article =~ "<script>"
     assert article =~ "<p>ok</p>"

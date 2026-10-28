@@ -33,6 +33,17 @@ defmodule Site.CSSTest do
     body
   end
 
+  # Every rule that sets `font-family`, as `{selector, value}`. Comments are
+  # stripped; at-rule wrappers such as @media are not rules, @font-face is.
+  defp font_family_rules do
+    css = Regex.replace(~r{/\*.*?\*/}s, @css, "")
+
+    for [_, selector, body] <- Regex.scan(~r/([^{}]+)\{([^{}]*)\}/, css),
+        [_, family] <- Regex.scan(~r/(?<![-\w])font-family:\s*([^;]+);/, body) do
+      {selector |> String.replace(~r/\s+/, " ") |> String.trim(), family}
+    end
+  end
+
   @light %{"bg" => "#f4efe4", "fg" => "#262523", "muted" => "#6b675f", "rule" => "#ddd6c8"}
   @dark %{"bg" => "#1e1d1b", "fg" => "#ece6d9", "muted" => "#9a958b", "rule" => "#34322f"}
 
@@ -57,26 +68,86 @@ defmodule Site.CSSTest do
     end
   end
 
-  test "the font faces are 400, 400 italic, 700 and 800, all swapping" do
+  test "the font faces are Inter (variable, normal and italic) and JetBrains Mono 400, all swapping" do
     faces = Regex.scan(~r/@font-face\s*\{(.*?)\}/s, @css) |> Enum.map(&List.last/1)
-    assert length(faces) == 4
+    assert length(faces) == 3
 
     expected = [
-      {"JetBrainsMono-Regular.woff2", "400", "normal"},
-      {"JetBrainsMono-Italic.woff2", "400", "italic"},
-      {"JetBrainsMono-Bold.woff2", "700", "normal"},
-      {"JetBrainsMono-ExtraBold.woff2", "800", "normal"}
+      {"Inter", "InterVariable.woff2", "100 900", "normal"},
+      {"Inter", "InterVariable-Italic.woff2", "100 900", "italic"},
+      {"JetBrains Mono", "JetBrainsMono-Regular.woff2", "400", "normal"}
     ]
 
-    for {file, weight, style} <- expected do
+    for {family, file, weight, style} <- expected do
       assert Enum.any?(faces, fn face ->
-               face =~ "/assets/fonts/#{file}" and face =~ "font-weight: #{weight};" and
-                 face =~ "font-style: #{style};" and face =~ "font-display: swap;"
+               face =~ ~s(font-family: "#{family}";) and face =~ "/assets/fonts/#{file}" and
+                 face =~ "font-weight: #{weight};" and face =~ "font-style: #{style};" and
+                 face =~ "font-display: swap;"
              end),
              "no @font-face for #{file}"
     end
 
-    for {file, _, _} <- expected, do: assert(File.exists?("assets/fonts/#{file}"))
+    for {_, file, _, _} <- expected, do: assert(File.exists?("assets/fonts/#{file}"))
+  end
+
+  test "the font files are WOFF2, the licences ship, and nothing unused is left" do
+    for file <- [
+          "InterVariable.woff2",
+          "InterVariable-Italic.woff2",
+          "JetBrainsMono-Regular.woff2"
+        ] do
+      assert <<"wOF2", _::binary>> = File.read!("assets/fonts/#{file}"), "#{file} is not WOFF2"
+    end
+
+    assert File.exists?("assets/fonts/Inter-OFL.txt")
+    assert File.exists?("assets/fonts/JetBrainsMono-OFL.txt")
+    refute File.exists?("assets/fonts/OFL.txt")
+
+    assert "assets/fonts/*" |> Path.wildcard() |> Enum.map(&Path.basename/1) |> Enum.sort() == [
+             "Inter-OFL.txt",
+             "InterVariable-Italic.woff2",
+             "InterVariable.woff2",
+             "JetBrainsMono-OFL.txt",
+             "JetBrainsMono-Regular.woff2"
+           ]
+  end
+
+  test "the font tokens: Inter for the text, JetBrains Mono for the few mono places" do
+    root = block(":root")
+
+    assert root =~
+             ~s(--font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;)
+
+    assert root =~
+             ~s(--font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;)
+
+    assert block("body") =~ "font-family: var(--font-sans);"
+  end
+
+  test "mono is used only for code, the log's hash and date, and the backdrop field" do
+    # outside the @font-face rules, the only rules that name a font
+    rules =
+      for {selector, family} <- font_family_rules(),
+          selector != "@font-face",
+          do: {selector, family}
+
+    assert Enum.sort(rules) ==
+             Enum.sort([
+               {"body", "var(--font-sans)"},
+               {"code, pre, kbd", "var(--font-mono)"},
+               {".log-hash, .log-date", "var(--font-mono)"},
+               {".field", "var(--font-mono)"}
+             ])
+  end
+
+  test "the field sets its own mono font, because field.js reads its computed font" do
+    assert block(".field") =~ "font-family: var(--font-mono);"
+  end
+
+  test "the log's type and title are sans: they set no font of their own" do
+    for selector <- [".log-type", ".log-title", ".log-row", ".log"] do
+      refute block(selector) =~ "font-family", "#{selector} sets a font"
+    end
   end
 
   test "the field has the metrics field.js reads" do
@@ -129,6 +200,64 @@ defmodule Site.CSSTest do
     assert block(".site-header,\nmain,\n.site-footer") =~ "margin-inline: auto;"
   end
 
+  test "entries are a centred reading column: 38-40rem of text, 1.0625-1.125rem body, 1.7 leading" do
+    [_, measure] =
+      Regex.run(~r/--column: calc\(([\d.]+)rem \+ 2 \* var\(--gutter\)\);/, block(":root"))
+
+    assert {rem, ""} = Float.parse(measure)
+    assert rem >= 38.0 and rem <= 40.0
+
+    prose = block(".prose")
+    [_, size] = Regex.run(~r/font-size: ([\d.]+)rem;/, prose)
+    assert {rem_size, ""} = Float.parse(size)
+    assert rem_size >= 1.0625 and rem_size <= 1.125
+    assert prose =~ "line-height: 1.7;"
+
+    # paragraphs and headings have room
+    assert block(".prose :is(p, ul, ol, pre, table, blockquote, figure)") =~ "margin: 0 0 1.35em;"
+    assert block(".prose h2") =~ ~r/margin: 2\.\d+rem 0 0\.\d+rem;/
+
+    # the paper column stays opaque: the field only shows in the side margins
+    assert block(".site-header,\nmain,\n.site-footer") =~ "background: var(--paper);"
+
+    # the meta line is small and muted
+    assert block(".meta") =~ "color: var(--muted);"
+    assert block(".meta") =~ "font-size: 0.875rem;"
+  end
+
+  test "every page shares one column width, and the home only drops the paper" do
+    home = block(~S|body[data-page="home"]|)
+    refute home =~ "--column:"
+    assert home =~ "--paper: transparent;"
+    assert length(Regex.scan(~r/--column:/, @css)) == 1
+  end
+
+  test "the shell has no nav, and the old list, page and uses/cv styles are gone" do
+    refute @css =~ "site-nav"
+    refute @css =~ "aria-current"
+    refute @css =~ ".list-page"
+    refute @css =~ ".lede"
+    refute @css =~ ".page table"
+    refute @css =~ ~r/data-page="(essays|notes|projects)"/
+
+    # the header is the name and the toggle, spaced apart
+    header = block(".site-header")
+    assert header =~ "justify-content: space-between;"
+    refute header =~ "flex-wrap"
+  end
+
+  test "type scale: 16-17px body, 1.6 leading, headings 650-700 with negative tracking" do
+    assert block("html") =~ "font-size: 16px;"
+    assert @css =~ ~r/@media \(min-width: 960px\)\s*\{\s*html\s*\{\s*font-size: 17px;/
+    assert block("body") =~ "font-size: 1rem;"
+    assert block("body") =~ "line-height: 1.6;"
+
+    headings = block("h1,\nh2,\nh3,\nh4")
+    [_, weight] = Regex.run(~r/font-weight: (\d+);/, headings)
+    assert String.to_integer(weight) in 650..700
+    assert headings =~ ~r/letter-spacing: -0\.0\d+em;/
+  end
+
   test "the split layout is gone: no hero, no sticky column, no field band" do
     refute @css =~ ".hero"
     refute @css =~ "sticky"
@@ -147,20 +276,36 @@ defmodule Site.CSSTest do
     assert block(".log-section .log-row") =~ ~r/padding: 0\.9\d*rem 0;/
   end
 
-  test "the log grid is in ch units and collapses under 600px" do
-    assert block(".log-row") =~ "grid-template-columns: 7ch 10ch 7ch minmax(0, 1fr);"
+  test "the log grid lines up whatever the row font is, and collapses under 600px" do
+    # the mono columns are as wide as 7 and 10 of their own characters ...
+    assert @css =~ ~r/\n\.log-hash \{\s*width: 7ch;/
+    assert @css =~ ~r/\n\.log-date \{\s*width: 10ch;/
+
+    # ... and the grid sizes them to that, then gives the sans type a fixed track in em
+    assert block(".log-row") =~
+             "grid-template-columns: max-content max-content 3.75em minmax(0, 1fr);"
+
+    # two lines under 600px: hash and date, then type and title
     assert @css =~ "@media (max-width: 599.98px)"
+    assert @css =~ "grid-template-columns: 4em minmax(0, 1fr);"
+
+    for {cell, area} <- [
+          {".log-hash", "1 / 1"},
+          {".log-date", "1 / 2"},
+          {".log-type", "2 / 1"},
+          {".log-title", "2 / 2"}
+        ] do
+      assert @css =~ ~r/#{Regex.escape(cell)} \{\s*grid-area: #{Regex.escape(area)};/
+    end
   end
 
-  test "headings are 800 weight, links invert, selection inverts" do
-    assert block("h1,\nh2,\nh3,\nh4") =~ "font-weight: 800;"
-
+  test "links invert, selection inverts" do
     assert @css =~
              ~r/a\[href\]:hover,\s*a\[href\]:focus-visible[^{]*\{\s*background: var\(--fg\);\s*color: var\(--bg\);/
 
     assert block("::selection") =~ "background: var(--fg);"
     assert block(":focus-visible") =~ "outline: 2px solid var(--fg);"
-    assert block("h1") =~ "clamp(1.9rem, 1.2rem + 3vw, 3.25rem)"
+    assert block("h1") =~ "clamp(1.875rem, 1.3rem + 2.2vw, 2.5rem)"
   end
 
   test "nothing is loaded from elsewhere" do

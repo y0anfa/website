@@ -12,24 +12,6 @@ defmodule Site.View do
           optional(:datetime) => String.t() | nil
         }
 
-  @doc """
-  The primary navigation. `current` is the active section (or `nil`); `exact?` is
-  true on the section's own page and false on a page inside it.
-  """
-  @spec nav(String.t() | nil, boolean()) :: [map()]
-  def nav(current, exact?) do
-    for section <- Site.Config.nav() do
-      aria =
-        cond do
-          section != current -> nil
-          exact? -> "page"
-          true -> "true"
-        end
-
-      %{label: section, href: "/#{section}/", aria_current: aria}
-    end
-  end
-
   @doc "The label and link of the footer's `built from` text."
   @spec build_info(%{sha: String.t(), dirty?: boolean()} | nil) :: %{
           label: String.t(),

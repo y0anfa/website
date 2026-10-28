@@ -17,21 +17,25 @@ defmodule Site.Templates do
   @templates [
     layout: "layout.html.eex",
     home: "home.html.eex",
-    list: "list.html.eex",
     article: "article.html.eex",
     project: "project.html.eex",
-    page: "page.html.eex",
     not_found: "404.html.eex",
-    header: "_header.html.eex",
     footer: "_footer.html.eex",
     log: "_log.html.eex",
     meta: "_meta.html.eex"
   ]
 
+  # Nothing to interpolate: these take no assigns.
+  @static [header: "_header.html.eex"]
+
   @doc "The template files, as `{function name, absolute path}`."
-  def files, do: for({name, file} <- @templates, do: {name, Path.join(@dir, file)})
+  def files, do: for({name, file} <- @templates ++ @static, do: {name, Path.join(@dir, file)})
 
   for {name, file} <- @templates do
     EEx.function_from_file(:def, name, Path.join(@dir, file), [:assigns], trim: true)
+  end
+
+  for {name, file} <- @static do
+    EEx.function_from_file(:def, name, Path.join(@dir, file), [], trim: true)
   end
 end

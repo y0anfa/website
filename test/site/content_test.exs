@@ -16,10 +16,8 @@ defmodule Site.ContentTest do
       %{content: Content.load(fixtures())}
     end
 
-    test "loads every type", %{content: content} do
-      assert %Site.Doc{key: :home, title: "Test Person"} = content.home
-      assert %Site.Doc{key: :uses} = content.uses
-      assert %Site.Doc{key: :cv} = content.cv
+    test "loads the home and every type", %{content: content} do
+      assert %Site.Doc{title: "Test Person"} = content.home
       assert Enum.map(content.essays, & &1.slug) == ["first-essay", "second-essay"]
       assert Enum.map(content.notes, & &1.slug) == ["escape-me", "small-note"]
       assert Enum.map(content.projects, & &1.slug) == ["widget"]
@@ -36,8 +34,21 @@ defmodule Site.ContentTest do
     test "slugs lose the extension and the date prefix", %{content: content} do
       first = Enum.find(content.essays, &(&1.title == "First essay"))
       assert first.slug == "first-essay"
-      assert Entry.path(first) == "/essays/first-essay/"
+      assert Entry.path(first) == "/first-essay/"
       assert Enum.find(content.essays, &(&1.title == "Second essay")).slug == "second-essay"
+    end
+
+    test "every entry has a flat path, whatever its type", %{content: content} do
+      paths = content |> Content.entries() |> Enum.map(&Entry.path/1) |> Enum.sort()
+
+      assert paths ==
+               ["/escape-me/", "/first-essay/", "/second-essay/", "/small-note/", "/widget/"]
+    end
+
+    test "the content folder sets the type", %{content: content} do
+      assert Enum.all?(content.essays, &(&1.type == :essay))
+      assert Enum.all?(content.notes, &(&1.type == :note))
+      assert Enum.all?(content.projects, &(&1.type == :project))
     end
 
     test "dates are parsed", %{content: content} do
@@ -73,7 +84,6 @@ defmodule Site.ContentTest do
     test "Markdown is rendered to HTML", %{content: content} do
       assert content.home.html =~ ~s(<a href="https://example.com/">link</a>)
       assert content.home.tagline == "Fixture tagline for the home page."
-      assert content.uses.html =~ "<table>"
     end
   end
 
@@ -126,24 +136,64 @@ defmodule Site.ContentTest do
       assert error.message =~ "`draft` must be true or false"
     end
 
-    test "a duplicate slug within a type" do
+    test "a duplicate slug within a type, naming both files" do
       note = "---\ntitle: N\ndate: 2026-10-28\n---\nbody"
 
       error =
         load_error(%{"notes/2026-10-28-same.md" => note, "notes/same.md" => note})
 
-      assert error.message =~ "duplicate note slug \"same\""
-      assert error.message =~ "2026-10-28-same.md"
+      assert error.message =~ "duplicate slug \"same\""
+      assert error.message =~ "notes/2026-10-28-same.md"
+      assert error.message =~ "notes/same.md"
     end
 
-    test "the same slug in different types is fine" do
-      note = "---\ntitle: N\ndate: 2026-10-28\n---\nbody"
-      essay = note
+    test "slugs are unique across all types, naming both files" do
+      entry = "---\ntitle: N\ndate: 2026-10-28\n---\nbody"
+      project = "---\ntitle: N\ndate: 2026-10-28\ntagline: t\n---\nbody"
+
+      error = load_error(%{"essays/same.md" => entry, "notes/same.md" => entry})
+      assert error.message =~ "duplicate slug \"same\""
+      assert error.message =~ "essays/same.md"
+      assert error.message =~ "notes/same.md"
+
+      error = load_error(%{"projects/2026-10-28-rhino.md" => project, "notes/rhino.md" => entry})
+      assert error.message =~ "duplicate slug \"rhino\""
+      assert error.message =~ "projects/2026-10-28-rhino.md"
+      assert error.message =~ "notes/rhino.md"
+    end
+
+    test "a slug used three times is one problem listing every file" do
+      entry = "---\ntitle: N\ndate: 2026-10-28\n---\nbody"
+      project = "---\ntitle: N\ndate: 2026-10-28\ntagline: t\n---\nbody"
+
+      error =
+        load_error(%{"essays/x.md" => entry, "notes/x.md" => entry, "projects/x.md" => project})
+
+      assert error.message =~ "1 problem(s)"
+      assert error.message =~ ~r/essays\/x\.md, .*notes\/x\.md, .*projects\/x\.md/
+    end
+
+    test "reserved slugs are refused, whatever the type" do
+      entry = "---\ntitle: N\ndate: 2026-10-28\n---\nbody"
+      project = "---\ntitle: N\ndate: 2026-10-28\ntagline: t\n---\nbody"
+
+      for slug <- ~w(assets 404 index robots.txt _headers _redirects blog projects resume) do
+        error = load_error(%{"notes/#{slug}.md" => entry})
+        assert error.message =~ "notes/#{slug}.md: slug #{inspect(slug)} is reserved", slug
+
+        error = load_error(%{"projects/2026-10-28-#{slug}.md" => project})
+        assert error.message =~ "slug #{inspect(slug)} is reserved", slug
+      end
+    end
+
+    test "a reserved word inside a longer slug is fine" do
+      entry = "---\ntitle: N\ndate: 2026-10-28\n---\nbody"
 
       content =
-        minimal_content(%{"notes/same.md" => note, "essays/same.md" => essay}) |> Content.load()
+        minimal_content(%{"notes/assets-audit.md" => entry, "notes/index-funds.md" => entry})
+        |> Content.load()
 
-      assert length(Content.entries(content)) == 2
+      assert Enum.map(content.notes, & &1.slug) == ["assets-audit", "index-funds"]
     end
 
     test "a duplicate slug involving a skipped draft is not an error" do
@@ -167,18 +217,25 @@ defmodule Site.ContentTest do
       assert error.message =~ "notes/n.md: missing frontmatter"
     end
 
-    test "pages need a title and a description" do
+    test "the home needs a title and a description" do
       dir = minimal_content()
-      File.write!(Path.join(dir, "cv.md"), "---\ntitle: cv\n---\nbody")
+      File.write!(Path.join(dir, "home.md"), "---\ntitle: t\n---\nbody")
       error = assert_raise Site.Error, fn -> Content.load(dir) end
-      assert error.message =~ "cv.md: missing required field `description`"
+      assert error.message =~ "home.md: missing required field `description`"
     end
 
-    test "a missing page file is an error" do
+    test "a missing home file is an error" do
       dir = minimal_content()
-      File.rm!(Path.join(dir, "uses.md"))
+      File.rm!(Path.join(dir, "home.md"))
       error = assert_raise Site.Error, fn -> Content.load(dir) end
-      assert error.message =~ "uses.md: cannot read file"
+      assert error.message =~ "home.md: cannot read file"
+    end
+
+    test "the content is the home and the three entry types, with no uses or cv page" do
+      content = Content.load(minimal_content())
+
+      assert content |> Map.from_struct() |> Map.keys() |> Enum.sort() ==
+               [:essays, :home, :notes, :projects]
     end
 
     test "all problems are reported together" do

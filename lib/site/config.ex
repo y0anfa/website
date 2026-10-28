@@ -1,25 +1,28 @@
 defmodule Site.Config do
   @moduledoc """
-  Constants of the site: identity, URLs, navigation, and the one-line sentence
-  shown under each list page title.
+  Constants of the site: identity, URLs, entry types, legacy redirects, and the
+  slugs that entries may not use.
   """
 
   @url "https://yoanfau.re"
 
   @types [
-    # type, section (directory and URL segment), log sort rank
-    essay: %{section: "essays", rank: 0},
-    project: %{section: "projects", rank: 1},
-    note: %{section: "notes", rank: 2}
+    # type, content directory under content/, log sort rank
+    essay: %{dir: "essays", rank: 0},
+    project: %{dir: "projects", rank: 1},
+    note: %{dir: "notes", rank: 2}
   ]
 
-  @nav ["essays", "notes", "projects", "uses", "cv"]
+  # Old Hugo URLs, sent to the flat URLs of this site: from, to, status.
+  @redirects [
+    {"/blog/*", "/:splat", 301},
+    {"/projects/*", "/:splat", 301},
+    {"/resume/", "/", 301},
+    {"/resume", "/", 301}
+  ]
 
-  @list_intros %{
-    "essays" => "Longer pieces on security and the things I build.",
-    "notes" => "Short notes, one idea each.",
-    "projects" => "Things I have built."
-  }
+  # Top-level names of files and directories the build writes.
+  @site_paths ~w(assets 404 404.html index index.html robots.txt _headers _redirects)
 
   def name, do: "Yoan Faure"
   def home_title, do: "Yoan Faure — security engineer who builds"
@@ -27,20 +30,28 @@ defmodule Site.Config do
   def email, do: "hello@yoanfau.re"
   def linkedin, do: "https://linkedin.com/in/yoan-faure"
 
-  @doc "Navigation sections, in display order."
-  def nav, do: @nav
-
   @doc "Entry types that appear in the log."
   def types, do: Keyword.keys(@types)
 
-  @doc "Section name for an entry type (`:essay` -> `\"essays\"`)."
-  def section(type), do: @types[type].section
+  @doc "Content directory of an entry type (`:essay` -> `\"essays\"`). It sets the type, not the URL."
+  def dir(type), do: @types[type].dir
 
   @doc "Sort rank of an entry type in the log (essay, project, note)."
   def rank(type), do: @types[type].rank
 
-  @doc "The plain sentence under a list page title."
-  def list_intro(section), do: Map.fetch!(@list_intros, section)
+  @doc "Legacy redirects as `{from, to, status}`, in file order."
+  def redirects, do: @redirects
+
+  @doc """
+  Slugs no entry may use, because `/<slug>/` would collide with a site path or
+  be taken over by a legacy redirect (`blog`, `projects`, `resume`).
+  """
+  def reserved_slugs do
+    redirected =
+      for {from, _to, _status} <- @redirects, do: from |> String.split("/") |> Enum.at(1)
+
+    Enum.sort(Enum.uniq(@site_paths ++ redirected))
+  end
 
   @doc "Absolute URL for a site path."
   def absolute(path), do: @url <> path

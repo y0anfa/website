@@ -5,13 +5,14 @@ defmodule Site.Build do
   1. Load and validate `content/` (nothing is written if this fails).
   2. Read git info for the footer.
   3. Render the pages.
-  4. Clean the output directory and write pages, assets, `_headers`, `robots.txt`.
+  4. Clean the output directory and write pages, assets, `_headers`, `_redirects`
+     and `robots.txt`.
 
   The output is deterministic: no timestamps, sorted iteration, so the same
   commit, content and environment always produce byte-identical trees.
   """
 
-  alias Site.{Content, Headers, Render}
+  alias Site.{Content, Headers, Redirects, Render}
 
   @beacon_token ~r/\A[A-Za-z0-9_-]+\z/
 
@@ -62,6 +63,7 @@ defmodule Site.Build do
 
     extras = [
       {"_headers", Headers.render(Headers.script_hash(head_js), beacon: beacon_token != nil)},
+      {"_redirects", Redirects.render()},
       {"robots.txt", "User-agent: *\nAllow: /\n"}
     ]
 

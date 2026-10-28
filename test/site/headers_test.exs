@@ -75,7 +75,7 @@ defmodule Site.HeadersTest do
     end
 
     test "/* matches every path", %{rules: rules} do
-      for path <- ["/", "/essays/", "/assets/js/field.js", "/404.html"] do
+      for path <- ["/", "/rhino/", "/assets/js/field.js", "/404.html"] do
         headers = Headers.for_path(rules, path)
         assert {"X-Content-Type-Options", "nosniff"} in headers
         refute Enum.any?(headers, &match?({"Cache-Control", _}, &1))
@@ -83,7 +83,7 @@ defmodule Site.HeadersTest do
     end
 
     test "fonts get both rules", %{rules: rules} do
-      headers = Headers.for_path(rules, "/assets/fonts/JetBrainsMono-Regular.woff2")
+      headers = Headers.for_path(rules, "/assets/fonts/InterVariable.woff2")
       assert {"Cache-Control", "public, max-age=31536000, immutable"} in headers
       assert {"X-Frame-Options", "DENY"} in headers
     end

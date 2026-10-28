@@ -38,9 +38,9 @@ defmodule Site.TestHelpers do
 
   @doc "Minimal valid content with extra files merged in."
   def minimal_content(extra \\ %{}) do
-    page = "---\ntitle: t\ndescription: d\n---\nbody\n"
+    home = "---\ntitle: t\ndescription: d\n---\nbody\n"
 
-    write_content(Map.merge(%{"home.md" => page, "uses.md" => page, "cv.md" => page}, extra))
+    write_content(Map.merge(%{"home.md" => home}, extra))
   end
 
   @doc "Reads every file under `dir` into `%{relative_path => content}`."

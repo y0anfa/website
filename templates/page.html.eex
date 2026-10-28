@@ -1,4 +1,0 @@
-<article class="prose page">
-  <h1><%= escape(@doc.title) %></h1>
-<%= raw(@doc.html) %>
-</article>

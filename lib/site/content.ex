@@ -31,18 +31,17 @@ defmodule Site.Entry do
           stack: [String.t()]
         }
 
-  @doc "URL path of the entry, with trailing slash."
+  @doc "URL path of the entry, flat and with a trailing slash: `/rhino/`."
   @spec path(t()) :: String.t()
-  def path(%__MODULE__{type: type, slug: slug}), do: "/#{Site.Config.section(type)}/#{slug}/"
+  def path(%__MODULE__{slug: slug}), do: "/#{slug}/"
 end
 
 defmodule Site.Doc do
-  @moduledoc "A single page written in Markdown: home, uses or cv."
+  @moduledoc "A single page written in Markdown: the home intro."
 
-  defstruct [:key, :title, :description, :tagline, :html, :file]
+  defstruct [:title, :description, :tagline, :html, :file]
 
   @type t :: %__MODULE__{
-          key: :home | :uses | :cv,
           title: String.t(),
           description: String.t(),
           tagline: String.t() | nil,
@@ -55,18 +54,20 @@ defmodule Site.Content do
   @moduledoc """
   Loads and validates everything under `content/`.
 
+  The content directory (`essays/`, `notes/`, `projects/`) sets an entry's type,
+  but every entry lives at `/<slug>/`, so slugs are unique across all types and
+  may not be one of `Site.Config.reserved_slugs/0`.
+
   All problems are collected and raised together as one `Site.Error`, so a bad
   build lists every file that needs fixing instead of just the first.
   """
 
   alias Site.{Doc, Entry}
 
-  defstruct [:home, :uses, :cv, essays: [], notes: [], projects: []]
+  defstruct [:home, essays: [], notes: [], projects: []]
 
   @type t :: %__MODULE__{
           home: Doc.t(),
-          uses: Doc.t(),
-          cv: Doc.t(),
           essays: [Entry.t()],
           notes: [Entry.t()],
           projects: [Entry.t()]
@@ -85,9 +86,7 @@ defmodule Site.Content do
   def load(dir, opts \\ []) do
     drafts? = Keyword.get(opts, :drafts, false)
 
-    docs =
-      for {key, file} <- [home: "home.md", uses: "uses.md", cv: "cv.md"],
-          do: load_doc(key, Path.join(dir, file))
+    home_result = load_home(Path.join(dir, "home.md"))
 
     entries =
       for type <- Site.Config.types() do
@@ -95,7 +94,7 @@ defmodule Site.Content do
       end
 
     errors =
-      Enum.flat_map(docs, fn {_key, result} -> errors(result) end) ++
+      errors(home_result) ++
         Enum.flat_map(entries, fn {_type, results} -> Enum.flat_map(results, &errors/1) end) ++
         duplicate_errors(entries)
 
@@ -103,13 +102,11 @@ defmodule Site.Content do
       raise Site.Error, message: format_errors(errors)
     end
 
-    [home, uses, cv] = for {_key, {:ok, doc}} <- docs, do: doc
+    {:ok, home} = home_result
     by_type = Map.new(entries, fn {type, results} -> {type, sorted(results)} end)
 
     %__MODULE__{
       home: home,
-      uses: uses,
-      cv: cv,
       essays: by_type.essay,
       notes: by_type.note,
       projects: by_type.project
@@ -134,35 +131,31 @@ defmodule Site.Content do
     file |> Path.basename(".md") |> String.replace(@date_prefix, "", global: false)
   end
 
-  # -- single pages ---------------------------------------------------------
+  # -- home -----------------------------------------------------------------
 
-  defp load_doc(key, file) do
-    result =
-      with {:ok, meta, body} <- read(file),
-           {:ok, title} <- required_string(meta, "title", file),
-           {:ok, description} <- required_string(meta, "description", file),
-           {:ok, tagline} <- optional_string(meta, "tagline", file) do
-        %{html: html} = Site.Markdown.render(body)
+  defp load_home(file) do
+    with {:ok, meta, body} <- read(file),
+         {:ok, title} <- required_string(meta, "title", file),
+         {:ok, description} <- required_string(meta, "description", file),
+         {:ok, tagline} <- optional_string(meta, "tagline", file) do
+      %{html: html} = Site.Markdown.render(body)
 
-        {:ok,
-         %Doc{
-           key: key,
-           title: title,
-           description: description,
-           tagline: tagline,
-           html: html,
-           file: file
-         }}
-      end
-
-    {key, result}
+      {:ok,
+       %Doc{
+         title: title,
+         description: description,
+         tagline: tagline,
+         html: html,
+         file: file
+       }}
+    end
   end
 
   # -- log entries ----------------------------------------------------------
 
   defp load_entries(type, dir, drafts?) do
     dir
-    |> Path.join(Site.Config.section(type))
+    |> Path.join(Site.Config.dir(type))
     |> Path.join("*.md")
     |> Path.wildcard()
     |> Enum.sort()
@@ -215,11 +208,22 @@ defmodule Site.Content do
   defp check_slug(file) do
     slug = slug(file)
 
-    if Regex.match?(@slug, slug) do
-      {:ok, slug}
-    else
-      {:error,
-       [problem(file, "slug #{inspect(slug)} must be lowercase letters, digits and hyphens")]}
+    cond do
+      slug in Site.Config.reserved_slugs() ->
+        {:error,
+         [
+           problem(
+             file,
+             "slug #{inspect(slug)} is reserved: /#{slug}/ would collide with a site path"
+           )
+         ]}
+
+      Regex.match?(@slug, slug) ->
+        {:ok, slug}
+
+      true ->
+        {:error,
+         [problem(file, "slug #{inspect(slug)} must be lowercase letters, digits and hyphens")]}
     end
   end
 
@@ -227,12 +231,23 @@ defmodule Site.Content do
     for({:ok, entry} <- results, do: entry) |> Enum.sort_by(& &1.slug)
   end
 
+  # Every entry lives at /<slug>/, whatever its type, so a slug may be used once.
   defp duplicate_errors(entries) do
-    for {type, results} <- entries,
-        {slug, [_, _ | _] = group} <- Enum.group_by(for({:ok, e} <- results, do: e), & &1.slug),
-        do:
-          "duplicate #{type} slug #{inspect(slug)}: " <>
+    for {_type, results} <- entries, {:ok, entry} <- results do
+      entry
+    end
+    |> Enum.group_by(& &1.slug)
+    |> Enum.sort()
+    |> Enum.flat_map(fn
+      {slug, [_, _ | _] = group} ->
+        [
+          "duplicate slug #{inspect(slug)}: " <>
             Enum.map_join(Enum.sort_by(group, & &1.file), ", ", & &1.file)
+        ]
+
+      _unique ->
+        []
+    end)
   end
 
   # -- field validation -----------------------------------------------------

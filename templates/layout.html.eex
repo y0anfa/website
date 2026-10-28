@@ -13,17 +13,17 @@
 <meta property="og:type" content="<%= escape(@og_type) %>">
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="preload" href="/assets/fonts/JetBrainsMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
 <script><%= raw(@head_js) %></script>
 <link rel="stylesheet" href="/assets/css/site.css">
 <script type="module" src="/assets/js/field.js"></script>
-<%= for script <- @scripts do %><script<%= if script.module do %> type="module"<% else %> defer<% end %> src="<%= escape(script.src) %>"></script>
+<%= for src <- @scripts do %><script defer src="<%= escape(src) %>"></script>
 <% end %><%= if @beacon_token do %><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"<%= escape(@beacon_token) %>"}'></script>
 <% end %></head>
 <body data-page="<%= escape(@page_key) %>">
 <a class="skip-link" href="#main">skip to content</a>
 <div class="field" data-field-root aria-hidden="true"><canvas class="field-canvas"></canvas></div>
-<%= header(%{nav: @nav}) %>
+<%= header() %>
 <main id="main">
 <%= raw(@content) %>
 </main>

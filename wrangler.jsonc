@@ -13,7 +13,7 @@
     "directory": "./dist",
     // Unknown paths serve dist/404.html with a 404 status.
     "not_found_handling": "404-page",
-    // /essays/x serves /essays/x/index.html; /essays/x/ also resolves.
+    // /rhino serves /rhino/index.html; /rhino/ also resolves.
     "html_handling": "auto-trailing-slash"
   }
 }

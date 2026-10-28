@@ -7,20 +7,18 @@ defmodule Site.BuildTest do
 
   @head_js File.read!("assets/js/head.js") |> String.trim()
 
+  # The home, the 404, and one flat page per entry (essays, notes and projects alike).
   @pages ~w(
     404.html
-    cv/index.html
-    essays/first-essay/index.html
-    essays/index.html
-    essays/second-essay/index.html
+    escape-me/index.html
+    first-essay/index.html
     index.html
-    notes/escape-me/index.html
-    notes/index.html
-    notes/small-note/index.html
-    projects/index.html
-    projects/widget/index.html
-    uses/index.html
+    second-essay/index.html
+    small-note/index.html
+    widget/index.html
   )
+
+  @extras ~w(_headers _redirects robots.txt)
 
   # One shared, read-only build of the fixtures; tests that change things build their own.
   setup_all do
@@ -31,25 +29,48 @@ defmodule Site.BuildTest do
   defp page(tree, path), do: Map.fetch!(tree, path)
 
   describe "output" do
-    test "writes every page of the URL map, plus _headers and robots.txt", %{tree: tree} do
+    test "writes every page of the URL map, plus _headers, _redirects and robots.txt",
+         %{tree: tree} do
       files = Map.keys(tree)
 
-      for path <- @pages ++ ["_headers", "robots.txt"],
-          do: assert(path in files, "missing #{path}")
+      for path <- @pages ++ @extras, do: assert(path in files, "missing #{path}")
 
       non_assets = Enum.reject(files, &String.starts_with?(&1, "assets/"))
-      assert Enum.sort(non_assets) == Enum.sort(@pages ++ ["_headers", "robots.txt"])
+      assert Enum.sort(non_assets) == Enum.sort(@pages ++ @extras)
+    end
+
+    test "every entry is one flat page, whatever its type", %{tree: tree} do
+      # an essay, a note and a project all live at /<slug>/
+      assert page(tree, "first-essay/index.html") =~ "<h1>First essay</h1>"
+      assert page(tree, "small-note/index.html") =~ "<h1>Small note</h1>"
+      assert page(tree, "widget/index.html") =~ "<h1>widget</h1>"
+
+      # and the folders of the content tree are not URL segments
+      for dir <- ~w(essays notes projects uses cv) do
+        refute Enum.any?(Map.keys(tree), &String.starts_with?(&1, dir <> "/")),
+               "#{dir}/ was written"
+      end
     end
 
     test "does not write drafts", %{tree: tree} do
-      refute Map.has_key?(tree, "essays/an-unfinished-draft/index.html")
-      refute tree |> page("essays/index.html") |> String.contains?("unfinished")
+      refute Map.has_key?(tree, "an-unfinished-draft/index.html")
+      refute tree |> page("index.html") |> String.contains?("unfinished")
     end
 
     test "writes drafts with drafts: true" do
       tree = [drafts: true] |> build_fixtures() |> read_tree()
-      assert page(tree, "essays/an-unfinished-draft/index.html") =~ "An unfinished draft"
+      assert page(tree, "an-unfinished-draft/index.html") =~ "An unfinished draft"
       assert page(tree, "index.html") =~ "An unfinished draft"
+    end
+
+    test "_redirects sends the old Hugo URLs to the flat ones, in a fixed order", %{tree: tree} do
+      assert page(tree, "_redirects") ==
+               "/blog/* /:splat 301\n" <>
+                 "/projects/* /:splat 301\n" <>
+                 "/resume/ / 301\n" <>
+                 "/resume / 301\n"
+
+      assert page(tree, "_redirects") == Site.Redirects.render()
     end
 
     test "robots.txt allows everything and names no sitemap", %{tree: tree} do
@@ -96,36 +117,34 @@ defmodule Site.BuildTest do
       assert page(tree, "index.html") =~
                "<title>Yoan Faure — security engineer who builds</title>"
 
-      assert page(tree, "essays/index.html") =~ "<title>essays — Yoan Faure</title>"
-
-      assert page(tree, "essays/first-essay/index.html") =~
+      assert page(tree, "first-essay/index.html") =~
                "<title>First essay — Yoan Faure</title>"
 
-      assert page(tree, "uses/index.html") =~ "<title>uses — Yoan Faure</title>"
+      assert page(tree, "widget/index.html") =~ "<title>widget — Yoan Faure</title>"
       assert page(tree, "404.html") =~ "<title>Not found — Yoan Faure</title>"
     end
 
     test "description, canonical, Open Graph, Twitter card, favicon, font preload", %{tree: tree} do
-      html = page(tree, "essays/second-essay/index.html")
+      html = page(tree, "second-essay/index.html")
 
       assert html =~
                ~s(<meta name="description" content="A second essay, with its own description.">)
 
-      assert html =~ ~s(<link rel="canonical" href="https://yoanfau.re/essays/second-essay/">)
+      assert html =~ ~s(<link rel="canonical" href="https://yoanfau.re/second-essay/">)
       assert html =~ ~s(<meta property="og:title" content="Second essay — Yoan Faure">)
 
       assert html =~
                ~s(<meta property="og:description" content="A second essay, with its own description.">)
 
       assert html =~
-               ~s(<meta property="og:url" content="https://yoanfau.re/essays/second-essay/">)
+               ~s(<meta property="og:url" content="https://yoanfau.re/second-essay/">)
 
       assert html =~ ~s(<meta property="og:type" content="article">)
       assert html =~ ~s(<meta name="twitter:card" content="summary">)
       assert html =~ ~s(<link rel="icon" href="/assets/favicon.svg")
 
       assert html =~
-               ~s(<link rel="preload" href="/assets/fonts/JetBrainsMono-Regular.woff2" as="font" type="font/woff2" crossorigin>)
+               ~s(<link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>)
 
       assert page(tree, "index.html") =~ ~s(<link rel="canonical" href="https://yoanfau.re/">)
       assert page(tree, "index.html") =~ ~s(<meta property="og:type" content="website">)
@@ -161,7 +180,6 @@ defmodule Site.BuildTest do
         assert html =~ ~s(<a class="skip-link" href="#main">), path
         assert html =~ ~s(<header class="site-header">), path
         assert html =~ ~s(<a class="brand" href="/">yoan faure</a>), path
-        assert html =~ ~s(<nav class="site-nav" aria-label="Primary">), path
 
         assert html =~ ~s(<button class="theme-toggle" type="button" aria-label="Toggle theme">),
                path
@@ -176,29 +194,21 @@ defmodule Site.BuildTest do
       end
     end
 
-    test "the nav lists the five sections in order", %{tree: tree} do
-      html = page(tree, "essays/index.html")
-      [_, nav] = Regex.run(~r{<nav class="site-nav".*?</nav>}s, html) |> then(&[nil, hd(&1)])
-      labels = Regex.scan(~r{>([a-z]+)</a>}, nav) |> Enum.map(&List.last/1)
-      assert labels == ~w(essays notes projects uses cv)
-    end
+    test "the header is the name and the theme toggle, and nothing else", %{tree: tree} do
+      for path <- @pages do
+        html = page(tree, path)
+        [header] = Regex.run(~r{<header class="site-header">.*?</header>}s, html)
 
-    test "aria-current marks the active section", %{tree: tree} do
-      assert page(tree, "essays/index.html") =~
-               ~s(<a href="/essays/" aria-current="page">essays</a>)
+        assert header =~ ~s(<a class="brand" href="/">yoan faure</a>), path
+        assert header =~ ~s(<button class="theme-toggle"), path
+        assert length(Regex.scan(~r/<a[\s>]/, header)) == 1, path
+        assert length(Regex.scan(~r/<button[\s>]/, header)) == 1, path
 
-      assert page(tree, "uses/index.html") =~ ~s(<a href="/uses/" aria-current="page">uses</a>)
-      assert page(tree, "cv/index.html") =~ ~s(<a href="/cv/" aria-current="page">cv</a>)
-      # inside a section the section is marked as the current parent
-      assert page(tree, "notes/small-note/index.html") =~
-               ~s(<a href="/notes/" aria-current="true">notes</a>)
-
-      assert page(tree, "projects/widget/index.html") =~
-               ~s(<a href="/projects/" aria-current="true">projects</a>)
-
-      refute page(tree, "index.html") =~ "aria-current"
-      refute page(tree, "404.html") =~ "aria-current"
-      assert length(Regex.scan(~r/aria-current/, page(tree, "essays/index.html"))) == 1
+        # no navigation anywhere on the page
+        refute html =~ "<nav", path
+        refute html =~ "site-nav", path
+        refute html =~ "aria-current", path
+      end
     end
 
     test "the footer says unversioned or links the HEAD commit", %{tree: tree} do
@@ -298,11 +308,11 @@ defmodule Site.BuildTest do
         Regex.scan(~r{<a class="log-title" href="([^"]+)">}, html) |> Enum.map(&List.last/1)
 
       assert titles == [
-               "/essays/second-essay/",
-               "/projects/widget/",
-               "/notes/small-note/",
-               "/notes/escape-me/",
-               "/essays/first-essay/"
+               "/second-essay/",
+               "/widget/",
+               "/small-note/",
+               "/escape-me/",
+               "/first-essay/"
              ]
 
       assert length(Regex.scan(~s(<a class="log-hash">·······</a>) |> Regex.compile!(), html)) ==
@@ -312,30 +322,39 @@ defmodule Site.BuildTest do
       assert html =~ ~s(<span class="log-type">project</span>)
     end
 
-    test "list pages reuse the log, filtered by type", %{tree: tree} do
-      essays = page(tree, "essays/index.html")
-      assert essays =~ "<h1>essays</h1>"
-      assert essays =~ ~s(<p class="lede">)
-      assert length(Regex.scan(~r/class="log-row"/, essays)) == 2
-      refute essays =~ "widget"
+    test "the log is the only list: no list pages, and no link to one", %{tree: tree} do
+      html = page(tree, "index.html")
 
-      assert length(Regex.scan(~r/class="log-row"/, page(tree, "notes/index.html"))) == 2
-      assert length(Regex.scan(~r/class="log-row"/, page(tree, "projects/index.html"))) == 1
+      assert length(Regex.scan(~r/class="log-row"/, html)) == 5
+      refute html =~ ~r{href="/(essays|notes|projects|uses|cv)/}
+
+      for {path, content} <- tree, String.ends_with?(path, ".html") do
+        refute content =~ ~s(class="list-page"), path
+        refute content =~ ~s(class="lede"), path
+      end
     end
 
-    test "an empty section says so" do
+    test "each row says what the entry is: essay, note or project", %{tree: tree} do
+      html = page(tree, "index.html")
+
+      assert length(Regex.scan(~r{<span class="log-type">essay</span>}, html)) == 2
+      assert length(Regex.scan(~r{<span class="log-type">note</span>}, html)) == 2
+      assert length(Regex.scan(~r{<span class="log-type">project</span>}, html)) == 1
+    end
+
+    test "an empty log says so" do
       dir = minimal_content()
       out = Path.join(tmp_dir(), "dist")
       Build.run(content: dir, out: out, beacon_token: nil)
 
-      assert out |> Path.join("essays/index.html") |> File.read!() =~
+      assert out |> Path.join("index.html") |> File.read!() =~
                ~s(<p class="empty">nothing here yet.</p>)
     end
   end
 
-  describe "articles, projects, pages" do
+  describe "entries and the 404" do
     test "an article has the meta line, the body and the back link", %{tree: tree} do
-      html = page(tree, "essays/first-essay/index.html")
+      html = page(tree, "first-essay/index.html")
 
       assert html =~ ~s(<article class="prose">)
 
@@ -344,15 +363,19 @@ defmodule Site.BuildTest do
 
       assert html =~ "<h1>First essay</h1>"
       assert html =~ ~s(<h2 id="a-heading">)
-      assert html =~ ~s(<p class="back"><a href="/essays/">← essays</a></p>)
+      assert html =~ ~s(<p class="back"><a href="/">← log</a></p>)
       assert html =~ "<table>"
       assert html =~ ~s(<pre><code class="language-sh">)
 
-      assert page(tree, "notes/small-note/index.html") =~ ~s(<a href="/notes/">← notes</a>)
+      note = page(tree, "small-note/index.html")
+      assert note =~ ~s(<p class="back"><a href="/">← log</a></p>)
+
+      assert note =~
+               ~s(<p class="meta"><span>note</span> · <time datetime="2026-10-28">2026-10-28</time> · <span>·······</span></p>)
     end
 
     test "raw HTML in Markdown is never rendered", %{tree: tree} do
-      html = page(tree, "essays/first-essay/index.html")
+      html = page(tree, "first-essay/index.html")
 
       refute html =~ "<script>alert"
       refute html =~ "<b>bold</b>"
@@ -361,7 +384,7 @@ defmodule Site.BuildTest do
     end
 
     test "a project has h1, tagline, meta line and body", %{tree: tree} do
-      html = page(tree, "projects/widget/index.html")
+      html = page(tree, "widget/index.html")
 
       assert html =~ ~s(<article class="prose project">)
       assert html =~ ~r{<h1>widget</h1>\s*<p class="tagline">A small widget for the fixtures.</p>}
@@ -370,16 +393,7 @@ defmodule Site.BuildTest do
                ~s(<p class="meta"><span>active</span> · <span>Elixir, YAML</span> · <a href="https://example.com/widget">example.com/widget</a></p>)
 
       assert html =~ "<li>one</li>"
-      assert html =~ ~s(<a href="/projects/">← projects</a>)
-    end
-
-    test "uses and cv are pages with a table", %{tree: tree} do
-      for {path, title} <- [{"uses/index.html", "uses"}, {"cv/index.html", "cv"}] do
-        html = page(tree, path)
-        assert html =~ ~s(<article class="prose page">)
-        assert html =~ "<h1>#{title}</h1>"
-        assert html =~ "<table>"
-      end
+      assert html =~ ~s(<p class="back"><a href="/">← log</a></p>)
     end
 
     test "the 404 page is a terminal", %{tree: tree} do
@@ -388,7 +402,7 @@ defmodule Site.BuildTest do
       assert html =~
                ~s(<pre class="terminal">zsh: no such file or directory: <span data-path>unknown</span></pre>)
 
-      assert html =~ ~s(<a href="/">cd ~</a>)
+      assert html =~ ~s(<pre class="terminal prompt"><a href="/">cd ~</a></pre>)
       assert html =~ ~s(<script defer src="/assets/js/404.js"></script>)
     end
   end
@@ -397,13 +411,13 @@ defmodule Site.BuildTest do
     test "titles and descriptions are escaped everywhere", %{tree: tree} do
       title = "Tom &amp; &quot;Jerry&quot; &lt;script&gt;alert(1)&lt;/script&gt;"
 
-      for path <- ["index.html", "notes/index.html", "notes/escape-me/index.html"] do
+      for path <- ["index.html", "escape-me/index.html"] do
         html = page(tree, path)
         assert html =~ title, path
         refute html =~ "<script>alert", path
       end
 
-      html = page(tree, "notes/escape-me/index.html")
+      html = page(tree, "escape-me/index.html")
       assert html =~ "<title>#{title} — Yoan Faure</title>"
 
       assert html =~
@@ -542,6 +556,34 @@ defmodule Site.BuildTest do
 
       assert_raise Site.Error, fn -> Build.run(content: bad, out: out, beacon_token: nil) end
       assert File.exists?(Path.join(out, "index.html"))
+    end
+
+    test "two entries with one slug fail the build, naming both files, writing nothing" do
+      entry = "---\ntitle: N\ndate: 2026-10-28\n---\nbody"
+
+      dir =
+        minimal_content(%{"essays/same.md" => entry, "notes/2026-10-28-same.md" => entry})
+
+      out = Path.join(tmp_dir(), "dist")
+
+      error =
+        assert_raise Site.Error, fn -> Build.run(content: dir, out: out, beacon_token: nil) end
+
+      assert error.message =~ ~s(duplicate slug "same")
+      assert error.message =~ "essays/same.md"
+      assert error.message =~ "notes/2026-10-28-same.md"
+      refute File.exists?(out)
+    end
+
+    test "a reserved slug fails the build" do
+      dir = minimal_content(%{"notes/robots.txt.md" => "---\ntitle: N\ndate: 2026-10-28\n---\nb"})
+      out = Path.join(tmp_dir(), "dist")
+
+      error =
+        assert_raise Site.Error, fn -> Build.run(content: dir, out: out, beacon_token: nil) end
+
+      assert error.message =~ ~s(slug "robots.txt" is reserved)
+      refute File.exists?(out)
     end
 
     test "a missing head.js is a clear error" do

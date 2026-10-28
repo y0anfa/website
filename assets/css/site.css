@@ -1,37 +1,30 @@
 /* yoanfau.re
-   Monochrome, one typeface, nothing decorative except the field.
-   Tokens first, then base, backdrop, shell, content, log, home. */
+   Monochrome. Inter for everything that is read; JetBrains Mono only for code,
+   the log's hash and date, and the backdrop field. Nothing decorative except
+   the field. Tokens first, then base, backdrop, shell, content, log, home. */
 
 /* ---------- fonts ---------- */
 
 @font-face {
-  font-family: "JetBrains Mono";
-  src: url("/assets/fonts/JetBrainsMono-Regular.woff2") format("woff2");
-  font-weight: 400;
+  font-family: "Inter";
+  src: url("/assets/fonts/InterVariable.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "JetBrains Mono";
-  src: url("/assets/fonts/JetBrainsMono-Italic.woff2") format("woff2");
-  font-weight: 400;
+  font-family: "Inter";
+  src: url("/assets/fonts/InterVariable-Italic.woff2") format("woff2");
+  font-weight: 100 900;
   font-style: italic;
   font-display: swap;
 }
 
 @font-face {
   font-family: "JetBrains Mono";
-  src: url("/assets/fonts/JetBrainsMono-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "JetBrains Mono";
-  src: url("/assets/fonts/JetBrainsMono-ExtraBold.woff2") format("woff2");
-  font-weight: 800;
+  src: url("/assets/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
@@ -44,16 +37,16 @@
   --muted: #6b675f;
   --rule: #ddd6c8;
 
-  --font: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
-    "Liberation Mono", monospace;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --gutter: clamp(1rem, 4vw, 2.5rem);
   --header-h: 3.5rem;
 
-  /* The page column: header, main and footer share one width, centred.
-     Reading pages are narrower than the pages that hold the log. In rem, not
-     ch: the footer has a smaller font, and its ch would be narrower. 72ch of
-     the body text is 43.2rem. */
-  --column: calc(43.2rem + 2 * var(--gutter));
+  /* The page column: header, main and footer share one width, centred, on
+     every page, so the brand never moves. 38rem of text is about 68 characters
+     of Inter at the entry body size. In rem, not ch, because the footer has a
+     smaller font and its ch would be narrower. */
+  --column: calc(38rem + 2 * var(--gutter));
 
   /* What the column is painted with. Inner pages: opaque paper with hairline
      edges, so the field only shows in the side margins. Home: nothing. */
@@ -94,7 +87,7 @@
 }
 
 html {
-  font-size: 15px;
+  font-size: 16px;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   scroll-padding-top: 4.5rem;
@@ -102,7 +95,7 @@ html {
 
 @media (min-width: 960px) {
   html {
-    font-size: 16px;
+    font-size: 17px;
   }
 }
 
@@ -113,17 +106,11 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font);
+  font-family: var(--font-sans);
   font-size: 1rem;
   font-weight: 400;
-  line-height: 1.65;
-  font-variant-ligatures: none;
-  font-feature-settings: "calt" 0;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-}
-
-body:is([data-page="home"], [data-page="essays"], [data-page="notes"], [data-page="projects"]) {
-  --column: calc(52.8rem + 2 * var(--gutter)); /* 88ch */
 }
 
 /* Home: the field shows behind everything. Text keeps a soft halo of the
@@ -168,21 +155,27 @@ h1,
 h2,
 h3,
 h4 {
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
 h1 {
   margin: 0 0 1.25rem;
-  font-size: clamp(1.9rem, 1.2rem + 3vw, 3.25rem);
-  line-height: 1.05;
-  letter-spacing: -0.045em;
+  font-size: clamp(1.875rem, 1.3rem + 2.2vw, 2.5rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
 }
 
+/* The only mono in the text. One weight ships, so nothing is faked. */
 code,
-pre {
-  font-family: inherit;
+pre,
+kbd {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-style: normal;
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0;
 }
 
 .visually-hidden,
@@ -210,13 +203,16 @@ pre {
 /* ---------- backdrop: the field ---------- */
 
 /* A fixed, full-viewport layer behind the page (field.js draws into it).
-   The shell sits above it; inner pages paint an opaque column over it. */
+   The shell sits above it; inner pages paint an opaque column over it.
+   field.js builds its character grid from this element's computed font, so the
+   field says "mono" itself instead of inheriting the sans from the body. */
 .field {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1;
   color: var(--fg);
@@ -253,41 +249,22 @@ main a[href]:is(:hover, :focus-visible),
 
 /* ---------- shell: header ---------- */
 
+/* The name on the left, the theme toggle on the right. Nothing else. */
 .site-header {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 0.15rem 1.5rem;
-  min-height: var(--header-h);
-  padding: 0.6rem var(--gutter);
+  justify-content: space-between;
+  gap: 1rem;
+  height: var(--header-h);
+  padding: 0 var(--gutter);
 }
 
 .brand {
-  margin: 0 auto 0 -0.3em;
+  margin-left: -0.3em;
   padding: 0 0.3em;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   text-decoration: none;
-}
-
-.site-nav {
-  display: flex;
-  flex: 1 0 100%;
-  flex-wrap: wrap;
-  gap: 0.1rem 1.1rem;
-  order: 3;
-}
-
-.site-nav a {
-  margin: 0 -0.3em;
-  padding: 0 0.3em;
-  text-decoration: none;
-}
-
-.site-nav a[aria-current] {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 0.35em;
 }
 
 .theme-toggle {
@@ -310,20 +287,6 @@ main a[href]:is(:hover, :focus-visible),
   background: linear-gradient(90deg, currentColor 50%, transparent 50%);
 }
 
-@media (min-width: 600px) {
-  .site-header {
-    height: var(--header-h);
-    padding-block: 0;
-    flex-wrap: nowrap;
-  }
-
-  .site-nav {
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
-    order: 0;
-  }
-}
-
 /* ---------- shell: footer ---------- */
 
 .site-footer {
@@ -341,30 +304,26 @@ main a[href]:is(:hover, :focus-visible),
   margin: 0;
 }
 
-/* ---------- pages: article, list, page, 404 ---------- */
+/* ---------- pages: entry, 404 ---------- */
 
 .prose,
-.list-page,
 .not-found {
   padding: clamp(2.5rem, 7vw, 5rem) var(--gutter) 0;
 }
 
-.lede {
-  max-width: 60ch;
-  margin: 0 0 2.5rem;
-}
-
 .meta {
-  margin: 0 0 1.25rem;
+  margin: 0 0 1rem;
   color: var(--muted);
   font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .project .tagline {
-  margin: -0.25rem 0 0.5rem;
-  font-size: 1.15rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  margin: -0.25rem 0 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
 }
 
 .back {
@@ -377,50 +336,53 @@ main a[href]:is(:hover, :focus-visible),
   color: var(--muted);
 }
 
-/* markdown body */
+/* markdown body: a reading column (the page column sets the measure, about 68
+   characters), with room between paragraphs and headings */
+
+.prose {
+  font-size: 1.125rem;
+  line-height: 1.7;
+}
 
 .prose :is(p, ul, ol, pre, table, blockquote, figure) {
-  margin: 0 0 1.25rem;
+  margin: 0 0 1.35em;
 }
 
 .prose h2 {
-  margin: 2.75rem 0 0.9rem;
-  font-size: 1.3rem;
+  margin: 2.75rem 0 0.8rem;
+  font-size: 1.5rem;
   line-height: 1.25;
 }
 
 .prose h3 {
-  margin: 2rem 0 0.6rem;
-  font-size: 1.05rem;
+  margin: 2.25rem 0 0.6rem;
+  font-size: 1.2rem;
   line-height: 1.35;
 }
 
 .prose h4 {
-  margin: 1.5rem 0 0.5rem;
-  font-size: 1rem;
+  margin: 1.75rem 0 0.5rem;
+  font-size: 1.125rem;
+  line-height: 1.4;
 }
 
-.prose ul {
-  padding-left: 3ch;
-  list-style: "- ";
-}
-
+.prose ul,
 .prose ol {
-  padding-left: 3ch;
+  padding-left: 1.4em;
 }
 
-.prose li {
-  padding-left: 0.5ch;
+.prose li + li {
+  margin-top: 0.4em;
 }
 
 .prose li > :is(ul, ol) {
-  margin: 0.25rem 0 0;
+  margin: 0.4em 0 0;
 }
 
 .prose :not(pre) > code {
-  padding: 0.1em 0.4ch;
+  padding: 0.12em 0.35em;
   background: var(--rule);
-  font-size: 0.92em;
+  font-size: 0.85em;
 }
 
 .prose pre {
@@ -428,17 +390,18 @@ main a[href]:is(:hover, :focus-visible),
   overflow-x: auto;
   border: 1px solid var(--rule);
   font-size: 0.875rem;
-  line-height: 1.55;
+  line-height: 1.6;
   tab-size: 2;
 }
 
 .prose pre code {
   padding: 0;
   background: none;
+  font-size: inherit;
 }
 
 .prose blockquote {
-  padding-left: 2ch;
+  padding-left: 1.25em;
   border-left: 2px solid var(--fg);
   font-style: italic;
 }
@@ -448,7 +411,7 @@ main a[href]:is(:hover, :focus-visible),
 }
 
 .prose hr {
-  margin: 2.5rem 0;
+  margin: 2.75rem 0;
   border: 0;
   border-top: 1px solid var(--rule);
 }
@@ -459,13 +422,13 @@ main a[href]:is(:hover, :focus-visible),
 }
 
 .prose strong {
-  font-weight: 700;
+  font-weight: 650;
 }
 
 /* heading permalinks (empty anchors added by the Markdown renderer) */
 
 .prose .anchor {
-  margin-left: 0.6ch;
+  margin-left: 0.4em;
   color: var(--muted);
   font-weight: 400;
   text-decoration: none;
@@ -508,12 +471,12 @@ main a[href]:is(:hover, :focus-visible),
   margin: 0 0 0.5rem;
 }
 
-/* tables (cv, uses): ruled, no boxes */
+/* tables: ruled, no boxes */
 
 .prose table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95rem;
+  font-size: 0.95em;
 }
 
 .prose :is(th, td) {
@@ -532,7 +495,7 @@ main a[href]:is(:hover, :focus-visible),
   border-top: 0;
   border-bottom: 1px solid var(--fg);
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .prose tbody tr:last-child td {
@@ -543,22 +506,16 @@ main a[href]:is(:hover, :focus-visible),
   color: var(--muted);
 }
 
-/* uses and cv: the first column hugs its content (dates, labels) */
-.page table :is(th, td):first-child {
-  width: 1%;
-  padding-right: 4ch;
-  white-space: nowrap;
-}
-
-/* 404: a terminal */
+/* 404: a terminal (its lines are <pre>, so they are mono) */
 
 .not-found {
   padding-top: clamp(3rem, 14vw, 9rem);
 }
 
-.not-found :is(pre, p) {
+.not-found pre {
   margin: 0;
-  font-size: clamp(0.95rem, 0.7rem + 1.2vw, 1.4rem);
+  font-size: clamp(0.95rem, 0.8rem + 0.8vw, 1.25rem);
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -574,6 +531,9 @@ main a[href]:is(:hover, :focus-visible),
 
 /* ---------- the log ---------- */
 
+/* Hash and date are mono and sized by their own `ch`, so they line up whatever
+   the row's font is. Type and title are Inter, so the type gets a fixed track
+   (in em) and the title takes the rest. */
 .log {
   margin: 0;
   padding: 0;
@@ -583,15 +543,29 @@ main a[href]:is(:hover, :focus-visible),
 
 .log-row {
   display: grid;
-  grid-template-columns: 7ch 10ch 7ch minmax(0, 1fr);
-  column-gap: 2ch;
+  grid-template-columns: max-content max-content 3.75em minmax(0, 1fr);
+  column-gap: 1.25em;
   align-items: baseline;
   padding: 0.6rem 0;
   border-bottom: 1px solid var(--rule);
 }
 
 .log-hash,
-.log-date,
+.log-date {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  font-variant-ligatures: none;
+}
+
+.log-hash {
+  width: 7ch;
+}
+
+.log-date {
+  width: 10ch;
+}
+
 .log-type {
   color: var(--muted);
 }
@@ -601,13 +575,14 @@ main a[href]:is(:hover, :focus-visible),
 }
 
 .log-title {
-  font-weight: 700;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
 @media (max-width: 599.98px) {
   .log-row {
-    grid-template-columns: 7ch minmax(0, 1fr);
+    grid-template-columns: 4em minmax(0, 1fr);
+    column-gap: 1em;
     padding: 0.7rem 0;
   }
 
@@ -637,23 +612,23 @@ main a[href]:is(:hover, :focus-visible),
 
 .intro h1 {
   margin: 0;
-  font-size: 1.375rem;
+  font-size: 1.5rem;
   line-height: 1.3;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 .intro p {
-  max-width: 64ch;
+  max-width: 38rem;
   margin: 0 0 0.7rem;
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
 }
 
 .intro .tagline {
   margin: 0.1rem 0 1.25rem;
   color: var(--fg);
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 1.0625rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
@@ -669,6 +644,7 @@ main a[href]:is(:hover, :focus-visible),
   margin: 0 0 0.85rem;
   color: var(--muted);
   font-size: 0.875rem;
+  font-weight: 600;
   letter-spacing: 0;
 }
 

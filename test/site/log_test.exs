@@ -53,7 +53,7 @@ defmodule Site.LogTest do
     assert row.commit_url == nil
     assert row.date == "2026-03-28"
     assert row.type == "essay"
-    assert row.href == "/essays/x/"
+    assert row.href == "/x/"
   end
 
   test "a committed entry shows the first 7 characters, linked to GitHub" do
@@ -62,7 +62,7 @@ defmodule Site.LogTest do
 
     assert row.hash == "a3f9c21"
     assert row.commit_url == "https://github.com/y0anfa/yoanfau.re/commit/" <> sha
-    assert row.href == "/notes/x/"
+    assert row.href == "/x/"
   end
 
   test "fixtures copied outside git have no commits" do
