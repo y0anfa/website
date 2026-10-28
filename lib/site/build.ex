@@ -1,0 +1,178 @@
+defmodule Site.Build do
+  @moduledoc """
+  The build pipeline.
+
+  1. Load and validate `content/` (nothing is written if this fails).
+  2. Read git info for the footer.
+  3. Render the pages.
+  4. Clean the output directory and write pages, assets, `_headers`, `robots.txt`.
+
+  The output is deterministic: no timestamps, sorted iteration, so the same
+  commit, content and environment always produce byte-identical trees.
+  """
+
+  alias Site.{Content, Headers, Render}
+
+  @beacon_token ~r/\A[A-Za-z0-9_-]+\z/
+
+  @type result :: %{out: Path.t(), files: non_neg_integer()}
+
+  @doc """
+  Builds the site.
+
+  Options:
+
+    * `:content` - content directory (default `"content"`)
+    * `:out` - output directory, deleted first (default `"dist"`)
+    * `:assets` - assets directory (default `"assets"`)
+    * `:drafts` - include entries marked `draft: true` (default `false`)
+    * `:beacon_token` - Cloudflare Web Analytics token; defaults to the
+      `CF_BEACON_TOKEN` environment variable, `nil` leaves the beacon out
+
+  Raises `Site.Error` when the content or the options are invalid.
+  """
+  @spec run(keyword()) :: result()
+  def run(opts \\ []) do
+    opts =
+      Keyword.validate!(opts,
+        content: "content",
+        out: "dist",
+        assets: "assets",
+        drafts: false,
+        beacon_token: :env
+      )
+
+    content_dir = Keyword.fetch!(opts, :content)
+    out = Keyword.fetch!(opts, :out)
+    assets = Keyword.fetch!(opts, :assets)
+
+    check_out!(out, [File.cwd!(), content_dir, assets, "templates", "lib", "test"])
+
+    content = Content.load(content_dir, drafts: Keyword.fetch!(opts, :drafts))
+    head_js = read_head_js!(assets)
+    beacon_token = beacon_token(Keyword.fetch!(opts, :beacon_token))
+
+    context = %{
+      head_js: head_js,
+      beacon_token: beacon_token,
+      build: Site.View.build_info(Site.Git.head("."))
+    }
+
+    pages = Render.pages(content, context)
+
+    extras = [
+      {"_headers", Headers.render(Headers.script_hash(head_js), beacon: beacon_token != nil)},
+      {"robots.txt", "User-agent: *\nAllow: /\n"}
+    ]
+
+    File.rm_rf!(out)
+    File.mkdir_p!(out)
+    Enum.each(pages ++ extras, fn {file, data} -> write!(out, file, data) end)
+    copied = copy_assets!(assets, out)
+
+    %{out: out, files: length(pages) + length(extras) + copied}
+  end
+
+  @doc """
+  SHA-256 over every file path and content under `dir`, in sorted path order.
+  Two trees have the same hash only if they are byte-identical.
+  """
+  @spec tree_hash(Path.t()) :: String.t()
+  def tree_hash(dir) do
+    dir
+    |> files()
+    |> Enum.reduce(:crypto.hash_init(:sha256), fn rel, state ->
+      data = File.read!(Path.join(dir, rel))
+      :crypto.hash_update(state, [rel, 0, Integer.to_string(byte_size(data)), 0, data, 0])
+    end)
+    |> :crypto.hash_final()
+    |> Base.encode16(case: :lower)
+  end
+
+  @doc "Relative paths of all regular files under `dir`, sorted."
+  @spec files(Path.t()) :: [Path.t()]
+  def files(dir) do
+    dir
+    |> Path.join("**")
+    |> Path.wildcard(match_dot: true)
+    |> Enum.filter(&File.regular?/1)
+    |> Enum.map(&Path.relative_to(&1, dir))
+    |> Enum.sort()
+  end
+
+  # -- steps ----------------------------------------------------------------
+
+  defp read_head_js!(assets) do
+    path = Path.join([assets, "js", "head.js"])
+
+    script =
+      case File.read(path) do
+        {:ok, source} ->
+          String.trim(source)
+
+        {:error, reason} ->
+          raise Site.Error, message: "cannot read #{path}: #{:file.format_error(reason)}"
+      end
+
+    if script == "" or String.contains?(String.downcase(script), "</script") do
+      raise Site.Error, message: "#{path} must be non-empty and must not contain </script"
+    end
+
+    script
+  end
+
+  defp beacon_token(:env), do: beacon_token(System.get_env("CF_BEACON_TOKEN"))
+  defp beacon_token(nil), do: nil
+
+  defp beacon_token(token) when is_binary(token) do
+    token = String.trim(token)
+
+    cond do
+      token == "" ->
+        nil
+
+      Regex.match?(@beacon_token, token) ->
+        token
+
+      true ->
+        raise Site.Error, message: "CF_BEACON_TOKEN may only contain letters, digits, - and _"
+    end
+  end
+
+  defp write!(out, file, data) do
+    path = Path.join(out, file)
+    File.mkdir_p!(Path.dirname(path))
+    File.write!(path, data)
+  end
+
+  defp copy_assets!(assets, out) do
+    files =
+      case File.dir?(assets) do
+        true -> Enum.reject(files(assets), &hidden?/1)
+        false -> raise Site.Error, message: "assets directory #{assets} does not exist"
+      end
+
+    for rel <- files do
+      target = Path.join([out, "assets", rel])
+      File.mkdir_p!(Path.dirname(target))
+      File.cp!(Path.join(assets, rel), target)
+    end
+
+    length(files)
+  end
+
+  defp hidden?(rel), do: rel |> Path.split() |> Enum.any?(&String.starts_with?(&1, "."))
+
+  # The output directory is deleted on every build, so refuse to point it at
+  # anything that holds source: the project, an ancestor of it, content, assets.
+  defp check_out!(out, protected) do
+    out_dir = out |> Path.expand() |> String.trim_trailing("/") |> Kernel.<>("/")
+
+    Enum.each(protected, fn path ->
+      if String.starts_with?(Path.expand(path) <> "/", out_dir) do
+        raise Site.Error,
+          message: "refusing to use #{out} as the output directory: it would delete #{path}"
+      end
+    end)
+  end
+end

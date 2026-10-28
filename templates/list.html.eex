@@ -1,0 +1,5 @@
+<section class="list-page">
+  <h1><%= escape(@section) %></h1>
+  <p class="lede"><%= escape(@intro) %></p>
+<%= log(%{rows: @rows}) %>
+</section>

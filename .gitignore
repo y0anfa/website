@@ -1,0 +1,9 @@
+/_build
+/deps
+/dist
+/.elixir_ls
+/.wrangler
+erl_crash.dump
+.DS_Store
+/node_modules
+*.ez

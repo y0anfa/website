@@ -1,0 +1,18 @@
+<section class="hero">
+  <div class="field" data-field-root>
+    <canvas class="field-canvas" aria-hidden="true"></canvas>
+    <nav class="field-nav" aria-label="Sections">
+<%= for section <- Site.Config.nav() do %>      <a class="hotspot hotspot--<%= escape(section) %>" href="/<%= escape(section) %>/" data-hotspot><%= escape(section) %></a>
+<% end %>    </nav>
+  </div>
+  <div class="intro">
+    <h1 data-field-clear><%= escape(@doc.title) %></h1>
+<%= if @doc.tagline do %>    <p class="tagline" data-field-clear><%= escape(@doc.tagline) %></p>
+<% end %><%= raw(@doc.html) %>
+    <p class="contact"><a href="mailto:<%= escape(Site.Config.email()) %>"><%= escape(Site.Config.email()) %></a> · <a href="<%= escape(Site.Config.linkedin()) %>" rel="noopener">linkedin</a></p>
+  </div>
+</section>
+<section class="log-section" aria-labelledby="log-h">
+  <h2 id="log-h">log</h2>
+<%= log(%{rows: @rows}) %>
+</section>

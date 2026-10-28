@@ -1,0 +1,7 @@
+<header class="site-header">
+  <a class="brand" href="/">yoan faure</a>
+  <nav class="site-nav" aria-label="Primary">
+<%= for item <- @nav do %>    <a href="<%= escape(item.href) %>"<%= if item.aria_current do %> aria-current="<%= escape(item.aria_current) %>"<% end %>><%= escape(item.label) %></a>
+<% end %>  </nav>
+  <button class="theme-toggle" type="button" aria-label="Toggle theme"><span class="theme-toggle__icon" aria-hidden="true"></span></button>
+</header>

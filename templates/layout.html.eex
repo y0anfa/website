@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-home="b" data-field="water">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= escape(@title) %></title>
+<meta name="description" content="<%= escape(@description) %>">
+<meta name="color-scheme" content="light dark">
+<%= if @url do %><link rel="canonical" href="<%= escape(@url) %>">
+<meta property="og:url" content="<%= escape(@url) %>">
+<% end %><meta property="og:title" content="<%= escape(@title) %>">
+<meta property="og:description" content="<%= escape(@description) %>">
+<meta property="og:type" content="<%= escape(@og_type) %>">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/fonts/JetBrainsMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+<script><%= raw(@head_js) %></script>
+<link rel="stylesheet" href="/assets/css/site.css">
+<%= for script <- @scripts do %><script<%= if script.module do %> type="module"<% else %> defer<% end %> src="<%= escape(script.src) %>"></script>
+<% end %><%= if @beacon_token do %><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"<%= escape(@beacon_token) %>"}'></script>
+<% end %></head>
+<body data-page="<%= escape(@page_key) %>">
+<a class="skip-link" href="#main">skip to content</a>
+<%= header(%{nav: @nav}) %>
+<main id="main">
+<%= raw(@content) %>
+</main>
+<%= footer(%{build: @build}) %>
+</body>
+</html>

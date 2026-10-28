@@ -1,0 +1,855 @@
+/* yoanfau.re
+   Monochrome, one typeface, nothing decorative except the field.
+   Tokens first, then base, shell, content, log, home (variant B, variant D). */
+
+/* ---------- fonts ---------- */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono-ExtraBold.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------- tokens ---------- */
+
+:root {
+  --bg: #f3f2ee;
+  --fg: #121212;
+  --muted: #6a6a66;
+  --rule: #d6d5cf;
+
+  --font: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --header-h: 3.5rem;
+
+  color-scheme: light;
+}
+
+/* No data-theme: follow the system. data-theme forces a theme. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f0f0e;
+    --fg: #e8e7e1;
+    --muted: #8b8a85;
+    --rule: #2b2b29;
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f0f0e;
+  --fg: #e8e7e1;
+  --muted: #8b8a85;
+  --rule: #2b2b29;
+
+  color-scheme: dark;
+}
+
+/* ---------- base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 15px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-padding-top: 4.5rem;
+}
+
+@media (min-width: 960px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.65;
+  font-variant-ligatures: none;
+  font-feature-settings: "calt" 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  flex: 1 0 auto;
+}
+
+::selection {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+a[href]:hover,
+a[href]:focus-visible,
+button:hover,
+button:focus-visible {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+h1 {
+  margin: 0 0 1.25rem;
+  font-size: clamp(1.9rem, 1.2rem + 3vw, 3.25rem);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+}
+
+code,
+pre {
+  font-family: inherit;
+}
+
+.visually-hidden,
+.skip-link:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: var(--gutter);
+  z-index: 100;
+  padding: 0.35rem 0.75rem;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* ---------- shell: header ---------- */
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 1.5rem;
+  min-height: var(--header-h);
+  padding: 0.6rem var(--gutter);
+}
+
+.brand {
+  margin: 0 auto 0 -0.3em;
+  padding: 0 0.3em;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  gap: 0.1rem 1.1rem;
+  order: 3;
+}
+
+.site-nav a {
+  margin: 0 -0.3em;
+  padding: 0 0.3em;
+  text-decoration: none;
+}
+
+.site-nav a[aria-current] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.35em;
+}
+
+.theme-toggle {
+  margin: 0 -0.4rem 0 0;
+  padding: 0.45rem 0.4rem;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.theme-toggle__icon {
+  display: inline-block;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+}
+
+@media (min-width: 600px) {
+  .site-header {
+    height: var(--header-h);
+    padding-block: 0;
+    flex-wrap: nowrap;
+  }
+
+  .site-nav {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    order: 0;
+  }
+}
+
+/* ---------- shell: footer ---------- */
+
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 2rem;
+  margin-top: 5rem;
+  padding: 1.75rem var(--gutter) 2.25rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+/* ---------- pages: article, list, page, 404 ---------- */
+
+.prose,
+.list-page,
+.not-found {
+  padding: clamp(2.5rem, 7vw, 5rem) var(--gutter) 0;
+}
+
+.prose {
+  max-width: calc(72ch + 2 * var(--gutter));
+}
+
+.list-page {
+  max-width: calc(88ch + 2 * var(--gutter));
+}
+
+.lede {
+  max-width: 60ch;
+  margin: 0 0 2.5rem;
+}
+
+.meta {
+  margin: 0 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.project .tagline {
+  margin: -0.25rem 0 0.5rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.back {
+  margin: 3.5rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.empty {
+  color: var(--muted);
+}
+
+/* markdown body */
+
+.prose :is(p, ul, ol, pre, table, blockquote, figure) {
+  margin: 0 0 1.25rem;
+}
+
+.prose h2 {
+  margin: 2.75rem 0 0.9rem;
+  font-size: 1.3rem;
+  line-height: 1.25;
+}
+
+.prose h3 {
+  margin: 2rem 0 0.6rem;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.prose h4 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.prose ul {
+  padding-left: 3ch;
+  list-style: "- ";
+}
+
+.prose ol {
+  padding-left: 3ch;
+}
+
+.prose li {
+  padding-left: 0.5ch;
+}
+
+.prose li > :is(ul, ol) {
+  margin: 0.25rem 0 0;
+}
+
+.prose :not(pre) > code {
+  padding: 0.1em 0.4ch;
+  background: var(--rule);
+  font-size: 0.92em;
+}
+
+.prose pre {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  border: 1px solid var(--rule);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.prose pre code {
+  padding: 0;
+  background: none;
+}
+
+.prose blockquote {
+  padding-left: 2ch;
+  border-left: 2px solid var(--fg);
+  font-style: italic;
+}
+
+.prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.prose hr {
+  margin: 2.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--rule);
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+}
+
+.prose strong {
+  font-weight: 700;
+}
+
+/* heading permalinks (empty anchors added by the Markdown renderer) */
+
+.prose .anchor {
+  margin-left: 0.6ch;
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: none;
+  visibility: hidden;
+}
+
+.prose .anchor::before {
+  content: "#";
+}
+
+.prose :is(h2, h3, h4):hover .anchor,
+.prose :is(h2, h3, h4):focus-within .anchor {
+  visibility: visible;
+}
+
+/* footnotes */
+
+.prose sup {
+  line-height: 0;
+}
+
+.prose sup a,
+.prose .footnote-backref {
+  text-decoration: none;
+}
+
+.prose .footnotes {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.prose .footnotes ol {
+  margin: 0;
+}
+
+.prose .footnotes p {
+  margin: 0 0 0.5rem;
+}
+
+/* tables (cv, uses): ruled, no boxes */
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.prose :is(th, td) {
+  padding: 0.7em 2ch 0.7em 0;
+  border-top: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.prose :is(th, td):last-child {
+  padding-right: 0;
+}
+
+.prose th {
+  border-top: 0;
+  border-bottom: 1px solid var(--fg);
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.prose tbody tr:last-child td {
+  border-bottom: 1px solid var(--rule);
+}
+
+.prose td:first-child {
+  color: var(--muted);
+}
+
+/* uses and cv: the first column hugs its content (dates, labels) */
+.page table :is(th, td):first-child {
+  width: 1%;
+  padding-right: 4ch;
+  white-space: nowrap;
+}
+
+/* 404: a terminal */
+
+.not-found {
+  padding-top: clamp(3rem, 14vw, 9rem);
+}
+
+.not-found :is(pre, p) {
+  margin: 0;
+  font-size: clamp(0.95rem, 0.7rem + 1.2vw, 1.4rem);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.not-found .prompt {
+  margin-top: 0.5rem;
+}
+
+.not-found .prompt::before {
+  content: "% ";
+  color: var(--muted);
+}
+
+/* ---------- the log ---------- */
+
+.log {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--rule);
+  list-style: none;
+}
+
+.log-row {
+  display: grid;
+  grid-template-columns: 7ch 10ch 7ch minmax(0, 1fr);
+  column-gap: 2ch;
+  align-items: baseline;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.log-hash,
+.log-date,
+.log-type {
+  color: var(--muted);
+}
+
+.log-hash:not([href]) {
+  text-decoration: none;
+}
+
+.log-title {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 599.98px) {
+  .log-row {
+    grid-template-columns: 7ch minmax(0, 1fr);
+    padding: 0.7rem 0;
+  }
+
+  .log-hash {
+    grid-area: 1 / 1;
+  }
+
+  .log-date {
+    grid-area: 1 / 2;
+  }
+
+  .log-type {
+    grid-area: 2 / 1;
+  }
+
+  .log-title {
+    grid-area: 2 / 2;
+  }
+}
+
+/* ---------- home: shared ---------- */
+
+.field {
+  position: relative;
+  overflow: hidden;
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.field-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.field-nav {
+  display: none;
+}
+
+.intro {
+  max-width: calc(64ch + 2 * var(--gutter));
+  padding: 2rem var(--gutter) 0;
+}
+
+.intro p {
+  margin: 0 0 1rem;
+}
+
+.intro > h1 + p {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.intro .contact {
+  margin-top: 1.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.log-section {
+  max-width: calc(88ch + 2 * var(--gutter));
+  padding: 3rem var(--gutter) 0;
+}
+
+.log-section h2 {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+body[data-page="home"] .site-footer {
+  margin-top: 4rem;
+}
+
+/* ---------- home: variant B (split, the default) ---------- */
+
+/* Below 960px: a field band, then the intro, then the log. */
+[data-home="b"] .field {
+  height: 45vh;
+  min-height: 13rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+@supports (height: 100svh) {
+  [data-home="b"] .field {
+    height: 45svh;
+  }
+}
+
+@media (min-width: 960px) {
+  [data-home="b"] body[data-page="home"] .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--bg);
+  }
+
+  [data-home="b"] body[data-page="home"] main {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: start;
+  }
+
+  /* Left column: sticky, full height. The field takes what the intro leaves
+     (about 60% on a laptop); the intro scrolls only on very short screens. */
+  [data-home="b"] .hero {
+    position: sticky;
+    top: var(--header-h);
+    display: grid;
+    grid-template-rows: minmax(12rem, 1fr) auto;
+    height: calc(100vh - var(--header-h));
+    border-right: 1px solid var(--rule);
+  }
+
+  [data-home="b"] .field {
+    height: auto;
+    min-height: 0;
+  }
+
+  [data-home="b"] .intro {
+    max-width: none;
+    max-height: calc((100vh - var(--header-h)) * 0.55);
+    padding: 1.5rem var(--gutter) 1.25rem;
+    overflow-y: auto;
+  }
+
+  [data-home="b"] .intro h1 {
+    margin-bottom: 0.75rem;
+  }
+
+  [data-home="b"] .intro p {
+    margin-bottom: 0.85rem;
+  }
+
+  [data-home="b"] .log-section {
+    max-width: none;
+    padding: 3.25rem var(--gutter) 4rem;
+  }
+
+  [data-home="b"] body[data-page="home"] .site-footer {
+    margin-top: 0;
+  }
+}
+
+@supports (height: 100svh) {
+  @media (min-width: 960px) {
+    [data-home="b"] .hero {
+      height: calc(100svh - var(--header-h));
+    }
+
+    [data-home="b"] .intro {
+      max-height: calc((100svh - var(--header-h)) * 0.55);
+    }
+  }
+}
+
+/* ---------- home: variant D (the field is the nav) ---------- */
+
+[data-home="d"] .hero {
+  --field-h: max(26rem, calc(100vh - var(--header-h)));
+  --name-y: 0.5;
+
+  position: relative;
+}
+
+@supports (height: 100svh) {
+  [data-home="d"] .hero {
+    --field-h: max(26rem, calc(100svh - var(--header-h)));
+  }
+}
+
+[data-home="d"] .field {
+  height: var(--field-h);
+  border-bottom: 1px solid var(--rule);
+}
+
+/* The home nav moves into the field. Keep the links for keyboards and screen
+   readers: visually hidden until one of them has focus. */
+[data-home="d"] body[data-page="home"] .site-nav:not(:focus-within) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+[data-home="d"] .field-nav {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  pointer-events: none;
+}
+
+[data-home="d"] .hotspot {
+  position: absolute;
+  padding: 0.2em 0.55em 0.25em;
+  background: var(--bg);
+  font-size: clamp(1.2rem, 0.9rem + 1.4vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  text-decoration: none;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+[data-home="d"] .hotspot:hover,
+[data-home="d"] .hotspot:focus-visible {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+/* Hotspot positions: percentages of the field, one class each. */
+[data-home="d"] .hotspot--essays {
+  top: 27%;
+  left: 24%;
+}
+
+[data-home="d"] .hotspot--notes {
+  top: 21%;
+  left: 71%;
+}
+
+[data-home="d"] .hotspot--projects {
+  top: 69%;
+  left: 77%;
+}
+
+[data-home="d"] .hotspot--uses {
+  top: 63%;
+  left: 19%;
+}
+
+[data-home="d"] .hotspot--cv {
+  top: 85%;
+  left: 49%;
+}
+
+/* The name and the tagline (the first paragraph of home.md) sit centred on the
+   field; the rest of the intro and the log follow below the fold. */
+[data-home="d"] .intro > h1,
+[data-home="d"] .intro > h1 + p {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  width: fit-content;
+  margin: 0 auto;
+  background: var(--bg);
+  text-align: center;
+  pointer-events: none;
+}
+
+[data-home="d"] .intro > h1 {
+  top: calc(var(--field-h) * var(--name-y));
+  padding: 0.05em 0.4em 0.1em;
+  transform: translateY(-100%);
+}
+
+[data-home="d"] .intro > h1 + p {
+  top: calc(var(--field-h) * var(--name-y));
+  max-width: calc(100% - 2 * var(--gutter));
+  padding: 0.35rem 0.8rem 0.45rem;
+}
+
+[data-home="d"] .intro {
+  padding-top: 3.5rem;
+}
+
+[data-home="d"] .log-section {
+  padding-top: 3.5rem;
+}
+
+/* Narrow screens: the hotspots stack as a centred column under the name. */
+@media (max-width: 699.98px) {
+  [data-home="d"] .hero {
+    --field-h: max(30rem, calc(100vh - var(--header-h)));
+    --name-y: 0.26;
+  }
+
+  @supports (height: 100svh) {
+    [data-home="d"] .hero {
+      --field-h: max(30rem, calc(100svh - var(--header-h)));
+    }
+  }
+
+  [data-home="d"] .field-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4rem;
+    padding-bottom: 9%;
+  }
+
+  [data-home="d"] .hotspot {
+    position: static;
+    font-size: 1.6rem;
+    transform: none;
+  }
+}

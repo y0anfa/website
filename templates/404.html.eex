@@ -1,0 +1,5 @@
+<section class="not-found">
+  <h1 class="visually-hidden">page not found</h1>
+<pre class="terminal">zsh: no such file or directory: <span data-path><%= escape(@fallback) %></span></pre>
+  <p class="terminal prompt"><a href="/">cd ~</a></p>
+</section>

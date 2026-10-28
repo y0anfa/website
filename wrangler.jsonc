@@ -1,0 +1,19 @@
+{
+  // Assets-only Worker: serves the static site built into ./dist.
+  // There is no `main` entry point; Cloudflare serves the assets directly.
+  "name": "yoanfau-re",
+  "compatibility_date": "2026-10-01",
+
+  // DNS cutover only: uncomment this line when the yoanfau.re zone is on
+  // Cloudflare and the old GitHub Pages records are gone. Until then the
+  // Worker stays on its workers.dev hostname.
+  // "routes": [{ "pattern": "yoanfau.re", "custom_domain": true }],
+
+  "assets": {
+    "directory": "./dist",
+    // Unknown paths serve dist/404.html with a 404 status.
+    "not_found_handling": "404-page",
+    // /essays/x serves /essays/x/index.html; /essays/x/ also resolves.
+    "html_handling": "auto-trailing-slash"
+  }
+}

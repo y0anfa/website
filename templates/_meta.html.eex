@@ -1,0 +1,1 @@
+<p class="meta"><%= for {part, index} <- Enum.with_index(@parts) do %><%= if index > 0 do %> · <% end %><%= cond do %><% part[:href] -> %><a href="<%= escape(part.href) %>"><%= escape(part.text) %></a><% part[:datetime] -> %><time datetime="<%= escape(part.datetime) %>"><%= escape(part.text) %></time><% true -> %><span><%= escape(part.text) %></span><% end %><% end %></p>

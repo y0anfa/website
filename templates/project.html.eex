@@ -1,0 +1,7 @@
+<article class="prose project">
+  <h1><%= escape(@entry.title) %></h1>
+  <p class="tagline"><%= escape(@entry.tagline) %></p>
+<%= meta(%{parts: @meta}) %>
+<%= raw(@entry.html) %>
+  <p class="back"><a href="/<%= escape(@section) %>/">← <%= escape(@section) %></a></p>
+</article>

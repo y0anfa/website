@@ -1,0 +1,236 @@
+<!doctype html>
+<!--
+  Playground for assets/js/field.js. Never built or deployed.
+  Serve the repo root (ES modules do not load from file://):
+      python3 -m http.server 8765
+  then open http://localhost:8765/lab/field.html
+  Query params: ?field=water|wind  ?home=b|d  ?theme=light|dark|system  ?reduced=1
+-->
+<html lang="en" data-home="b" data-field="water">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>field playground</title>
+<style>
+  @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-style: normal; font-display: swap;
+    src: url("../assets/fonts/JetBrainsMono-Regular.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 700; font-style: normal; font-display: swap;
+    src: url("../assets/fonts/JetBrainsMono-Bold.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 800; font-style: normal; font-display: swap;
+    src: url("../assets/fonts/JetBrainsMono-ExtraBold.woff2") format("woff2"); }
+
+  :root { --bg: #f3f2ee; --fg: #121212; --muted: #6a6a66; --rule: #d6d5cf; --bar: 44px; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0f0f0e; --fg: #e8e7e1; --muted: #8b8a85; --rule: #2b2b29; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #0f0f0e; --fg: #e8e7e1; --muted: #8b8a85; --rule: #2b2b29; color-scheme: dark; }
+  :root[data-theme="light"] { --bg: #f3f2ee; --fg: #121212; --muted: #6a6a66; --rule: #d6d5cf; color-scheme: light; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.65 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  a { color: inherit; text-decoration: underline; text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
+  a:hover, a:focus-visible { background: var(--fg); color: var(--bg); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  ::selection { background: var(--fg); color: var(--bg); }
+
+  /* playground controls */
+  .bar { position: sticky; top: 0; z-index: 10; height: var(--bar); display: flex; align-items: center; gap: 18px;
+    padding: 0 16px; background: var(--bg); border-bottom: 1px solid var(--rule); font-size: 12px; line-height: 1;
+    overflow-x: auto; white-space: nowrap; }
+  .group { display: flex; align-items: center; gap: 4px; }
+  .group > span { color: var(--muted); margin-right: 4px; }
+  .bar button { font: inherit; color: var(--fg); background: none; border: 1px solid var(--rule); padding: 5px 8px; cursor: pointer; }
+  .bar button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .readout { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* field */
+  .field { position: relative; font-size: 14px; line-height: 1; color: var(--fg); overflow: hidden; }
+  .field-canvas { position: absolute; inset: 0; display: block; }
+  .field-nav { display: none; }
+  .intro h1 { margin: 0; font-weight: 800; font-size: clamp(1.9rem, 1.2rem + 3vw, 3.25rem); letter-spacing: -0.03em; line-height: 1.05; }
+  .intro p { margin: 0.6rem 0 0; color: var(--muted); max-width: 52ch; }
+
+  /* variant B: split */
+  .page { display: block; }
+  .hero { display: flex; flex-direction: column; height: calc(100vh - var(--bar)); }
+  .hero .field { flex: 0 0 45%; }
+  .hero .intro { flex: 1; padding: 24px 16px; }
+  .log-section { padding: 24px 16px 96px; }
+  .log-section h2 { margin: 0 0 12px; font-weight: 800; letter-spacing: -0.02em; }
+  .log { list-style: none; margin: 0; padding: 0; }
+  .log li { display: grid; grid-template-columns: 8ch 11ch 8ch 1fr; gap: 0 2ch; padding: 4px 0; border-top: 1px solid var(--rule); }
+  .log li > :nth-child(1), .log li > :nth-child(2), .log li > :nth-child(3) { color: var(--muted); }
+  @media (min-width: 960px) {
+    html[data-home="b"] .page { display: grid; grid-template-columns: 1fr 1fr; }
+    html[data-home="b"] .hero { position: sticky; top: var(--bar); border-right: 1px solid var(--rule); }
+    html[data-home="b"] .hero .field { flex-basis: 60%; }
+    html[data-home="b"] .intro { padding: 28px 32px; }
+    html[data-home="b"] .log-section { padding: 28px 32px 96px; }
+    body { font-size: 16px; }
+  }
+
+  /* variant D: the field is the nav */
+  html[data-home="d"] .hero { position: relative; display: block; }
+  html[data-home="d"] .hero .field { position: absolute; inset: 0; }
+  html[data-home="d"] .field-nav { display: block; position: absolute; inset: 0; pointer-events: none; }
+  html[data-home="d"] .intro { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 0; pointer-events: none; }
+  html[data-home="d"] .intro p { margin-inline: auto; }
+  html[data-home="d"] .intro .more { display: none; }
+  html[data-home="d"] .hero-title { padding: 10px 18px; }
+  .hotspot { position: absolute; pointer-events: auto; font-weight: 800; font-size: clamp(18px, 1.2rem + 0.8vw, 30px);
+    letter-spacing: -0.02em; line-height: 1.2; padding: 0 0.25em; text-decoration: none; }
+  .hotspot--essays { left: 12%; top: 24%; }
+  .hotspot--notes { left: 58%; top: 16%; }
+  .hotspot--projects { left: 68%; top: 56%; }
+  .hotspot--uses { left: 18%; top: 66%; }
+  .hotspot--cv { left: 44%; top: 82%; }
+  @media (max-width: 700px) {
+    html[data-home="d"] .field-nav { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; padding-bottom: 12vh; }
+    html[data-home="d"] .hotspot { position: static; }
+  }
+</style>
+<script>
+  /* Lets the playground fake prefers-reduced-motion. Runs before field.js loads. */
+  (function () {
+    var real = window.matchMedia.bind(window);
+    var fake = new EventTarget();
+    fake.media = '(prefers-reduced-motion: reduce)';
+    fake.matches = real('(prefers-reduced-motion: reduce)').matches;
+    fake.addListener = function (f) { fake.addEventListener('change', f); };
+    fake.removeListener = function (f) { fake.removeEventListener('change', f); };
+    window.matchMedia = function (q) { return /prefers-reduced-motion:\s*reduce/.test(q) ? fake : real(q); };
+    window.__setReducedMotion = function (on) { fake.matches = !!on; fake.dispatchEvent(new Event('change')); };
+    window.__reducedMotion = function () { return fake.matches; };
+  })();
+</script>
+</head>
+<body>
+  <div class="bar" role="toolbar" aria-label="Playground controls">
+    <div class="group" data-group="field"><span>preset</span>
+      <button type="button" data-set="field" data-value="water">water</button>
+      <button type="button" data-set="field" data-value="wind">wind</button></div>
+    <div class="group" data-group="theme"><span>theme</span>
+      <button type="button" data-set="theme" data-value="system">system</button>
+      <button type="button" data-set="theme" data-value="light">light</button>
+      <button type="button" data-set="theme" data-value="dark">dark</button></div>
+    <div class="group" data-group="home"><span>layout</span>
+      <button type="button" data-set="home" data-value="b">B split</button>
+      <button type="button" data-set="home" data-value="d">D nav</button></div>
+    <div class="group" data-group="motion"><span>motion</span>
+      <button type="button" data-set="motion" data-value="normal">normal</button>
+      <button type="button" data-set="motion" data-value="reduced">reduced</button></div>
+    <div class="group" data-group="mount"><span>mount</span>
+      <button type="button" data-act="remount">remount</button>
+      <button type="button" data-act="destroy">destroy</button></div>
+    <div class="readout" id="readout" aria-live="off"></div>
+  </div>
+
+  <main class="page">
+    <section class="hero">
+      <div class="field" data-field-root>
+        <canvas class="field-canvas" aria-hidden="true"></canvas>
+        <nav class="field-nav" aria-label="Sections">
+          <a class="hotspot hotspot--essays" href="#essays" data-hotspot>essays</a>
+          <a class="hotspot hotspot--notes" href="#notes" data-hotspot>notes</a>
+          <a class="hotspot hotspot--projects" href="#projects" data-hotspot>projects</a>
+          <a class="hotspot hotspot--uses" href="#uses" data-hotspot>uses</a>
+          <a class="hotspot hotspot--cv" href="#cv" data-hotspot>cv</a>
+        </nav>
+      </div>
+      <div class="intro">
+        <div class="hero-title" data-field-clear>
+          <h1>Yoan Faure</h1>
+          <p>security engineer who builds.</p>
+        </div>
+        <div class="more">
+          <p>I work on security at Riot, in Paris. I write about threat modeling, small tools,
+          and the unglamorous parts of the job. This is a placeholder paragraph in the playground.</p>
+          <p><a href="#hello">hello@yoanfau.re</a> &middot; <a href="#linkedin">linkedin</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="log-section" aria-labelledby="log-h">
+      <h2 id="log-h">log</h2>
+      <ol class="log">
+        <li><a href="#a">9f19333</a><time>2026-10-28</time><span>note</span><a href="#a">Build the small tool</a></li>
+        <li><a href="#b">c1d4e07</a><time>2026-10-28</time><span>note</span><a href="#b">Security should unleash</a></li>
+        <li><a href="#c">77ab210</a><time>2026-10-28</time><span>note</span><a href="#c">Security pays in more than one currency</a></li>
+        <li><a href="#d">e30f5a9</a><time>2026-10-28</time><span>note</span><a href="#d">AI is a teammate</a></li>
+        <li><a href="#e">0b8c6d2</a><time>2026-10-28</time><span>note</span><a href="#e">Comms is the staff skill</a></li>
+        <li><a href="#f">5d21f84</a><time>2026-09-02</time><span>project</span><a href="#f">rhino</a></li>
+        <li><a href="#g">a3f9c21</a><time>2026-03-28</time><span>essay</span><a href="#g">Threat modeling with Claude Code</a></li>
+        <li><a href="#h">1e7a9b3</a><time>2026-02-11</time><span>note</span><a href="#h">Placeholder row to make the column scroll</a></li>
+        <li><a href="#i">42c0d18</a><time>2026-01-30</time><span>note</span><a href="#i">Another placeholder row</a></li>
+        <li><a href="#j">b95e3f6</a><time>2025-12-19</time><span>essay</span><a href="#j">One more, for the scrollbar</a></li>
+        <li><a href="#k">f01a7c4</a><time>2025-11-04</time><span>note</span><a href="#k">Yet another placeholder row</a></li>
+        <li><a href="#l">38d6e91</a><time>2025-10-01</time><span>project</span><a href="#l">The last one</a></li>
+      </ol>
+    </section>
+  </main>
+
+  <script type="module">
+    import { mountField } from '../assets/js/field.js';
+
+    const html = document.documentElement;
+    const root = document.querySelector('[data-field-root]');
+    const readout = document.getElementById('readout');
+    const params = new URLSearchParams(location.search);
+    let api = null;
+
+    // initial state from the URL
+    if (params.get('field') === 'wind') html.dataset.field = 'wind';
+    if (params.get('home') === 'd') html.dataset.home = 'd';
+    if (params.get('theme') === 'light' || params.get('theme') === 'dark') html.dataset.theme = params.get('theme');
+    if (params.get('reduced') === '1') window.__setReducedMotion(true);
+
+    function state() {
+      return {
+        field: html.dataset.field || 'water',
+        theme: html.dataset.theme || 'system',
+        home: html.dataset.home || 'b',
+        motion: window.__reducedMotion() ? 'reduced' : 'normal',
+      };
+    }
+    function syncButtons() {
+      const s = state();
+      document.querySelectorAll('button[data-set]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(s[b.dataset.set] === b.dataset.value));
+      });
+      const p = new URLSearchParams();
+      p.set('field', s.field); p.set('home', s.home);
+      if (s.theme !== 'system') p.set('theme', s.theme);
+      if (s.motion === 'reduced') p.set('reduced', '1');
+      history.replaceState(null, '', '?' + p.toString());
+    }
+
+    document.querySelector('.bar').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.act === 'remount') { if (api) api.destroy(); api = mountField(root); }
+      else if (b.dataset.act === 'destroy') { if (api) api.destroy(); api = null; }
+      else if (b.dataset.set === 'theme') {
+        if (b.dataset.value === 'system') html.removeAttribute('data-theme');
+        else html.dataset.theme = b.dataset.value;
+      } else if (b.dataset.set === 'motion') window.__setReducedMotion(b.dataset.value === 'reduced');
+      else if (b.dataset.set) html.dataset[b.dataset.set] = b.dataset.value;
+      syncButtons();
+    });
+
+    // links are placeholders
+    document.addEventListener('click', (e) => { const a = e.target.closest('a[href^="#"]'); if (a) e.preventDefault(); });
+
+    // auto-mount already ran on import; mount again to get a handle for the readout
+    api = mountField(root);
+    syncButtons();
+
+    setInterval(() => {
+      if (!api) { readout.textContent = 'destroyed'; return; }
+      const s = api.stats();
+      readout.textContent = s.cols + 'x' + s.rows + ' cells  ' + s.ms.toFixed(2) + ' ms/frame (draw ' + s.drawMs.toFixed(2) + ')  dpr ' + s.dpr +
+        '  ' + (s.reduced ? 'static' : s.running ? 'running' : 'paused') + '  hotspots ' + s.hotspots;
+    }, 400);
+  </script>
+</body>
+</html>

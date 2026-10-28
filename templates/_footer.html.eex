@@ -1,0 +1,4 @@
+<footer class="site-footer">
+  <p class="footer-contact"><a href="mailto:<%= escape(Site.Config.email()) %>"><%= escape(Site.Config.email()) %></a> · <a href="<%= escape(Site.Config.linkedin()) %>" rel="noopener">linkedin</a></p>
+  <p class="footer-build">built from <%= if @build.href do %><a href="<%= escape(@build.href) %>"><%= escape(@build.label) %></a><% else %><span><%= escape(@build.label) %></span><% end %></p>
+</footer>
