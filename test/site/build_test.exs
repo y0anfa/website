@@ -155,15 +155,16 @@ defmodule Site.BuildTest do
       refute page(tree, "404.html") =~ "og:url"
     end
 
-    test "the page sets the lang and the default field preset", %{tree: tree} do
+    test "the page sets the lang, with no field preset attribute", %{tree: tree} do
       for path <- @pages do
-        assert page(tree, path) =~ ~s(<html lang="en" data-field="topo">), path
+        assert page(tree, path) =~ ~s(<html lang="en">), path
       end
     end
 
-    test "head.js offers the topo and water presets, topo first, and no wind" do
-      assert @head_js =~ ~r/field: \['topo', 'water'\]/
-      refute @head_js =~ "wind"
+    test "head.js only restores the theme" do
+      assert @head_js =~ "localStorage.getItem('theme')"
+      refute @head_js =~ "sessionStorage"
+      refute @head_js =~ "field"
     end
 
     test "the stylesheet is linked and no script is deferred wrongly", %{tree: tree} do

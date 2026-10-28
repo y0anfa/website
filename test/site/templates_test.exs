@@ -82,12 +82,12 @@ defmodule Site.TemplatesTest do
     assert length(Regex.scan(~r/data-field-root/, layout)) == 1
   end
 
-  test "the layout defaults the field to topo and loads field.js as a module" do
+  test "the layout loads field.js as a module, with no preset switch" do
     layout = File.read!("templates/layout.html.eex")
 
-    assert layout =~ ~S(<html lang="en" data-field="topo">)
+    assert layout =~ ~S(<html lang="en">)
     assert layout =~ ~S(<script type="module" src="/assets/js/field.js"></script>)
-    refute layout =~ "wind"
+    refute layout =~ "data-field="
   end
 
   test "no page template but the layout knows about the field" do

@@ -20,7 +20,7 @@ It shows who he is, what he thinks, and what he makes.
 | Home | One centred column: a compact, quiet intro (who, where, off-hours), then the log as the main content. No hero. (A split screen with the field on the left, and a "field is the nav" prototype, were tried and dropped at review.) |
 | Feed | A "git log" list, the only list on the site. Essays, notes and projects share it. Each row is: real short commit hash (linked to GitHub), date, type, title. |
 | URLs | Flat: every entry lives at `/<slug>/`, whatever its type. The content folder sets the type (a label in the log and in the entry's meta line), not the URL. Slugs are unique across all types. The old Hugo URLs are redirected (§4). |
-| Signature | A quiet ASCII backdrop, fixed behind every page: on the home it shows behind everything, on inner pages only in the side margins. Two presets compared via `?field=topo` (default, topographic contour lines) or `?field=water`. |
+| Signature | A quiet backdrop of topographic contour lines in ASCII, fixed behind every page: on the home it shows behind everything, on inner pages only in the side margins. (Water and wind presets were tried and dropped at review.) |
 | Type | Inter (variable, self-hosted) for all text and UI. JetBrains Mono 400, self-hosted, only for code, the log's hash and date, and the backdrop field. |
 | Color | Monochrome only. Light and dark follow the system, with a manual toggle. |
 | Motion | Only the field moves. Everything else is static. `prefers-reduced-motion` gets a static field frame. |
@@ -150,10 +150,7 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 - `main#main`.
 - `footer.site-footer`: `hello@yoanfau.re · linkedin` on the left; `built from <a>a3f9c21</a>` on the right, linking to the HEAD commit (`-dirty` suffix if the tree is dirty, `unversioned` with no git).
 - `<title>`: `<Page> — Yoan Faure` (home: `Yoan Faure — security engineer who builds`). Also meta description, canonical, `og:title/description/url/type`, `twitter:card=summary`, favicon, and a preload for the Inter variable font (`/assets/fonts/InterVariable.woff2`, with `crossorigin`).
-- `<html lang="en" data-field="topo">` by default. The inline head script (`assets/js/head.js`) does three things:
-  - Reads `?field=topo|water`, sets it on `<html>` and remembers it in `sessionStorage`, so navigating between pages keeps the preset during review.
-  - Without the param, falls back to `sessionStorage`.
-  - Applies `localStorage.theme` (`light` / `dark`) to `data-theme`.
+- `<html lang="en">`. The inline head script (`assets/js/head.js`) only applies `localStorage.theme` (`light` / `dark`) to `data-theme`, before first paint.
 - `<script type="module" src="/assets/js/field.js">` is loaded on every page, from the shared layout. `theme.js` (and `404.js` on the 404) are plain `defer` scripts.
 
 **Backdrop and column**
@@ -209,15 +206,13 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 A quiet, fixed, full-viewport layer behind every page: a watermark you notice after a few seconds, never competing with the text. An ES module with no dependencies and no `innerHTML`/`eval`. It exports `mountField(root)` and auto-mounts every `[data-field-root]`.
 
 - **DOM:** `<div class="field" data-field-root aria-hidden="true"><canvas class="field-canvas"></canvas></div>` right after the skip link in the layout. `.field` is `position: fixed; inset: 0; z-index: 0; pointer-events: none` and sets `font-family: var(--font-mono)`, 14px. Header, main and footer sit above it. Inner pages paint their column opaque, so the field shows only in the margins.
-- **Rendering:** a canvas sized to the root (ResizeObserver plus a window resize fallback), DPR-aware (capped at 2). Cell metrics come from the root's computed mono font; the cell height is 1.1em so line glyphs join. A pre-rendered glyph atlas is tinted with the root's computed `color` and rebuilt on theme change (MutationObserver on `<html>` `data-theme`/`data-field`, plus the `prefers-color-scheme` change event). Only changed cells are redrawn.
-- **Presets:** read from `document.documentElement.dataset.field`; unknown values fall back to `topo`. The preset re-mounts when the attribute changes.
-  - **topo** (default) is topographic contour lines, like a retro survey map. The terrain is 3 octaves of 2D gradient noise pinned to viewport pixels, with slowly rotating gradients, so contours drift a few pixels per second and never jitter. A cell is lit when it sits within half a cell's gradient of a contour level, which gives thin, connected lines (about 7% of cells). Glyphs follow the line direction: `-`, `|`, `/`, `\`. Every 5th level is an index contour, drawn stronger. The pointer slowly raises a wide Gaussian hill (rises over ~1 s, relaxes over ~3 s), so the lines flow around it. 20 fps.
-  - **water** is calm water. Blank at rest. Pointer movement leaves sparse rings (at most one every 120–200 ms, at least 14 cells apart), and a rare ambient drop arrives every 6–10 s. Rings are analytic, not simulated, so they stay clean when they overlap. Soft ramp ` .·:-`, blank below a threshold. 30 fps.
-- **Alpha:** watermark level. Topo contours 0.13–0.17, index contours 0.26–0.32, water 0.14–0.27, scaled ×0.88 on dark.
+- **Rendering:** a canvas sized to the root (ResizeObserver plus a window resize fallback), DPR-aware (capped at 2). Cell metrics come from the root's computed mono font; the cell height is 1.1em so line glyphs join. A pre-rendered glyph atlas is tinted with the root's computed `color` and rebuilt on theme change (MutationObserver on `<html>` `data-theme`, plus the `prefers-color-scheme` change event). Only changed cells are redrawn.
+- **Topo:** topographic contour lines, like a retro survey map. The terrain is 3 octaves of 2D gradient noise pinned to viewport pixels, with slowly rotating gradients, so contours drift a few pixels per second and never jitter. A cell is lit when it sits within half a cell's gradient of a contour level, which gives thin, connected lines (about 7% of cells). Glyphs follow the line direction: `-`, `|`, `/`, `\`. Every 5th level is an index contour, drawn stronger. The pointer slowly raises a wide Gaussian hill (rises over ~1 s, relaxes over ~3 s), so the lines flow around it. 20 fps.
+- **Alpha:** watermark level. Contours 0.13–0.17, index contours 0.26–0.32, scaled ×0.88 on dark.
 - **Budget:** under 4 ms per frame on large screens (measured about 1 ms at 2560×1440, DPR 2). Pauses when the document is hidden.
-- **Accessibility:** the root is `aria-hidden`. Under `prefers-reduced-motion: reduce`, it renders one static frame (a still map, or one faint ring) with no loop and no pointer effects, re-rendered on resize and theme change.
+- **Accessibility:** the root is `aria-hidden`. Under `prefers-reduced-motion: reduce`, it renders one static frame (a still map) with no loop and no pointer effects, re-rendered on resize and theme change.
 - **CSP-safe:** sizing only via CSSOM (`canvas.style.width = …`), never `setAttribute('style')` and never inline `<style>`.
-- **Playground:** `lab/field.html` shows the backdrop behind a fake log and an "inner page" column, with preset, theme and reduced-motion switches.
+- **Playground:** `lab/field.html` shows the backdrop behind a fake log and an "inner page" column, with theme and reduced-motion switches.
 
 ## 10. Build (Elixir)
 

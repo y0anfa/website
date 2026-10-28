@@ -7,9 +7,9 @@
   The field is a fixed, full-viewport backdrop behind a fake site: a header, a
   home-style log, and an "inner page" mode with an opaque 72ch column, so the
   field only shows in the margins.
-  Query params: ?field=topo|water  ?theme=light|dark  ?reduced=1  ?page=home|inner  ?halo=0
+  Query params: ?theme=light|dark  ?reduced=1  ?page=home|inner  ?halo=0
 -->
-<html lang="en" data-field="topo">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -113,9 +113,6 @@
   <div class="field" data-field-root aria-hidden="true"><canvas class="field-canvas"></canvas></div>
 
   <div class="bar" role="toolbar" aria-label="Playground controls">
-    <div class="group"><span>preset</span>
-      <button type="button" data-set="field" data-value="topo">topo</button>
-      <button type="button" data-set="field" data-value="water">water</button></div>
     <div class="group"><span>theme</span>
       <button type="button" data-set="theme" data-value="system">system</button>
       <button type="button" data-set="theme" data-value="light">light</button>
@@ -169,8 +166,8 @@
         <p>I work on security at Riot, in Paris. I write about threat modeling, small tools, and the unglamorous parts of
         the job. This paragraph is a placeholder so there is something to read next to the map: a few lines of body text,
         set in the same monospace as everything else on the site.</p>
-        <p>Move the pointer over the margins. On the topo preset a wide, gentle hill rises under it and the contour lines
-        flow around it; on water it leaves slow rings. Leave the window and everything settles again.</p>
+        <p>Move the pointer over the margins. A wide, gentle hill rises under it and the contour lines flow around it.
+        Leave the window and everything settles again.</p>
         <p>Move the pointer over this column and nothing should happen under the text: the field is behind it, and the
         column hides it entirely. The pointer still raises the hill, which is visible again as soon as it reaches a margin.</p>
         <p><a href="#back">&larr; essays</a></p>
@@ -194,7 +191,6 @@
     let api = null;
 
     // initial state from the URL
-    if (params.get('field') === 'topo' || params.get('field') === 'water') html.dataset.field = params.get('field');
     if (params.get('theme') === 'light' || params.get('theme') === 'dark') html.dataset.theme = params.get('theme');
     if (params.get('page') === 'inner') body.dataset.page = 'inner';
     if (params.get('halo') === '0') body.dataset.halo = 'off';
@@ -202,7 +198,6 @@
 
     function state() {
       return {
-        field: html.dataset.field || 'topo',
         theme: html.dataset.theme || 'system',
         motion: window.__reducedMotion() ? 'reduced' : 'normal',
         page: body.dataset.page,
@@ -215,12 +210,12 @@
         b.setAttribute('aria-pressed', String(s[b.dataset.set] === b.dataset.value));
       });
       const p = new URLSearchParams();
-      p.set('field', s.field);
       if (s.theme !== 'system') p.set('theme', s.theme);
       if (s.motion === 'reduced') p.set('reduced', '1');
       if (s.page !== 'home') p.set('page', s.page);
       if (s.halo === 'off') p.set('halo', '0');
-      history.replaceState(null, '', '?' + p.toString());
+      const q = p.toString();
+      history.replaceState(null, '', q ? '?' + q : location.pathname);
     }
 
     document.querySelector('.bar').addEventListener('click', (e) => {
@@ -233,7 +228,6 @@
         else html.dataset.theme = b.dataset.value;
       } else if (b.dataset.set === 'motion') window.__setReducedMotion(b.dataset.value === 'reduced');
       else if (b.dataset.set === 'page' || b.dataset.set === 'halo') body.dataset[b.dataset.set] = b.dataset.value;
-      else if (b.dataset.set) html.dataset[b.dataset.set] = b.dataset.value;
       syncButtons();
     });
 

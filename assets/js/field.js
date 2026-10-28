@@ -2,16 +2,12 @@
  * field.js: the ASCII field. The only motion on the site, and a quiet one.
  *
  * It is a backdrop: one fixed, full-viewport layer behind the page, low in
- * contrast and slow, a watermark you notice after a few seconds. Two presets,
- * chosen by <html data-field="topo|water"> (topo is the default; anything else
- * falls back to it):
- *   topo   a survey map. Contour lines of a slowly evolving landscape, drawn
- *          with - | / \ ; every fifth contour is an index contour, a little
- *          stronger. About 8% of the cells are lit, the rest stay blank. The
- *          pointer raises a wide, gentle hill (it eases in over about a second
- *          and relaxes over about three) and the lines flow around it.
- *   water  calm water. A blank, still surface; the pointer leaves slow, sparse
- *          rings and a rare drop falls on its own every 6-10 s.
+ * contrast and slow, a watermark you notice after a few seconds. It draws a
+ * survey map: contour lines of a slowly evolving landscape, drawn with the
+ * strokes - | / \ ; every fifth contour is an index contour, a little stronger.
+ * About 8% of the cells are lit, the rest stay blank. The pointer raises a
+ * wide, gentle hill (it eases in over about a second and relaxes over about
+ * three) and the lines flow around it.
  *
  * Contract (SPEC section 7 and 9): export mountField(root) -> { destroy() },
  * and auto-mount every [data-field-root]. No dependencies, no markup
@@ -27,41 +23,27 @@
  *
  * Behaviour:
  *  - The canvas is redrawn by diff; typed arrays only, nothing allocated per
- *    frame. Topo runs at 20 fps (the landscape itself is recomputed at 10 Hz,
- *    on a half-resolution lattice), water at 30. Both take well under 2 ms a
- *    frame on a 2560x1440 viewport. Paused while the document is hidden or the
- *    root is off screen; DPR is capped at 2.
+ *    frame. It runs at 20 fps (the landscape itself is recomputed at 10 Hz, on
+ *    a half-resolution lattice) and takes well under 2 ms a frame on a
+ *    2560x1440 viewport. Paused while the document is hidden or the root is off
+ *    screen; DPR is capped at 2.
  *  - Glyph alpha is baked into the atlas: 0.13-0.17 for contours, about 0.3 for
- *    index contours, 0.14-0.27 for water rings. It is eased by 12% on a dark
- *    theme, where light ink reads heavier.
- *  - prefers-reduced-motion: one static frame (topo: a map; water: one faint
- *    settled ring), no loop and no pointer effects; redrawn on resize and
- *    theme change.
- *  - The atlas is rebuilt on [data-theme] and [data-field] changes and on the
- *    prefers-color-scheme change. A new [data-field] value swaps the preset.
+ *    index contours. It is eased by 12% on a dark theme, where light ink reads
+ *    heavier.
+ *  - prefers-reduced-motion: one static frame (the map at rest), no loop and no
+ *    pointer effects; redrawn on resize and theme change.
+ *  - The atlas is rebuilt on [data-theme] changes and on the
+ *    prefers-color-scheme change.
  *
  * Optional extra (extends the SPEC, harmless if unused):
  *  - mountField(root).stats() returns debug numbers for lab/field.html.
  */
 
 const DPR_CAP = 2;
-const CELL_H = 1.25; // default cell height as a multiple of the font size
-const DEFAULT_PRESET = 'topo';
 
 /* ------------------------------------------------------------------------ *
  * Pure helpers. Exported so they can be unit-tested in node.
  * ------------------------------------------------------------------------ */
-
-export function mulberry32(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 /** Integer lattice hash to [0, 1). Position based, so a landscape survives a resize. */
 export function hash2(ix, iy, salt) {
@@ -119,7 +101,7 @@ export function smoothTo(s, target, omega, dt) {
  * cell is a single drawImage; the field stays quieter than body text.
  * ------------------------------------------------------------------------ */
 
-// topo: index = 1 + shape * 2 + (index contour ? 1 : 0); shapes: - | / \
+// index = 1 + shape * 2 + (index contour ? 1 : 0); shapes: - | / \
 // (tall strokes carry more ink per cell, so they get a little less alpha)
 const TOPO_GLYPHS = [
   ['', 0],
@@ -133,16 +115,8 @@ const TOPO_GLYPHS = [
   ['\\', 0.3],
 ];
 
-const WATER_GLYPHS = [
-  ['', 0],
-  ['.', 0.14],
-  ['·', 0.18],
-  [':', 0.22],
-  ['-', 0.27],
-];
-
 /* ------------------------------------------------------------------------ *
- * Preset: topo
+ * Topo
  *
  * Height field: three octaves of 2D gradient noise whose lattice gradients
  * slowly rotate, which makes the landscape evolve without ever jittering.
@@ -330,10 +304,6 @@ export function createTopo(seed) {
   }
 
   return {
-    glyphs: TOPO_GLYPHS,
-    fps: TOPO.fps,
-    cell: TOPO.cell,
-
     /** ox, oy: where the grid starts inside the viewport, css px. The landscape is pinned to the viewport, not the grid. */
     resize(cols, rows, cellW, cellH, ox, oy) {
       if (cols !== w || rows !== h || !base) {
@@ -347,7 +317,7 @@ export function createTopo(seed) {
       dirty = true;
     },
 
-    /** The first call picks a start time; `still` (reduced motion) pins the landscape and drops the hill. */
+    /** The first call picks a start time; `still` (reduced motion) pins the landscape and clears the hill. */
     settle(still) {
       if (!started) {
         started = true;
@@ -434,224 +404,7 @@ export function createTopo(seed) {
     pointerLeave() {
       want = false;
     },
-
-    time() {
-      return t;
-    },
-
-    /** Debug: the hill's current strength, 0..1. */
-    hill() {
-      return amp.v;
-    },
   };
-}
-
-/* ------------------------------------------------------------------------ *
- * Preset: water
- *
- * Calm water: a still, blank surface. Nothing moves until something falls in
- * it, and then only a ring does: a soft crest that opens slowly from the spot
- * and fades as it goes. The pointer drops one now and then (rate limited, and
- * never closer than a few cells to the last one), and a rare drop falls on its
- * own. Rings are drawn, not simulated: each is one analytic crest, and
- * overlapping rings take the stronger of the two, so there is no interference,
- * no wake and no speckle, and the surface is blank most of the time.
- * ------------------------------------------------------------------------ */
-
-const WATER = {
-  fps: 30,
-  cell: 1.25,
-  max: 24, // rings alive at once; the oldest is reused
-  open: 1.2, // a ring starts this many cell widths wide
-  grow: 0.04, // crest width, in cell widths: grow * radius + base
-  base: 0.95,
-  steps: [0.08, 0.17, 0.3, 0.5], // crest strength needed for ramp steps . · : -; below the first the cell stays blank
-  fade: 0.35, // seconds a ring takes to come in
-  pointer: { gap: 0.12, jitter: 0.08, dist: 14, amp: 0.5, life: 3.4, speed: 4.6 }, // one ring per 120-200 ms of movement; speed in cell widths a second
-  ambient: { gap: 6, jitter: 4, first: 1.5, amp: 0.62, ampJitter: 0.1, life: 7.5, lifeJitter: 1.5, speed: 4.2 }, // one drop every 6-10 s
-};
-
-// strength (in hundredths) -> ramp level. No logs or branches per cell.
-const WATER_LUT = (() => {
-  const lut = new Uint8Array(256);
-  for (let k = 0; k < 256; k++) {
-    const v = k / 100;
-    let lv = 0;
-    for (let s = 0; s < WATER.steps.length; s++) if (v >= WATER.steps[s]) lv = s + 1;
-    lut[k] = lv;
-  }
-  return lut;
-})();
-
-export function createWater(seed) {
-  const rnd = mulberry32(seed === undefined ? (Math.random() * 4294967296) >>> 0 : seed);
-  const M = WATER.max;
-  const rx = new Float32Array(M); // ring centre, cells
-  const ry = new Float32Array(M);
-  const born = new Float32Array(M);
-  const life = new Float32Array(M); // 0: slot is free
-  const amp = new Float32Array(M);
-  const speed = new Float32Array(M);
-  let w = 0;
-  let h = 0;
-  let buf = null; // crest strength per cell
-  let inv = 2.08; // cell height / cell width
-  let t = 0;
-  let nextDrop = 0;
-  let nextPtr = 0;
-  let lastX = -1e3; // where the pointer last dropped something, cells
-  let lastY = -1e3;
-  let any = false; // something was drawn last time
-
-  // a free slot, else the ring closest to the end of its life
-  function drop(cx, cy, a, l, v, age) {
-    let k = 0;
-    let least = Infinity;
-    for (let i = 0; i < M; i++) {
-      const rest = life[i] === 0 ? -1 : life[i] - (t - born[i]);
-      if (rest < least) {
-        least = rest;
-        k = i;
-      }
-      if (rest <= 0) break;
-    }
-    rx[k] = cx;
-    ry[k] = cy;
-    born[k] = t - (age || 0);
-    life[k] = l;
-    amp[k] = a;
-    speed[k] = v;
-  }
-
-  function ambient() {
-    const A = WATER.ambient;
-    const mx = 6;
-    const my = 6 / inv;
-    const cx = mx + rnd() * Math.max(1, w - 2 * mx);
-    const cy = my + rnd() * Math.max(1, h - 2 * my);
-    drop(cx, cy, A.amp + rnd() * A.ampJitter, A.life + rnd() * A.lifeJitter, A.speed);
-  }
-
-  return {
-    glyphs: WATER_GLYPHS,
-    fps: WATER.fps,
-    cell: WATER.cell,
-
-    resize(cols, rows, cellW, cellH) {
-      if (cols !== w || rows !== h || !buf) {
-        w = cols;
-        h = rows;
-        buf = new Float32Array(w * h);
-        life.fill(0);
-        any = true;
-      }
-      inv = cellH / cellW;
-    },
-
-    /** A blank surface. `still` (reduced motion) leaves one faint ring, mid-way through its life. */
-    settle(still) {
-      life.fill(0);
-      t = 0;
-      any = true;
-      lastX = lastY = -1e3;
-      if (still) {
-        const A = WATER.ambient;
-        drop(0.68 * w, 0.42 * h, A.amp, A.life, A.speed, 3);
-      }
-      nextDrop = t + WATER.ambient.first + rnd() * 2;
-    },
-
-    step(dt) {
-      t += dt;
-      if (t >= nextDrop) {
-        ambient();
-        nextDrop = t + WATER.ambient.gap + rnd() * WATER.ambient.jitter;
-      }
-    },
-
-    render(out) {
-      buf.fill(0);
-      let live = false;
-      for (let n = 0; n < M; n++) {
-        const l = life[n];
-        if (l === 0) continue;
-        const age = t - born[n];
-        if (age >= l) continue;
-        live = true;
-        const u = 1 - age / l;
-        let env = amp[n] * u * Math.sqrt(u);
-        if (age < WATER.fade) {
-          const f = age / WATER.fade;
-          env *= f * f * (3 - 2 * f);
-        }
-        const r = WATER.open + speed[n] * age;
-        const sig = WATER.base + WATER.grow * r;
-        const sf = sig * 0.7; // a crisper leading edge...
-        const sb = sig * 1.4; // ... and a softer back
-        const outer = r + 3 * sf;
-        const inner = r - 3 * sb;
-        const o2 = outer * outer;
-        const i2 = inner > 0 ? inner * inner : -1;
-        const cx = rx[n];
-        const cy = ry[n];
-        const x0 = Math.max(0, Math.floor(cx - outer));
-        const x1 = Math.min(w - 1, Math.ceil(cx + outer));
-        const y0 = Math.max(0, Math.floor(cy - outer / inv));
-        const y1 = Math.min(h - 1, Math.ceil(cy + outer / inv));
-        for (let y = y0; y <= y1; y++) {
-          const dy = (y + 0.5 - cy) * inv;
-          const dy2 = dy * dy;
-          let i = y * w + x0;
-          for (let x = x0; x <= x1; x++, i++) {
-            const dx = x + 0.5 - cx;
-            const d2 = dx * dx + dy2;
-            if (d2 > o2 || d2 < i2) continue;
-            const e = Math.sqrt(d2) - r;
-            const q = e > 0 ? e / sf : e / sb;
-            const v = env * Math.exp(-q * q);
-            if (v > buf[i]) buf[i] = v;
-          }
-        }
-      }
-      if (!live) {
-        if (any) out.fill(0);
-        any = false;
-        return;
-      }
-      any = true;
-      for (let i = 0, n = w * h; i < n; i++) {
-        const k = (buf[i] * 100) | 0;
-        out[i] = WATER_LUT[k > 255 ? 255 : k];
-      }
-    },
-
-    /** Called every frame while a pointer is over the page; cx, cy are in cell units. */
-    pointer(cx, cy, moved) {
-      const P = WATER.pointer;
-      if (!moved || t < nextPtr) return;
-      const dx = cx - lastX;
-      const dy = (cy - lastY) * inv;
-      if (dx * dx + dy * dy < P.dist * P.dist) return; // not far enough from the last ring: a slow pointer stays sparse
-      drop(cx, cy, P.amp, P.life, P.speed);
-      lastX = cx;
-      lastY = cy;
-      nextPtr = t + P.gap + rnd() * P.jitter;
-    },
-
-    pointerLeave() {
-      lastX = lastY = -1e3;
-    },
-
-    time() {
-      return t;
-    },
-  };
-}
-
-const PRESETS = { topo: createTopo, water: createWater };
-
-function presetName(value) {
-  return Object.prototype.hasOwnProperty.call(PRESETS, value) ? value : DEFAULT_PRESET;
 }
 
 /* ------------------------------------------------------------------------ *
@@ -691,13 +444,12 @@ export function mountField(root) {
   let raf = 0;
   let last = 0;
   let cost = 0; // moving average of the work per frame, ms
-  let costRender = 0; // ... of which the preset's render
+  let costRender = 0; // ... of which the contour pass
   let costDraw = 0; // ... and of which drawing
   let lit = 0; // share of cells showing a glyph, 0..1
 
-  let name = presetName(html.dataset.field);
-  let preset = PRESETS[name]();
-  let frameMs = 1000 / preset.fps;
+  const topo = createTopo();
+  const frameMs = 1000 / TOPO.fps;
 
   // metrics
   let styleKey = '';
@@ -720,13 +472,13 @@ export function mountField(root) {
   /* ---- atlas ---- */
 
   function buildAtlas(family, size, weight, color) {
-    const defs = preset.glyphs;
+    const defs = TOPO_GLYPHS;
     const fpx = size * dpr;
     const font = weight + ' ' + fpx + 'px ' + family;
     measure.font = font;
     const m = measure.measureText('M');
     cwD = Math.max(3, Math.round(m.width));
-    chD = Math.max(4, Math.round(fpx * (preset.cell || CELL_H)));
+    chD = Math.max(4, Math.round(fpx * TOPO.cell));
     cellW = cwD / dpr;
     cellH = chD / dpr;
     atlas.width = cwD * defs.length;
@@ -760,7 +512,7 @@ export function mountField(root) {
     const cs = getComputedStyle(root);
     const size = parseFloat(cs.fontSize) || 14;
     const ratio = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-    const key = [name, cs.fontFamily, size, cs.fontWeight, cs.color, ratio].join('|');
+    const key = [cs.fontFamily, size, cs.fontWeight, cs.color, ratio].join('|');
     const now = key + '|' + cw + 'x' + ch;
     if (now === sig && sized) return; // nothing changed (the observer and the window both report a resize)
     sig = now;
@@ -808,8 +560,8 @@ export function mountField(root) {
       shown = new Uint8Array(cols * rows);
       forceFull = true;
     }
-    preset.resize(cols, rows, cellW, cellH, offX / dpr, offY / dpr);
-    if (fresh || reduced) preset.settle(reduced);
+    topo.resize(cols, rows, cellW, cellH, offX / dpr, offY / dpr);
+    if (fresh || reduced) topo.settle(reduced);
     sized = true;
     paint();
     updateRunning();
@@ -839,7 +591,7 @@ export function mountField(root) {
     if (!ptr.inside) {
       if (ptr.had) {
         ptr.had = false;
-        preset.pointerLeave();
+        topo.pointerLeave();
       }
       return;
     }
@@ -847,7 +599,7 @@ export function mountField(root) {
     let cy = (ptr.y - offY / dpr) / cellH;
     cx = cx < 0 ? 0 : cx > cols ? cols : cx;
     cy = cy < 0 ? 0 : cy > rows ? rows : cy;
-    preset.pointer(cx, cy, ptr.moved);
+    topo.pointer(cx, cy, ptr.moved);
     ptr.moved = false;
     ptr.had = true;
   }
@@ -857,7 +609,7 @@ export function mountField(root) {
   function paint() {
     if (!sized) return;
     const t0 = performance.now();
-    preset.render(idx);
+    topo.render(idx);
     const t1 = performance.now();
     draw();
     costRender = costRender * 0.92 + (t1 - t0) * 0.08;
@@ -913,7 +665,7 @@ export function mountField(root) {
     if (now - last > frameMs) last = now;
     const t0 = performance.now();
     tickPointer();
-    preset.step(frameMs / 1000);
+    topo.step(frameMs / 1000);
     paint();
     cost = cost * 0.92 + (performance.now() - t0) * 0.08;
   }
@@ -948,30 +700,6 @@ export function mountField(root) {
     later(layout, 350);
   }
 
-  function setPreset(next) {
-    if (next === name) return;
-    name = next;
-    preset = PRESETS[name]();
-    frameMs = 1000 / preset.fps;
-    styleKey = '';
-    sig = '';
-    cols = 0; // forces the new preset to size and settle itself
-    ptr.had = false;
-    layout();
-  }
-
-  function onMutation(records) {
-    let theme = false;
-    let field = false;
-    for (let k = 0; k < records.length; k++) {
-      const a = records[k].attributeName;
-      if (a === 'data-theme') theme = true;
-      else if (a === 'data-field') field = true;
-    }
-    if (field) setPreset(presetName(html.dataset.field));
-    if (theme) refreshTheme();
-  }
-
   function onMotionChange() {
     reduced = mqReduce.matches;
     onPointerGone();
@@ -979,7 +707,7 @@ export function mountField(root) {
     if (reduced) {
       stopLoop();
       if (sized) {
-        preset.settle(true);
+        topo.settle(true);
         forceFull = true;
         paint();
       }
@@ -1027,8 +755,8 @@ export function mountField(root) {
         })
       : null;
   if (io) io.observe(root);
-  const mo = new MutationObserver(onMutation);
-  mo.observe(html, { attributes: true, attributeFilter: ['data-theme', 'data-field'] });
+  const mo = new MutationObserver(refreshTheme);
+  mo.observe(html, { attributes: true, attributeFilter: ['data-theme'] });
 
   const listen = (mq, fn) => (mq.addEventListener ? mq.addEventListener('change', fn) : mq.addListener(fn));
   const unlisten = (mq, fn) => (mq.removeEventListener ? mq.removeEventListener('change', fn) : mq.removeListener(fn));
@@ -1077,7 +805,7 @@ export function mountField(root) {
     },
     /** Debug info for the playground. */
     stats() {
-      return { preset: name, cols, rows, cellW, cellH, dpr, fps: preset.fps, ms: cost, renderMs: costRender, drawMs: costDraw, lit, running: !!raf, reduced };
+      return { cols, rows, cellW, cellH, dpr, fps: TOPO.fps, ms: cost, renderMs: costRender, drawMs: costDraw, lit, running: !!raf, reduced };
     },
   };
   mounts.set(root, api);

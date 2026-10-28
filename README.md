@@ -21,7 +21,7 @@ mix test           # run the test suite
 
 `mix site.build` also accepts `--drafts`, `--content DIR` and `--out DIR`.
 
-The field is a quiet backdrop on every page. Its preset is chosen with a query parameter: `?field=topo` (the default, topographic contour lines) or `?field=water`, e.g. `http://localhost:4000/?field=water`. The choice is kept for the session, so it holds as you navigate.
+The field is a quiet backdrop of topographic contour lines on every page: behind everything on the home, only in the side margins on entry pages.
 
 `mix site.serve` applies the headers from `dist/_headers`, so a Content Security Policy violation shows locally in the same way it does in production. It does not apply `dist/_redirects`: the old Hugo URLs only redirect on Cloudflare.
 
