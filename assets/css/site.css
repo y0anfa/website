@@ -39,10 +39,10 @@
 /* ---------- tokens ---------- */
 
 :root {
-  --bg: #f3f2ee;
-  --fg: #121212;
-  --muted: #6a6a66;
-  --rule: #d6d5cf;
+  --bg: #f4efe4;
+  --fg: #262523;
+  --muted: #6b675f;
+  --rule: #ddd6c8;
 
   --font: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
@@ -55,20 +55,20 @@
 /* No data-theme: follow the system. data-theme forces a theme. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f0f0e;
-    --fg: #e8e7e1;
-    --muted: #8b8a85;
-    --rule: #2b2b29;
+    --bg: #1e1d1b;
+    --fg: #ece6d9;
+    --muted: #9a958b;
+    --rule: #34322f;
 
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0f0f0e;
-  --fg: #e8e7e1;
-  --muted: #8b8a85;
-  --rule: #2b2b29;
+  --bg: #1e1d1b;
+  --fg: #ece6d9;
+  --muted: #9a958b;
+  --rule: #34322f;
 
   color-scheme: dark;
 }

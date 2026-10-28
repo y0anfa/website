@@ -33,8 +33,8 @@ defmodule Site.CSSTest do
     body
   end
 
-  @light %{"bg" => "#f3f2ee", "fg" => "#121212", "muted" => "#6a6a66", "rule" => "#d6d5cf"}
-  @dark %{"bg" => "#0f0f0e", "fg" => "#e8e7e1", "muted" => "#8b8a85", "rule" => "#2b2b29"}
+  @light %{"bg" => "#f4efe4", "fg" => "#262523", "muted" => "#6b675f", "rule" => "#ddd6c8"}
+  @dark %{"bg" => "#1e1d1b", "fg" => "#ece6d9", "muted" => "#9a958b", "rule" => "#34322f"}
 
   test "the light palette is the one in the spec" do
     assert tokens(block(":root")) == @light

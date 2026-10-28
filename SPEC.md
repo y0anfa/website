@@ -163,9 +163,9 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 
 ```css
 /* light (default when system is light) */
---bg: #f3f2ee;  --fg: #121212;  --muted: #6a6a66;  --rule: #d6d5cf;
+--bg: #f4efe4;  --fg: #262523;  --muted: #6b675f;  --rule: #ddd6c8;
 /* dark */
---bg: #0f0f0e;  --fg: #e8e7e1;  --muted: #8b8a85;  --rule: #2b2b29;
+--bg: #1e1d1b;  --fg: #ece6d9;  --muted: #9a958b;  --rule: #34322f;
 ```
 
 - **Theming:** no `data-theme` means follow `prefers-color-scheme`; `[data-theme=light|dark]` forces it. `theme.js` toggles the effective theme and stores it in `localStorage`.
