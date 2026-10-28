@@ -136,8 +136,8 @@ defmodule Site.BuildTest do
       refute page(tree, "404.html") =~ "og:url"
     end
 
-    test "the page sets the lang and the default home variants", %{tree: tree} do
-      assert page(tree, "index.html") =~ ~s(<html lang="en" data-home="b" data-field="water">)
+    test "the page sets the lang and the default field preset", %{tree: tree} do
+      assert page(tree, "index.html") =~ ~s(<html lang="en" data-field="water">)
     end
 
     test "the stylesheet is linked and no script is deferred wrongly", %{tree: tree} do
@@ -210,18 +210,12 @@ defmodule Site.BuildTest do
       assert html =~ ~s(<section class="hero">)
       assert html =~ ~s(<div class="field" data-field-root>)
       assert html =~ ~s(<canvas class="field-canvas" aria-hidden="true"></canvas>)
-      assert html =~ ~s(<nav class="field-nav" aria-label="Sections">)
       assert html =~ ~s(<div class="intro">)
       assert html =~ ~s(<section class="log-section" aria-labelledby="log-h">)
       assert html =~ ~s(<h2 id="log-h">log</h2>)
       assert html =~ ~s(<ol class="log">)
 
-      for section <- ~w(essays notes projects uses cv) do
-        assert html =~
-                 ~s(<a class="hotspot hotspot--#{section}" href="/#{section}/" data-hotspot>#{section}</a>)
-      end
-
-      assert length(Regex.scan(~r/data-hotspot/, html)) == 5
+      refute html =~ "data-hotspot"
       assert length(Regex.scan(~r/data-field-root/, html)) == 1
     end
 
@@ -235,7 +229,7 @@ defmodule Site.BuildTest do
       assert hero < field and field < intro and intro < log
 
       assert html =~
-               ~r{<div class="intro">\s*<h1 data-field-clear>Test Person</h1>\s*<p class="tagline" data-field-clear>Fixture tagline for the home page.</p>}
+               ~r{<div class="intro">\s*<h1>Test Person</h1>\s*<p class="tagline">Fixture tagline for the home page.</p>}
 
       assert html =~ ~s(<p class="contact"><a href="mailto:hello@yoanfau.re">)
     end

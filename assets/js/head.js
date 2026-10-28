@@ -1,6 +1,6 @@
 (function () {
   var root = document.documentElement;
-  var choices = { home: ['b', 'd'], field: ['water', 'wind'] };
+  var choices = { field: ['water', 'wind'] };
   try {
     var query = new URLSearchParams(location.search);
     Object.keys(choices).forEach(function (key) {

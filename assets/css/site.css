@@ -1,6 +1,6 @@
 /* yoanfau.re
    Monochrome, one typeface, nothing decorative except the field.
-   Tokens first, then base, shell, content, log, home (variant B, variant D). */
+   Tokens first, then base, shell, content, log, home. */
 
 /* ---------- fonts ---------- */
 
@@ -584,10 +584,6 @@ pre {
   display: block;
 }
 
-.field-nav {
-  display: none;
-}
-
 .intro {
   max-width: calc(64ch + 2 * var(--gutter));
   padding: 2rem var(--gutter) 0;
@@ -597,7 +593,7 @@ pre {
   margin: 0 0 1rem;
 }
 
-.intro > h1 + p {
+.intro .tagline {
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -624,30 +620,30 @@ body[data-page="home"] .site-footer {
   margin-top: 4rem;
 }
 
-/* ---------- home: variant B (split, the default) ---------- */
+/* ---------- home: split ---------- */
 
 /* Below 960px: a field band, then the intro, then the log. */
-[data-home="b"] .field {
+.field {
   height: 45vh;
   min-height: 13rem;
   border-bottom: 1px solid var(--rule);
 }
 
 @supports (height: 100svh) {
-  [data-home="b"] .field {
+  .field {
     height: 45svh;
   }
 }
 
 @media (min-width: 960px) {
-  [data-home="b"] body[data-page="home"] .site-header {
+  body[data-page="home"] .site-header {
     position: sticky;
     top: 0;
     z-index: 10;
     background: var(--bg);
   }
 
-  [data-home="b"] body[data-page="home"] main {
+  body[data-page="home"] main {
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
     align-items: start;
@@ -655,7 +651,7 @@ body[data-page="home"] .site-footer {
 
   /* Left column: sticky, full height. The field takes what the intro leaves
      (about 60% on a laptop); the intro scrolls only on very short screens. */
-  [data-home="b"] .hero {
+  .hero {
     position: sticky;
     top: var(--header-h);
     display: grid;
@@ -664,192 +660,44 @@ body[data-page="home"] .site-footer {
     border-right: 1px solid var(--rule);
   }
 
-  [data-home="b"] .field {
+  .field {
     height: auto;
     min-height: 0;
   }
 
-  [data-home="b"] .intro {
+  .intro {
     max-width: none;
     max-height: calc((100vh - var(--header-h)) * 0.55);
     padding: 1.5rem var(--gutter) 1.25rem;
     overflow-y: auto;
   }
 
-  [data-home="b"] .intro h1 {
+  .intro h1 {
     margin-bottom: 0.75rem;
   }
 
-  [data-home="b"] .intro p {
+  .intro p {
     margin-bottom: 0.85rem;
   }
 
-  [data-home="b"] .log-section {
+  .log-section {
     max-width: none;
     padding: 3.25rem var(--gutter) 4rem;
   }
 
-  [data-home="b"] body[data-page="home"] .site-footer {
+  body[data-page="home"] .site-footer {
     margin-top: 0;
   }
 }
 
 @supports (height: 100svh) {
   @media (min-width: 960px) {
-    [data-home="b"] .hero {
+    .hero {
       height: calc(100svh - var(--header-h));
     }
 
-    [data-home="b"] .intro {
+    .intro {
       max-height: calc((100svh - var(--header-h)) * 0.55);
     }
-  }
-}
-
-/* ---------- home: variant D (the field is the nav) ---------- */
-
-[data-home="d"] .hero {
-  --field-h: max(26rem, calc(100vh - var(--header-h)));
-  --name-y: 0.5;
-
-  position: relative;
-}
-
-@supports (height: 100svh) {
-  [data-home="d"] .hero {
-    --field-h: max(26rem, calc(100svh - var(--header-h)));
-  }
-}
-
-[data-home="d"] .field {
-  height: var(--field-h);
-  border-bottom: 1px solid var(--rule);
-}
-
-/* The home nav moves into the field. Keep the links for keyboards and screen
-   readers: visually hidden until one of them has focus. */
-[data-home="d"] body[data-page="home"] .site-nav:not(:focus-within) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-
-[data-home="d"] .field-nav {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: block;
-  pointer-events: none;
-}
-
-[data-home="d"] .hotspot {
-  position: absolute;
-  padding: 0.2em 0.55em 0.25em;
-  background: var(--bg);
-  font-size: clamp(1.2rem, 0.9rem + 1.4vw, 2rem);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
-  text-decoration: none;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-}
-
-[data-home="d"] .hotspot:hover,
-[data-home="d"] .hotspot:focus-visible {
-  background: var(--fg);
-  color: var(--bg);
-}
-
-/* Hotspot positions: percentages of the field, one class each. */
-[data-home="d"] .hotspot--essays {
-  top: 27%;
-  left: 24%;
-}
-
-[data-home="d"] .hotspot--notes {
-  top: 21%;
-  left: 71%;
-}
-
-[data-home="d"] .hotspot--projects {
-  top: 69%;
-  left: 77%;
-}
-
-[data-home="d"] .hotspot--uses {
-  top: 63%;
-  left: 19%;
-}
-
-[data-home="d"] .hotspot--cv {
-  top: 85%;
-  left: 49%;
-}
-
-/* The name and the tagline (the first paragraph of home.md) sit centred on the
-   field; the rest of the intro and the log follow below the fold. */
-[data-home="d"] .intro > h1,
-[data-home="d"] .intro > h1 + p {
-  position: absolute;
-  right: 0;
-  left: 0;
-  z-index: 1;
-  width: fit-content;
-  margin: 0 auto;
-  background: var(--bg);
-  text-align: center;
-  pointer-events: none;
-}
-
-[data-home="d"] .intro > h1 {
-  top: calc(var(--field-h) * var(--name-y));
-  padding: 0.05em 0.4em 0.1em;
-  transform: translateY(-100%);
-}
-
-[data-home="d"] .intro > h1 + p {
-  top: calc(var(--field-h) * var(--name-y));
-  max-width: calc(100% - 2 * var(--gutter));
-  padding: 0.35rem 0.8rem 0.45rem;
-}
-
-[data-home="d"] .intro {
-  padding-top: 3.5rem;
-}
-
-[data-home="d"] .log-section {
-  padding-top: 3.5rem;
-}
-
-/* Narrow screens: the hotspots stack as a centred column under the name. */
-@media (max-width: 699.98px) {
-  [data-home="d"] .hero {
-    --field-h: max(30rem, calc(100vh - var(--header-h)));
-    --name-y: 0.26;
-  }
-
-  @supports (height: 100svh) {
-    [data-home="d"] .hero {
-      --field-h: max(30rem, calc(100svh - var(--header-h)));
-    }
-  }
-
-  [data-home="d"] .field-nav {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.4rem;
-    padding-bottom: 9%;
-  }
-
-  [data-home="d"] .hotspot {
-    position: static;
-    font-size: 1.6rem;
-    transform: none;
   }
 }

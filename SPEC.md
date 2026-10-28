@@ -17,7 +17,7 @@ It shows who he is, what he thinks, and what he makes.
 | Topic | Decision |
 |---|---|
 | Pages | home (with intro), essays, notes, projects, uses, cv, 404. No about page, no now page, no RSS, no colophon. |
-| Home | Two prototypes, switched by `?home=b` (split screen, the default) or `?home=d` (the field is the nav). The loser gets deleted after review. |
+| Home | Split screen: the field and intro on the left, the log on the right. (A "field is the nav" prototype was tried and dropped at review.) |
 | Feed | A "git log" list. Each row is: real short commit hash (linked to GitHub), date, type, title. |
 | Signature | An abstract ASCII field, peaceful and a bit retro. Two presets compared via `?field=water` (default) or `?field=wind`. |
 | Type | JetBrains Mono everywhere, self-hosted. |
@@ -135,28 +135,23 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 - `<title>`: `<Page> — Yoan Faure` (home: `Yoan Faure — security engineer who builds`). Also meta description, canonical, `og:title/description/url/type`, `twitter:card=summary`, favicon, and a preload for the Regular font.
 
 **Home**
-- `<html data-home="b" data-field="water">` by default. The inline head script (`assets/js/head.js`) does three things:
-  - Reads `?home=b|d` and `?field=water|wind`, sets them on `<html>` and remembers them in `sessionStorage`, so navigating back home keeps the variant during review.
-  - Without params, falls back to `sessionStorage`.
+- `<html data-field="water">` by default. The inline head script (`assets/js/head.js`) does three things:
+  - Reads `?field=water|wind`, sets it on `<html>` and remembers it in `sessionStorage`, so navigating back home keeps the preset during review.
+  - Without the param, falls back to `sessionStorage`.
   - Applies `localStorage.theme` (`light` / `dark`) to `data-theme`.
-- Both variants share **one** HTML document. CSS switches layout on `[data-home]`. DOM contract (field.js depends on it):
+- DOM contract (field.js depends on it):
 
 ```html
 <section class="hero">
   <div class="field" data-field-root>
     <canvas class="field-canvas" aria-hidden="true"></canvas>
-    <nav class="field-nav" aria-label="Sections">           <!-- shown only in variant D -->
-      <a class="hotspot hotspot--essays" href="/essays/" data-hotspot>essays</a>
-      … notes, projects, uses, cv …
-    </nav>
   </div>
-  <div class="intro"> h1 "Yoan Faure" + rendered home.md + contact line </div>
+  <div class="intro"> h1 "Yoan Faure" + p.tagline + rendered home.md + contact line </div>
 </section>
 <section class="log-section" aria-labelledby="log-h"> <h2 id="log-h">log</h2> <ol class="log">…</ol> </section>
 ```
 
-- **Variant B (split):** at ≥ 960px, two columns. The left column is sticky at 100vh: field on top (~60%), intro below. The right column scrolls the log. Below 960px: field band (~45vh), then intro, then log. `.field-nav` is `display:none`.
-- **Variant D (field is nav):** the first screen is a full-viewport field. `.hotspot` links are absolutely positioned over it with **CSS classes** (percent coordinates per `hotspot--*`, never inline styles). The name and tagline sit centred. Hovered or focused hotspots invert (bg ↔ fg). Intro and log follow below the fold. `.site-nav` links are visually hidden on the home page in D; brand and theme toggle stay. On narrow screens the hotspots stack as a centred column.
+- **Layout:** at ≥ 960px, two columns. The left column is sticky at 100vh: field on top (~60%), intro below. The right column scrolls the log. Below 960px: field band (~45vh), then intro, then log.
 
 **Article (essay, note):** `article.prose`, max 72ch. A meta line `essay · 2026-03-28 · <hash link>`, then h1, then body, then a `← essays` / `← notes` back link.
 **Project:** h1, tagline, a meta line `status · stack · link`, then the body.
@@ -187,11 +182,10 @@ An ES module with no dependencies and no `innerHTML`/`eval`. It exports `mountFi
 - **Presets:** read from `document.documentElement.dataset.field`. The preset re-mounts if the attribute changes.
   - **water** (default) is a calm surface. A two-buffer height-field ripple simulation with gentle damping, over a very slow low-amplitude swell so it is never fully still. Occasional ambient drops arrive every ~2–4 s. Pointer movement leaves rate-limited drops along its path. Height maps to a soft ramp, e.g. ` .·:-=+*`; avoid heavy `#@` so it stays peaceful.
   - **wind** is grass in wind. A slow, mostly horizontal noise flow field with drifting gusts. Each cell's glyph comes from local angle and strength: calm cells use ` .,'`, gusts use `- ~ / | \`. The pointer parts the wind: strokes deflect radially within ~8 cells, easing back.
-- **Hotspots (variant D):** collect visible `[data-hotspot]` in the root, in cell coordinates, and recompute on resize and on `data-home` change. Draw blank cells in a padded rect around each one so the word reads cleanly. On `pointerenter` or `focus`, a hotspot emits a soft effect: a centred drop for water, a widening calm for wind.
 - **Budget:** 30 fps cap; pause when off-screen (IntersectionObserver) or when the document is hidden. Under 4 ms per frame at ~160×60 cells.
 - **Accessibility:** the canvas is `aria-hidden`. Under `prefers-reduced-motion: reduce`, render one static frame with no loop and no pointer effects, re-rendered on resize and theme change.
 - **CSP-safe:** sizing only via CSSOM (`canvas.style.width = …`), never `setAttribute('style')` and never inline `<style>`.
-- **Playground:** `lab/field.html` mounts the field with a preset switch, a theme switch and a fake hotspot, for tuning without the build.
+- **Playground:** `lab/field.html` mounts the field with a preset switch and a theme switch, for tuning without the build.
 
 ## 10. Build (Elixir)
 

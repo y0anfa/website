@@ -12,9 +12,7 @@
  * CSS it expects: .field { position: relative; font-size: 14px; line-height: 1;
  * color: var(--fg) } and .field-canvas { position: absolute; inset: 0 }.
  *
- * Optional extras (extend the SPEC, harmless if unused):
- *  - any element anywhere carrying [data-field-clear] is blanked out of the
- *    field like a hotspot (no hover effect). Handy for a centred title.
+ * Optional extra (extends the SPEC, harmless if unused):
  *  - mountField(root).stats() returns debug numbers for lab/field.html.
  */
 
@@ -23,10 +21,7 @@ const FRAME_MS = 1000 / FPS;
 const STEP_DT = 1 / FPS;
 const DPR_CAP = 2;
 const CELL_H = 1.25; // cell height as a multiple of the font size
-const PAD_X = 2; // blank padding around hotspots, in cells
-const PAD_Y = 1;
 const PTR_RADIUS = 8; // wind deflection radius, in cell widths
-const CALM_RADIUS = 9; // how far a hovered hotspot's calm zone can widen
 
 /* ------------------------------------------------------------------------ *
  * Pure helpers. Exported so they can be unit-tested in node.
@@ -364,13 +359,6 @@ export function createWater(seed) {
       drop(cx, cy, 0.3, 3.4);
     },
 
-    /** Hovering or focusing a hotspot: one soft, centred drop. */
-    hotspot(hs) {
-      if (t < hs.cool) return;
-      hs.cool = t + 0.7;
-      drop((hs.x0 + hs.x1) / 2, (hs.y0 + hs.y1) / 2, 0.4, 4.8);
-    },
-
     time() {
       return t;
     },
@@ -405,7 +393,6 @@ export function createWind() {
   let h = 0;
   let wx = null; // pointer wake (flow offset), physical units
   let wy = null;
-  let calm = null; // multiplier: 1 = free wind, 0 = still (hovered hotspots)
   let jit = null;
   let ph = null;
   let ce = null; // coarse lattice: resting energy
@@ -417,7 +404,6 @@ export function createWind() {
   let inv = 2.08;
   let t = 0;
   let wake = 0; // 0 when the wake is fully faded; skips all wake work
-  let calmDirty = false; // the calm buffer holds non-1 values that need clearing
 
   function stamp(cx, cy) {
     const R = PTR_RADIUS;
@@ -452,7 +438,6 @@ export function createWind() {
         h = rows;
         wx = new Float32Array(w * h);
         wy = new Float32Array(w * h);
-        calm = new Float32Array(w * h).fill(1);
         jit = new Float32Array(w * h);
         ph = new Float32Array(w * h);
         // the noise fields are smooth, so they are sampled on a lattice of every
@@ -476,12 +461,11 @@ export function createWind() {
     settle() {
       wx.fill(0);
       wy.fill(0);
-      calm.fill(1);
       wake = 0;
       t = 6.4;
     },
 
-    step(dt, hotspots, nHot) {
+    step(dt) {
       t += dt;
       if (wake > 0) {
         wake *= WIND.decay;
@@ -494,37 +478,6 @@ export function createWind() {
           for (let i = 0; i < wx.length; i++) {
             wx[i] *= d;
             wy[i] *= d;
-          }
-        }
-      }
-      // hovered hotspots widen a calm zone around themselves
-      let any = false;
-      for (let k = 0; k < nHot; k++) if (hotspots[k].calm > 0.002) any = true;
-      if (any || calmDirty) {
-        calm.fill(1);
-        calmDirty = any;
-        for (let k = 0; k < nHot; k++) {
-          const hs = hotspots[k];
-          if (hs.calm <= 0.002) continue;
-          const R = CALM_RADIUS * hs.calm;
-          const gx0 = Math.max(0, Math.floor(hs.x0 - R));
-          const gx1 = Math.min(w - 1, Math.ceil(hs.x1 + R));
-          const gy0 = Math.max(0, Math.floor(hs.y0 - R / inv));
-          const gy1 = Math.min(h - 1, Math.ceil(hs.y1 + R / inv));
-          for (let y = gy0; y <= gy1; y++) {
-            const cyc = y + 0.5;
-            const ey = cyc < hs.y0 ? hs.y0 - cyc : cyc > hs.y1 ? cyc - hs.y1 : 0;
-            for (let x = gx0; x <= gx1; x++) {
-              const cxc = x + 0.5;
-              const ex = cxc < hs.x0 ? hs.x0 - cxc : cxc > hs.x1 ? cxc - hs.x1 : 0;
-              const d = Math.sqrt(ex * ex + ey * inv * ey * inv);
-              if (d >= R) continue;
-              let f = 1 - d / R;
-              f = f * f * (3 - 2 * f);
-              const m = 1 - f * 0.94;
-              const i = y * w + x;
-              if (m < calm[i]) calm[i] = m;
-            }
           }
         }
       }
@@ -577,7 +530,7 @@ export function createWind() {
             vx += wx[k];
             vy += wy[k];
           }
-          const es = Math.sqrt(vx * vx + vy * vy) * calm[k] + jit[k] * WIND.jitter;
+          const es = Math.sqrt(vx * vx + vy * vy) + jit[k] * WIND.jitter;
           if (es < WIND.tCalm1) {
             out[k] = 0;
           } else if (es < WIND.tDir) {
@@ -615,8 +568,6 @@ export function createWind() {
     tap(cx, cy) {
       stamp(cx, cy);
     },
-
-    hotspot() {},
 
     time() {
       return t;
@@ -683,12 +634,7 @@ export function mountField(root) {
   let rows = 0;
   let idx = null; // glyph index per cell
   let shown = null; // what is currently on the canvas
-  let mask = null; // 1 = forced blank (around hotspots)
-  let masked = 0; // number of masked cells
   let forceFull = true;
-
-  let hotspots = [];
-  let clears = [];
 
   const ptr = { active: false, dirty: false, tap: false, has: false, x: 0, y: 0, cx: 0, cy: 0 };
 
@@ -778,18 +724,16 @@ export function mountField(root) {
     if (fresh) {
       idx = new Uint8Array(cols * rows);
       shown = new Uint8Array(cols * rows);
-      mask = new Uint8Array(cols * rows);
       forceFull = true;
     }
     preset.resize(cols, rows, cellW, cellH);
     if (fresh) preset.settle();
     sized = true;
-    computeHotspots();
     paint();
     updateRunning();
   }
 
-  /* ---- hotspots ---- */
+  /* ---- pointer ---- */
 
   function gridOrigin(rr) {
     return {
@@ -797,101 +741,6 @@ export function mountField(root) {
       y: rr.top + root.clientTop + offY / dpr,
     };
   }
-
-  function computeHotspots() {
-    if (!sized) return;
-    const old = hotspots;
-    const next = [];
-    const nextClears = [];
-    const rr = root.getBoundingClientRect();
-    const o = gridOrigin(rr);
-    mask.fill(0);
-    masked = 0;
-
-    const rectOf = (el, pad) => {
-      const r = el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) return null;
-      const x0 = Math.floor((r.left - o.x) / cellW) - (pad ? PAD_X : 0);
-      const x1 = Math.ceil((r.right - o.x) / cellW) + (pad ? PAD_X : 0);
-      const y0 = Math.floor((r.top - o.y) / cellH) - (pad ? PAD_Y : 0);
-      const y1 = Math.ceil((r.bottom - o.y) / cellH) + (pad ? PAD_Y : 0);
-      if (x1 <= 0 || y1 <= 0 || x0 >= cols || y0 >= rows) return null;
-      return { x0, x1, y0, y1 };
-    };
-    const blank = (b) => {
-      const ax = Math.max(0, b.x0);
-      const bx = Math.min(cols, b.x1);
-      const ay = Math.max(0, b.y0);
-      const by = Math.min(rows, b.y1);
-      for (let y = ay; y < by; y++) {
-        for (let x = ax; x < bx; x++) {
-          if (!mask[y * cols + x]) masked++;
-          mask[y * cols + x] = 1;
-        }
-      }
-    };
-
-    const els = root.querySelectorAll('[data-hotspot]');
-    for (let k = 0; k < els.length; k++) {
-      const b = rectOf(els[k], true);
-      if (!b) continue;
-      let hs = null;
-      for (let j = 0; j < old.length; j++) if (old[j].el === els[k]) hs = old[j];
-      if (!hs) hs = { el: els[k], hover: false, focus: false, calm: 0, cool: 0, x0: 0, x1: 0, y0: 0, y1: 0 };
-      hs.x0 = b.x0;
-      hs.x1 = b.x1;
-      hs.y0 = b.y0;
-      hs.y1 = b.y1;
-      blank(b);
-      next.push(hs);
-    }
-    const cels = document.querySelectorAll('[data-field-clear]');
-    for (let k = 0; k < cels.length; k++) {
-      const b = rectOf(cels[k], true);
-      if (b) {
-        blank(b);
-        nextClears.push(b);
-      }
-    }
-    hotspots = next;
-    clears = nextClears;
-    forceFull = true;
-  }
-
-  function hotspotFor(target) {
-    const el = target && target.closest ? target.closest('[data-hotspot]') : null;
-    if (!el) return null;
-    for (let k = 0; k < hotspots.length; k++) if (hotspots[k].el === el) return hotspots[k];
-    return null;
-  }
-
-  function onOver(e) {
-    if (reduced) return;
-    const hs = hotspotFor(e.target);
-    if (!hs || (e.relatedTarget && hs.el.contains(e.relatedTarget))) return;
-    const was = hs.hover || hs.focus;
-    hs.hover = true;
-    if (!was) preset.hotspot(hs);
-  }
-  function onOut(e) {
-    const hs = hotspotFor(e.target);
-    if (!hs || (e.relatedTarget && hs.el.contains(e.relatedTarget))) return;
-    hs.hover = false;
-  }
-  function onFocusIn(e) {
-    if (reduced) return;
-    const hs = hotspotFor(e.target);
-    if (!hs) return;
-    const was = hs.hover || hs.focus;
-    hs.focus = true;
-    if (!was) preset.hotspot(hs);
-  }
-  function onFocusOut(e) {
-    const hs = hotspotFor(e.target);
-    if (hs) hs.focus = false;
-  }
-
-  /* ---- pointer ---- */
 
   function onPointerMove(e) {
     ptr.x = e.clientX;
@@ -944,7 +793,6 @@ export function mountField(root) {
   function paint() {
     if (!sized) return;
     preset.render(idx);
-    if (masked > 0) for (let i = 0; i < idx.length; i++) if (mask[i]) idx[i] = 0;
     const t0 = performance.now();
     draw();
     costDraw = costDraw * 0.92 + (performance.now() - t0) * 0.08;
@@ -1003,13 +851,7 @@ export function mountField(root) {
     if (now - last > FRAME_MS) last = now;
     const t0 = performance.now();
     tickPointer();
-    for (let k = 0; k < hotspots.length; k++) {
-      const hs = hotspots[k];
-      const target = hs.hover || hs.focus ? 1 : 0;
-      hs.calm += (target - hs.calm) * (target ? 0.14 : 0.04);
-      if (Math.abs(target - hs.calm) < 0.003) hs.calm = target;
-    }
-    preset.step(STEP_DT, hotspots, hotspots.length);
+    preset.step(STEP_DT);
     paint();
     cost = cost * 0.92 + (performance.now() - t0) * 0.08;
   }
@@ -1051,31 +893,20 @@ export function mountField(root) {
     styleKey = '';
     cols = 0; // forces the new preset to size and settle itself
     ptr.has = false;
-    for (let k = 0; k < hotspots.length; k++) {
-      hotspots[k].calm = 0;
-      hotspots[k].cool = 0;
-    }
     layout();
     if (reduced) paintStatic();
   }
 
   function onMutation(records) {
     let theme = false;
-    let home = false;
     let field = false;
     for (let k = 0; k < records.length; k++) {
       const a = records[k].attributeName;
       if (a === 'data-theme') theme = true;
-      else if (a === 'data-home') home = true;
       else if (a === 'data-field') field = true;
     }
     if (field) setPreset(html.dataset.field === 'wind' ? 'wind' : 'water');
     if (theme) refreshTheme();
-    if (home) {
-      layout();
-      computeHotspots();
-      if (reduced) paintStatic();
-    }
   }
 
   function onResize() {
@@ -1090,11 +921,6 @@ export function mountField(root) {
     attachPointer(!reduced);
     if (reduced) {
       stopLoop();
-      for (let k = 0; k < hotspots.length; k++) {
-        hotspots[k].hover = false;
-        hotspots[k].focus = false;
-        hotspots[k].calm = 0;
-      }
       paintStatic();
     } else {
       updateRunning();
@@ -1124,19 +950,12 @@ export function mountField(root) {
     window[m]('pointercancel', onPointerUp, opts);
     window[m]('blur', onPointerGone, opts);
     html[m]('pointerleave', onPointerGone, opts);
-    root[m]('pointerover', onOver, opts);
-    root[m]('pointerout', onOut, opts);
-    root[m]('focusin', onFocusIn);
-    root[m]('focusout', onFocusOut);
   }
 
   /* ---- wire up ---- */
 
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null;
-  if (ro) {
-    ro.observe(root);
-    root.querySelectorAll('[data-hotspot]').forEach((el) => ro.observe(el));
-  }
+  if (ro) ro.observe(root);
   const io =
     typeof IntersectionObserver === 'function'
       ? new IntersectionObserver((entries) => {
@@ -1146,7 +965,7 @@ export function mountField(root) {
       : null;
   if (io) io.observe(root);
   const mo = new MutationObserver(onMutation);
-  mo.observe(html, { attributes: true, attributeFilter: ['data-theme', 'data-field', 'data-home'] });
+  mo.observe(html, { attributes: true, attributeFilter: ['data-theme', 'data-field'] });
 
   const listen = (mq, fn) => (mq.addEventListener ? mq.addEventListener('change', fn) : mq.addListener(fn));
   const unlisten = (mq, fn) => (mq.removeEventListener ? mq.removeEventListener('change', fn) : mq.removeListener(fn));
@@ -1196,7 +1015,7 @@ export function mountField(root) {
     },
     /** Debug info for the playground. */
     stats() {
-      return { preset: presetName, cols, rows, cellW, cellH, dpr, ms: cost, drawMs: costDraw, running: !!raf, reduced, hotspots: hotspots.length };
+      return { preset: presetName, cols, rows, cellW, cellH, dpr, ms: cost, drawMs: costDraw, running: !!raf, reduced };
     },
   };
   mounts.set(root, api);

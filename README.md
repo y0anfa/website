@@ -21,12 +21,7 @@ mix test           # run the test suite
 
 `mix site.build` also accepts `--drafts`, `--content DIR` and `--out DIR`.
 
-Two review variants of the home page are chosen with query parameters:
-
-- `?home=b` (split screen, the default) or `?home=d` (the field is the nav).
-- `?field=water` (the default) or `?field=wind`.
-
-For example, `http://localhost:4000/?home=d&field=wind`. The choice is kept for the session, so it holds when you navigate back home.
+The field preset is chosen with a query parameter: `?field=water` (the default) or `?field=wind`, e.g. `http://localhost:4000/?field=wind`. The choice is kept for the session, so it holds when you navigate back home.
 
 `mix site.serve` applies the headers from `dist/_headers`, so a Content Security Policy violation shows locally in the same way it does in production.
 

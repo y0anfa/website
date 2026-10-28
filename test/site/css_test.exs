@@ -85,18 +85,10 @@ defmodule Site.CSSTest do
     assert block(".field") =~ "color: var(--fg);"
   end
 
-  test "every home nav section has a hotspot class with percentage coordinates" do
-    for section <- Site.Config.nav() do
-      body = block(~s([data-home="d"] .hotspot--#{section}))
-      assert body =~ ~r/top:\s*\d+(\.\d+)?%;/, "#{section}: top"
-      assert body =~ ~r/left:\s*\d+(\.\d+)?%;/, "#{section}: left"
-    end
-  end
-
-  test "variants are switched on [data-home]" do
-    assert @css =~ ~s([data-home="b"])
-    assert @css =~ ~s([data-home="d"])
+  test "the home splits into two columns at 960px, with no variant switch left" do
     assert @css =~ "@media (min-width: 960px)"
+    refute @css =~ "data-home"
+    refute @css =~ "hotspot"
   end
 
   test "the log grid is in ch units and collapses under 600px" do

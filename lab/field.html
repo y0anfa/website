@@ -4,9 +4,9 @@
   Serve the repo root (ES modules do not load from file://):
       python3 -m http.server 8765
   then open http://localhost:8765/lab/field.html
-  Query params: ?field=water|wind  ?home=b|d  ?theme=light|dark|system  ?reduced=1
+  Query params: ?field=water|wind  ?theme=light|dark|system  ?reduced=1
 -->
-<html lang="en" data-home="b" data-field="water">
+<html lang="en" data-field="water">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -47,11 +47,10 @@
   /* field */
   .field { position: relative; font-size: 14px; line-height: 1; color: var(--fg); overflow: hidden; }
   .field-canvas { position: absolute; inset: 0; display: block; }
-  .field-nav { display: none; }
   .intro h1 { margin: 0; font-weight: 800; font-size: clamp(1.9rem, 1.2rem + 3vw, 3.25rem); letter-spacing: -0.03em; line-height: 1.05; }
   .intro p { margin: 0.6rem 0 0; color: var(--muted); max-width: 52ch; }
 
-  /* variant B: split */
+  /* home layout: field beside the intro on wide screens, stacked on narrow ones */
   .page { display: block; }
   .hero { display: flex; flex-direction: column; height: calc(100vh - var(--bar)); }
   .hero .field { flex: 0 0 45%; }
@@ -62,32 +61,12 @@
   .log li { display: grid; grid-template-columns: 8ch 11ch 8ch 1fr; gap: 0 2ch; padding: 4px 0; border-top: 1px solid var(--rule); }
   .log li > :nth-child(1), .log li > :nth-child(2), .log li > :nth-child(3) { color: var(--muted); }
   @media (min-width: 960px) {
-    html[data-home="b"] .page { display: grid; grid-template-columns: 1fr 1fr; }
-    html[data-home="b"] .hero { position: sticky; top: var(--bar); border-right: 1px solid var(--rule); }
-    html[data-home="b"] .hero .field { flex-basis: 60%; }
-    html[data-home="b"] .intro { padding: 28px 32px; }
-    html[data-home="b"] .log-section { padding: 28px 32px 96px; }
+    .page { display: grid; grid-template-columns: 1fr 1fr; }
+    .hero { position: sticky; top: var(--bar); border-right: 1px solid var(--rule); }
+    .hero .field { flex-basis: 60%; }
+    .intro { padding: 28px 32px; }
+    .log-section { padding: 28px 32px 96px; }
     body { font-size: 16px; }
-  }
-
-  /* variant D: the field is the nav */
-  html[data-home="d"] .hero { position: relative; display: block; }
-  html[data-home="d"] .hero .field { position: absolute; inset: 0; }
-  html[data-home="d"] .field-nav { display: block; position: absolute; inset: 0; pointer-events: none; }
-  html[data-home="d"] .intro { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; padding: 0; pointer-events: none; }
-  html[data-home="d"] .intro p { margin-inline: auto; }
-  html[data-home="d"] .intro .more { display: none; }
-  html[data-home="d"] .hero-title { padding: 10px 18px; }
-  .hotspot { position: absolute; pointer-events: auto; font-weight: 800; font-size: clamp(18px, 1.2rem + 0.8vw, 30px);
-    letter-spacing: -0.02em; line-height: 1.2; padding: 0 0.25em; text-decoration: none; }
-  .hotspot--essays { left: 12%; top: 24%; }
-  .hotspot--notes { left: 58%; top: 16%; }
-  .hotspot--projects { left: 68%; top: 56%; }
-  .hotspot--uses { left: 18%; top: 66%; }
-  .hotspot--cv { left: 44%; top: 82%; }
-  @media (max-width: 700px) {
-    html[data-home="d"] .field-nav { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; padding-bottom: 12vh; }
-    html[data-home="d"] .hotspot { position: static; }
   }
 </style>
 <script>
@@ -114,9 +93,6 @@
       <button type="button" data-set="theme" data-value="system">system</button>
       <button type="button" data-set="theme" data-value="light">light</button>
       <button type="button" data-set="theme" data-value="dark">dark</button></div>
-    <div class="group" data-group="home"><span>layout</span>
-      <button type="button" data-set="home" data-value="b">B split</button>
-      <button type="button" data-set="home" data-value="d">D nav</button></div>
     <div class="group" data-group="motion"><span>motion</span>
       <button type="button" data-set="motion" data-value="normal">normal</button>
       <button type="button" data-set="motion" data-value="reduced">reduced</button></div>
@@ -130,19 +106,10 @@
     <section class="hero">
       <div class="field" data-field-root>
         <canvas class="field-canvas" aria-hidden="true"></canvas>
-        <nav class="field-nav" aria-label="Sections">
-          <a class="hotspot hotspot--essays" href="#essays" data-hotspot>essays</a>
-          <a class="hotspot hotspot--notes" href="#notes" data-hotspot>notes</a>
-          <a class="hotspot hotspot--projects" href="#projects" data-hotspot>projects</a>
-          <a class="hotspot hotspot--uses" href="#uses" data-hotspot>uses</a>
-          <a class="hotspot hotspot--cv" href="#cv" data-hotspot>cv</a>
-        </nav>
       </div>
       <div class="intro">
-        <div class="hero-title" data-field-clear>
-          <h1>Yoan Faure</h1>
-          <p>security engineer who builds.</p>
-        </div>
+        <h1>Yoan Faure</h1>
+        <p>security engineer who builds.</p>
         <div class="more">
           <p>I work on security at Riot, in Paris. I write about threat modeling, small tools,
           and the unglamorous parts of the job. This is a placeholder paragraph in the playground.</p>
@@ -181,7 +148,6 @@
 
     // initial state from the URL
     if (params.get('field') === 'wind') html.dataset.field = 'wind';
-    if (params.get('home') === 'd') html.dataset.home = 'd';
     if (params.get('theme') === 'light' || params.get('theme') === 'dark') html.dataset.theme = params.get('theme');
     if (params.get('reduced') === '1') window.__setReducedMotion(true);
 
@@ -189,7 +155,6 @@
       return {
         field: html.dataset.field || 'water',
         theme: html.dataset.theme || 'system',
-        home: html.dataset.home || 'b',
         motion: window.__reducedMotion() ? 'reduced' : 'normal',
       };
     }
@@ -199,7 +164,7 @@
         b.setAttribute('aria-pressed', String(s[b.dataset.set] === b.dataset.value));
       });
       const p = new URLSearchParams();
-      p.set('field', s.field); p.set('home', s.home);
+      p.set('field', s.field);
       if (s.theme !== 'system') p.set('theme', s.theme);
       if (s.motion === 'reduced') p.set('reduced', '1');
       history.replaceState(null, '', '?' + p.toString());
@@ -229,7 +194,7 @@
       if (!api) { readout.textContent = 'destroyed'; return; }
       const s = api.stats();
       readout.textContent = s.cols + 'x' + s.rows + ' cells  ' + s.ms.toFixed(2) + ' ms/frame (draw ' + s.drawMs.toFixed(2) + ')  dpr ' + s.dpr +
-        '  ' + (s.reduced ? 'static' : s.running ? 'running' : 'paused') + '  hotspots ' + s.hotspots;
+        '  ' + (s.reduced ? 'static' : s.running ? 'running' : 'paused');
     }, 400);
   </script>
 </body>
