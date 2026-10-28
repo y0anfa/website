@@ -4,22 +4,26 @@
   Serve the repo root (ES modules do not load from file://):
       python3 -m http.server 8765
   then open http://localhost:8765/lab/field.html
-  Query params: ?field=water|wind  ?theme=light|dark|system  ?reduced=1
+  The field is a fixed, full-viewport backdrop behind a fake site: a header, a
+  home-style log, and an "inner page" mode with an opaque 72ch column, so the
+  field only shows in the margins.
+  Query params: ?field=topo|water  ?theme=light|dark  ?reduced=1  ?page=home|inner  ?halo=0
 -->
-<html lang="en" data-field="water">
+<html lang="en" data-field="topo">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>field playground</title>
 <style>
+  /* the site's fonts: Inter for text, JetBrains Mono for the field and for mono bits */
+  @font-face { font-family: "Inter"; font-weight: 100 900; font-style: normal; font-display: swap;
+    src: url("../assets/fonts/InterVariable.woff2") format("woff2"); }
   @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-style: normal; font-display: swap;
     src: url("../assets/fonts/JetBrainsMono-Regular.woff2") format("woff2"); }
-  @font-face { font-family: "JetBrains Mono"; font-weight: 700; font-style: normal; font-display: swap;
-    src: url("../assets/fonts/JetBrainsMono-Bold.woff2") format("woff2"); }
-  @font-face { font-family: "JetBrains Mono"; font-weight: 800; font-style: normal; font-display: swap;
-    src: url("../assets/fonts/JetBrainsMono-ExtraBold.woff2") format("woff2"); }
 
-  :root { --bg: #f4efe4; --fg: #262523; --muted: #6b675f; --rule: #ddd6c8; --bar: 44px; color-scheme: light; }
+  :root { --bg: #f4efe4; --fg: #262523; --muted: #6b675f; --rule: #ddd6c8; --bar: 44px; color-scheme: light;
+    --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) { --bg: #1e1d1b; --fg: #ece6d9; --muted: #9a958b; --rule: #34322f; color-scheme: dark; }
   }
@@ -27,16 +31,22 @@
   :root[data-theme="light"] { --bg: #f4efe4; --fg: #262523; --muted: #6b675f; --rule: #ddd6c8; color-scheme: light; }
 
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--fg);
-    font: 15px/1.65 "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  body { margin: 0; padding-top: var(--bar); min-height: 100vh; display: flex; flex-direction: column;
+    background: var(--bg); color: var(--fg);
+    font: 16px/1.6 var(--font-sans); -webkit-font-smoothing: antialiased; }
   a { color: inherit; text-decoration: underline; text-underline-offset: 0.2em; text-decoration-thickness: 1px; }
   a:hover, a:focus-visible { background: var(--fg); color: var(--bg); }
   a:focus-visible, button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
   ::selection { background: var(--fg); color: var(--bg); }
 
+  /* the backdrop: this is the whole contract with the real site's CSS */
+  .field { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    font-family: var(--font-mono); font-size: 14px; line-height: 1; color: var(--fg); }
+  .field-canvas { position: absolute; inset: 0; display: block; }
+
   /* playground controls */
-  .bar { position: sticky; top: 0; z-index: 10; height: var(--bar); display: flex; align-items: center; gap: 18px;
-    padding: 0 16px; background: var(--bg); border-bottom: 1px solid var(--rule); font-size: 12px; line-height: 1;
+  .bar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; height: var(--bar); display: flex; align-items: center; gap: 18px;
+    padding: 0 16px; background: var(--bg); border-bottom: 1px solid var(--rule); font: 12px/1 var(--font-mono);
     overflow-x: auto; white-space: nowrap; }
   .group { display: flex; align-items: center; gap: 4px; }
   .group > span { color: var(--muted); margin-right: 4px; }
@@ -44,30 +54,45 @@
   .bar button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
   .readout { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-  /* field */
-  .field { position: relative; font-size: 14px; line-height: 1; color: var(--fg); overflow: hidden; }
-  .field-canvas { position: absolute; inset: 0; display: block; }
-  .intro h1 { margin: 0; font-weight: 800; font-size: clamp(1.9rem, 1.2rem + 3vw, 3.25rem); letter-spacing: -0.03em; line-height: 1.05; }
-  .intro p { margin: 0.6rem 0 0; color: var(--muted); max-width: 52ch; }
+  /* the fake site, above the field */
+  .shell { position: relative; z-index: 1; width: 100%; max-width: 48rem; margin-inline: auto; padding-inline: 1.5rem; }
+  body[data-page="inner"] .shell { max-width: 41rem; }
+  .site-header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; height: 3.5rem; padding-top: 1rem; }
+  .brand { font-weight: 800; letter-spacing: -0.02em; text-decoration: none; white-space: nowrap; }
+  .site-nav { display: flex; gap: clamp(0.6rem, 2.5vw, 1.25rem); }
+  .site-nav a { text-decoration: none; }
+  .site-nav a[aria-current="page"] { text-decoration: underline; }
+  main { flex: 1 0 auto; padding-bottom: 4rem; }
+  .site-footer { display: flex; justify-content: space-between; gap: 1rem; padding-block: 1.25rem 2rem;
+    font-size: 0.8125rem; color: var(--muted); }
 
-  /* home layout: field beside the intro on wide screens, stacked on narrow ones */
-  .page { display: block; }
-  .hero { display: flex; flex-direction: column; height: calc(100vh - var(--bar)); }
-  .hero .field { flex: 0 0 45%; }
-  .hero .intro { flex: 1; padding: 24px 16px; }
-  .log-section { padding: 24px 16px 96px; }
-  .log-section h2 { margin: 0 0 12px; font-weight: 800; letter-spacing: -0.02em; }
+  h1 { margin: 2.5rem 0 0; font-weight: 800; font-size: clamp(1.9rem, 1.2rem + 3vw, 3.25rem); letter-spacing: -0.03em; line-height: 1.05; }
+  .tagline { margin: 0.6rem 0 0; color: var(--muted); }
+  h2 { margin: 3rem 0 0.75rem; font-weight: 800; letter-spacing: -0.02em; }
+
   .log { list-style: none; margin: 0; padding: 0; }
-  .log li { display: grid; grid-template-columns: 8ch 11ch 8ch 1fr; gap: 0 2ch; padding: 4px 0; border-top: 1px solid var(--rule); }
-  .log li > :nth-child(1), .log li > :nth-child(2), .log li > :nth-child(3) { color: var(--muted); }
-  @media (min-width: 960px) {
-    .page { display: grid; grid-template-columns: 1fr 1fr; }
-    .hero { position: sticky; top: var(--bar); border-right: 1px solid var(--rule); }
-    .hero .field { flex-basis: 60%; }
-    .intro { padding: 28px 32px; }
-    .log-section { padding: 28px 32px 96px; }
-    body { font-size: 16px; }
+  .log li { display: grid; grid-template-columns: 7.5ch 10.5ch 7.5ch 1fr; gap: 0 2ch; padding: 0.3rem 0; border-top: 1px solid var(--rule); }
+  .log li > :nth-child(1), .log li > :nth-child(2), .log li > :nth-child(3) { color: var(--muted); font: 0.8125rem/1.9 var(--font-mono); }
+  @media (max-width: 600px) {
+    .log li { grid-template-columns: 7ch 1fr; }
+    .log li > :nth-child(3) { grid-column: 1; }
+    .log li > :nth-child(4) { grid-column: 2; }
   }
+
+  /* home: nothing under the text but the field, plus the soft halo the real CSS gives it */
+  body[data-page="home"] .shell { --paper: transparent; --edge: transparent; }
+  body[data-page="home"][data-halo="on"] main,
+  body[data-page="home"][data-halo="on"] .site-header,
+  body[data-page="home"][data-halo="on"] .site-footer {
+    text-shadow: 0 0 0.25em var(--bg), 0 0 0.5em var(--bg), 0 0 0.5em var(--bg); }
+  body[data-page="home"] .inner-only { display: none; }
+
+  /* inner page: an opaque column, so the field only shows in the margins */
+  body[data-page="inner"] .home-only { display: none; }
+  body[data-page="inner"] .shell { background: var(--bg); border-inline: 1px solid var(--rule); }
+  .prose h1 { margin-top: 2rem; }
+  .prose p { margin: 1rem 0 0; }
+  .meta { margin: 2rem 0 0; color: var(--muted); font-size: 0.875rem; }
 </style>
 <script>
   /* Lets the playground fake prefers-reduced-motion. Runs before field.js loads. */
@@ -84,78 +109,104 @@
   })();
 </script>
 </head>
-<body>
+<body data-page="home" data-halo="on">
+  <div class="field" data-field-root aria-hidden="true"><canvas class="field-canvas"></canvas></div>
+
   <div class="bar" role="toolbar" aria-label="Playground controls">
-    <div class="group" data-group="field"><span>preset</span>
-      <button type="button" data-set="field" data-value="water">water</button>
-      <button type="button" data-set="field" data-value="wind">wind</button></div>
-    <div class="group" data-group="theme"><span>theme</span>
+    <div class="group"><span>preset</span>
+      <button type="button" data-set="field" data-value="topo">topo</button>
+      <button type="button" data-set="field" data-value="water">water</button></div>
+    <div class="group"><span>theme</span>
       <button type="button" data-set="theme" data-value="system">system</button>
       <button type="button" data-set="theme" data-value="light">light</button>
       <button type="button" data-set="theme" data-value="dark">dark</button></div>
-    <div class="group" data-group="motion"><span>motion</span>
+    <div class="group"><span>motion</span>
       <button type="button" data-set="motion" data-value="normal">normal</button>
       <button type="button" data-set="motion" data-value="reduced">reduced</button></div>
-    <div class="group" data-group="mount"><span>mount</span>
+    <div class="group"><span>page</span>
+      <button type="button" data-set="page" data-value="home">home</button>
+      <button type="button" data-set="page" data-value="inner">inner</button></div>
+    <div class="group"><span>halo</span>
+      <button type="button" data-set="halo" data-value="on">on</button>
+      <button type="button" data-set="halo" data-value="off">off</button></div>
+    <div class="group"><span>mount</span>
       <button type="button" data-act="remount">remount</button>
       <button type="button" data-act="destroy">destroy</button></div>
     <div class="readout" id="readout" aria-live="off"></div>
   </div>
 
-  <main class="page">
-    <section class="hero">
-      <div class="field" data-field-root>
-        <canvas class="field-canvas" aria-hidden="true"></canvas>
-      </div>
-      <div class="intro">
-        <h1>Yoan Faure</h1>
-        <p>security engineer who builds.</p>
-        <div class="more">
-          <p>I work on security at Riot, in Paris. I write about threat modeling, small tools,
-          and the unglamorous parts of the job. This is a placeholder paragraph in the playground.</p>
-          <p><a href="#hello">hello@yoanfau.re</a> &middot; <a href="#linkedin">linkedin</a></p>
-        </div>
-      </div>
-    </section>
+  <div class="shell">
+    <header class="site-header">
+      <a class="brand" href="#home">yoan faure</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#essays">essays</a><a href="#notes">notes</a><a href="#projects">projects</a><a href="#uses">uses</a><a href="#cv">cv</a>
+      </nav>
+    </header>
 
-    <section class="log-section" aria-labelledby="log-h">
-      <h2 id="log-h">log</h2>
-      <ol class="log">
-        <li><a href="#a">9f19333</a><time>2026-10-28</time><span>note</span><a href="#a">Build the small tool</a></li>
-        <li><a href="#b">c1d4e07</a><time>2026-10-28</time><span>note</span><a href="#b">Security should unleash</a></li>
-        <li><a href="#c">77ab210</a><time>2026-10-28</time><span>note</span><a href="#c">Security pays in more than one currency</a></li>
-        <li><a href="#d">e30f5a9</a><time>2026-10-28</time><span>note</span><a href="#d">AI is a teammate</a></li>
-        <li><a href="#e">0b8c6d2</a><time>2026-10-28</time><span>note</span><a href="#e">Comms is the staff skill</a></li>
-        <li><a href="#f">5d21f84</a><time>2026-09-02</time><span>project</span><a href="#f">rhino</a></li>
-        <li><a href="#g">a3f9c21</a><time>2026-03-28</time><span>essay</span><a href="#g">Threat modeling with Claude Code</a></li>
-        <li><a href="#h">1e7a9b3</a><time>2026-02-11</time><span>note</span><a href="#h">Placeholder row to make the column scroll</a></li>
-        <li><a href="#i">42c0d18</a><time>2026-01-30</time><span>note</span><a href="#i">Another placeholder row</a></li>
-        <li><a href="#j">b95e3f6</a><time>2025-12-19</time><span>essay</span><a href="#j">One more, for the scrollbar</a></li>
-        <li><a href="#k">f01a7c4</a><time>2025-11-04</time><span>note</span><a href="#k">Yet another placeholder row</a></li>
-        <li><a href="#l">38d6e91</a><time>2025-10-01</time><span>project</span><a href="#l">The last one</a></li>
-      </ol>
-    </section>
-  </main>
+    <main>
+      <section class="home-only">
+        <h1>Yoan Faure</h1>
+        <p class="tagline">security engineer who builds.</p>
+
+        <h2 id="log-h">log</h2>
+        <ol class="log" aria-labelledby="log-h">
+          <li><a href="#a">9f19333</a><time>2026-10-28</time><span>note</span><a href="#a">Build the small tool</a></li>
+          <li><a href="#b">c1d4e07</a><time>2026-10-28</time><span>note</span><a href="#b">Security should unleash</a></li>
+          <li><a href="#c">77ab210</a><time>2026-10-28</time><span>note</span><a href="#c">Security pays in more than one currency</a></li>
+          <li><a href="#d">e30f5a9</a><time>2026-10-28</time><span>note</span><a href="#d">AI is a teammate</a></li>
+          <li><a href="#e">0b8c6d2</a><time>2026-10-28</time><span>note</span><a href="#e">Comms is the staff skill</a></li>
+          <li><a href="#f">5d21f84</a><time>2026-09-02</time><span>project</span><a href="#f">rhino</a></li>
+          <li><a href="#g">a3f9c21</a><time>2026-03-28</time><span>essay</span><a href="#g">Threat modeling with Claude Code</a></li>
+          <li><a href="#h">1e7a9b3</a><time>2026-02-11</time><span>note</span><a href="#h">Placeholder row, to see the field behind it</a></li>
+        </ol>
+      </section>
+
+      <article class="inner-only prose">
+        <p class="meta">essay &middot; 2026-03-28 &middot; <a href="#g">a3f9c21</a></p>
+        <h1>Threat modeling with Claude Code</h1>
+        <p>This is an inner page. The column is opaque, so the field only shows in the side margins. Text never sits on it.
+        Narrow the window below about 760px and the margins disappear, which is also how it behaves on a phone.</p>
+        <p>I work on security at Riot, in Paris. I write about threat modeling, small tools, and the unglamorous parts of
+        the job. This paragraph is a placeholder so there is something to read next to the map: a few lines of body text,
+        set in the same monospace as everything else on the site.</p>
+        <p>Move the pointer over the margins. On the topo preset a wide, gentle hill rises under it and the contour lines
+        flow around it; on water it leaves slow rings. Leave the window and everything settles again.</p>
+        <p>Move the pointer over this column and nothing should happen under the text: the field is behind it, and the
+        column hides it entirely. The pointer still raises the hill, which is visible again as soon as it reaches a margin.</p>
+        <p><a href="#back">&larr; essays</a></p>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <span><a href="#hello">hello@yoanfau.re</a> &middot; <a href="#linkedin">linkedin</a></span>
+      <span>built from <a href="#a3f9c21">a3f9c21</a></span>
+    </footer>
+  </div>
 
   <script type="module">
     import { mountField } from '../assets/js/field.js';
 
     const html = document.documentElement;
+    const body = document.body;
     const root = document.querySelector('[data-field-root]');
     const readout = document.getElementById('readout');
     const params = new URLSearchParams(location.search);
     let api = null;
 
     // initial state from the URL
-    if (params.get('field') === 'wind') html.dataset.field = 'wind';
+    if (params.get('field') === 'topo' || params.get('field') === 'water') html.dataset.field = params.get('field');
     if (params.get('theme') === 'light' || params.get('theme') === 'dark') html.dataset.theme = params.get('theme');
+    if (params.get('page') === 'inner') body.dataset.page = 'inner';
+    if (params.get('halo') === '0') body.dataset.halo = 'off';
     if (params.get('reduced') === '1') window.__setReducedMotion(true);
 
     function state() {
       return {
-        field: html.dataset.field || 'water',
+        field: html.dataset.field || 'topo',
         theme: html.dataset.theme || 'system',
         motion: window.__reducedMotion() ? 'reduced' : 'normal',
+        page: body.dataset.page,
+        halo: body.dataset.halo,
       };
     }
     function syncButtons() {
@@ -167,6 +218,8 @@
       p.set('field', s.field);
       if (s.theme !== 'system') p.set('theme', s.theme);
       if (s.motion === 'reduced') p.set('reduced', '1');
+      if (s.page !== 'home') p.set('page', s.page);
+      if (s.halo === 'off') p.set('halo', '0');
       history.replaceState(null, '', '?' + p.toString());
     }
 
@@ -179,6 +232,7 @@
         if (b.dataset.value === 'system') html.removeAttribute('data-theme');
         else html.dataset.theme = b.dataset.value;
       } else if (b.dataset.set === 'motion') window.__setReducedMotion(b.dataset.value === 'reduced');
+      else if (b.dataset.set === 'page' || b.dataset.set === 'halo') body.dataset[b.dataset.set] = b.dataset.value;
       else if (b.dataset.set) html.dataset[b.dataset.set] = b.dataset.value;
       syncButtons();
     });
@@ -190,11 +244,14 @@
     api = mountField(root);
     syncButtons();
 
+    // handy from the console: __field.stats()
+    window.__field = { stats: () => (api ? api.stats() : null) };
+
     setInterval(() => {
       if (!api) { readout.textContent = 'destroyed'; return; }
       const s = api.stats();
-      readout.textContent = s.cols + 'x' + s.rows + ' cells  ' + s.ms.toFixed(2) + ' ms/frame (draw ' + s.drawMs.toFixed(2) + ')  dpr ' + s.dpr +
-        '  ' + (s.reduced ? 'static' : s.running ? 'running' : 'paused');
+      readout.textContent = s.cols + 'x' + s.rows + ' cells  ' + s.ms.toFixed(2) + ' ms/frame (draw ' + s.drawMs.toFixed(2) + ')  ' +
+        (s.lit * 100).toFixed(1) + '% lit  ' + s.fps + ' fps  dpr ' + s.dpr + '  ' + (s.reduced ? 'static' : s.running ? 'running' : 'paused');
     }, 400);
   </script>
 </body>

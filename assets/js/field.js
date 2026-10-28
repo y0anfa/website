@@ -1,27 +1,52 @@
 /*
- * field.js: the ASCII field. The only motion on the site.
+ * field.js: the ASCII field. The only motion on the site, and a quiet one.
  *
- * Two presets, chosen by <html data-field="water|wind">:
- *   water  a calm surface: damped height-field ripples over a slow swell.
- *   wind   grass in wind: a drifting noise flow field with gusts.
+ * It is a backdrop: one fixed, full-viewport layer behind the page, low in
+ * contrast and slow, a watermark you notice after a few seconds. Two presets,
+ * chosen by <html data-field="topo|water"> (topo is the default; anything else
+ * falls back to it):
+ *   topo   a survey map. Contour lines of a slowly evolving landscape, drawn
+ *          with - | / \ ; every fifth contour is an index contour, a little
+ *          stronger. About 8% of the cells are lit, the rest stay blank. The
+ *          pointer raises a wide, gentle hill (it eases in over about a second
+ *          and relaxes over about three) and the lines flow around it.
+ *   water  calm water. A blank, still surface; the pointer leaves slow, sparse
+ *          rings and a rare drop falls on its own every 6-10 s.
  *
  * Contract (SPEC section 7 and 9): export mountField(root) -> { destroy() },
  * and auto-mount every [data-field-root]. No dependencies, no markup
  * injection, no dynamic code, no inline styles (sizing goes through CSSOM).
  *
- * CSS it expects: .field { position: relative; font-size: 14px; line-height: 1;
- * color: var(--fg) } and .field-canvas { position: absolute; inset: 0 }.
+ * CSS it expects: .field { position: fixed; inset: 0; z-index: 0;
+ * pointer-events: none; font-family: <a mono face>; font-size: 14px;
+ * line-height: 1; color: var(--fg) } and .field-canvas { position: absolute;
+ * inset: 0 }. The cell metrics and the ink colour come from the root's computed
+ * style. The root is sized with a ResizeObserver plus a window resize
+ * fallback, and the pointer is read in viewport coordinates (the root is
+ * fixed, so they are the same thing as root coordinates).
+ *
+ * Behaviour:
+ *  - The canvas is redrawn by diff; typed arrays only, nothing allocated per
+ *    frame. Topo runs at 20 fps (the landscape itself is recomputed at 10 Hz,
+ *    on a half-resolution lattice), water at 30. Both take well under 2 ms a
+ *    frame on a 2560x1440 viewport. Paused while the document is hidden or the
+ *    root is off screen; DPR is capped at 2.
+ *  - Glyph alpha is baked into the atlas: 0.13-0.17 for contours, about 0.3 for
+ *    index contours, 0.14-0.27 for water rings. It is eased by 12% on a dark
+ *    theme, where light ink reads heavier.
+ *  - prefers-reduced-motion: one static frame (topo: a map; water: one faint
+ *    settled ring), no loop and no pointer effects; redrawn on resize and
+ *    theme change.
+ *  - The atlas is rebuilt on [data-theme] and [data-field] changes and on the
+ *    prefers-color-scheme change. A new [data-field] value swaps the preset.
  *
  * Optional extra (extends the SPEC, harmless if unused):
  *  - mountField(root).stats() returns debug numbers for lab/field.html.
  */
 
-const FPS = 30;
-const FRAME_MS = 1000 / FPS;
-const STEP_DT = 1 / FPS;
 const DPR_CAP = 2;
-const CELL_H = 1.25; // cell height as a multiple of the font size
-const PTR_RADIUS = 8; // wind deflection radius, in cell widths
+const CELL_H = 1.25; // default cell height as a multiple of the font size
+const DEFAULT_PRESET = 'topo';
 
 /* ------------------------------------------------------------------------ *
  * Pure helpers. Exported so they can be unit-tested in node.
@@ -38,124 +63,55 @@ export function mulberry32(seed) {
   };
 }
 
-/** Improved Perlin noise in 3D, roughly in [-1, 1] (typically within +-0.7). */
-export function createNoise3(seed) {
-  const rnd = mulberry32(seed);
-  const p = new Uint8Array(512);
-  for (let i = 0; i < 256; i++) p[i] = i;
-  for (let i = 255; i > 0; i--) {
-    const j = (rnd() * (i + 1)) | 0;
-    const t = p[i];
-    p[i] = p[j];
-    p[j] = t;
-  }
-  for (let i = 0; i < 256; i++) p[i + 256] = p[i];
-
-  function grad(h, x, y, z) {
-    h &= 15;
-    const u = h < 8 ? x : y;
-    const v = h < 4 ? y : h === 12 || h === 14 ? x : z;
-    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
-  }
-
-  return function noise3(x, y, z) {
-    const fx = Math.floor(x);
-    const fy = Math.floor(y);
-    const fz = Math.floor(z);
-    x -= fx;
-    y -= fy;
-    z -= fz;
-    const X = fx & 255;
-    const Y = fy & 255;
-    const Z = fz & 255;
-    const u = x * x * x * (x * (x * 6 - 15) + 10);
-    const v = y * y * y * (y * (y * 6 - 15) + 10);
-    const w = z * z * z * (z * (z * 6 - 15) + 10);
-    const A = p[X] + Y;
-    const AA = p[A] + Z;
-    const AB = p[A + 1] + Z;
-    const B = p[X + 1] + Y;
-    const BA = p[B] + Z;
-    const BB = p[B + 1] + Z;
-    const g000 = grad(p[AA], x, y, z);
-    const g100 = grad(p[BA], x - 1, y, z);
-    const g010 = grad(p[AB], x, y - 1, z);
-    const g110 = grad(p[BB], x - 1, y - 1, z);
-    const g001 = grad(p[AA + 1], x, y, z - 1);
-    const g101 = grad(p[BA + 1], x - 1, y, z - 1);
-    const g011 = grad(p[AB + 1], x, y - 1, z - 1);
-    const g111 = grad(p[BB + 1], x - 1, y - 1, z - 1);
-    const x00 = g000 + u * (g100 - g000);
-    const x10 = g010 + u * (g110 - g010);
-    const x01 = g001 + u * (g101 - g001);
-    const x11 = g011 + u * (g111 - g011);
-    const y0 = x00 + v * (x10 - x00);
-    const y1 = x01 + v * (x11 - x01);
-    return y0 + w * (y1 - y0);
-  };
+/** Integer lattice hash to [0, 1). Position based, so a landscape survives a resize. */
+export function hash2(ix, iy, salt) {
+  let h = (Math.imul(ix, 0x27d4eb2d) ^ Math.imul(iy, 0x165667b1) ^ Math.imul(salt, 0x9e3779b1)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 /**
- * One step of the damped 2D wave equation on a two-buffer height field.
- * `prev` is overwritten with the new state; the caller then swaps the two
- * buffers. kx and ky are the squared Courant numbers along x and y (they
- * differ because cells are taller than wide); stable while kx + ky <= 1.
- * Border cells are never written, so they stay at rest.
+ * Add a Gaussian hill to a height buffer, tapered to exactly zero at
+ * `reach` standard deviations. Centre (cx, cy) is in fractional cell units,
+ * `sigma` in cell widths, invAspect is the cell height divided by the cell width.
  */
-export function rippleStep(prev, cur, w, h, kx, ky, damp, sponge) {
-  const c0 = 2 - 2 * kx - 2 * ky;
-  if (sponge) {
-    // per-cell damping: stronger near the edges so ripples fade out instead of bouncing back
-    for (let y = 1; y < h - 1; y++) {
-      let i = y * w + 1;
-      for (let x = 1; x < w - 1; x++, i++) {
-        prev[i] = (c0 * cur[i] + kx * (cur[i - 1] + cur[i + 1]) + ky * (cur[i - w] + cur[i + w]) - prev[i]) * sponge[i];
-      }
-    }
-    return;
-  }
-  for (let y = 1; y < h - 1; y++) {
-    let i = y * w + 1;
-    for (let x = 1; x < w - 1; x++, i++) {
-      prev[i] = (c0 * cur[i] + kx * (cur[i - 1] + cur[i + 1]) + ky * (cur[i - w] + cur[i + w]) - prev[i]) * damp;
-    }
-  }
-}
-
-/** Per-cell damping for rippleStep: `damp` inside, falling to damp * (1 - edge) at the border, over `band` cells. */
-export function makeSponge(w, h, damp, edge, band, invAspect) {
-  const sp = new Float32Array(w * h);
-  const bandY = band / invAspect;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const dx = Math.min(x, w - 1 - x) / band;
-      const dy = Math.min(y, h - 1 - y) / bandY;
-      const d = Math.min(1, dx, dy);
-      sp[y * w + x] = damp * (1 - edge * (1 - d) * (1 - d));
-    }
-  }
-  return sp;
-}
-
-/**
- * Add a raised-cosine bump to a height buffer. Centre (cx, cy) is in
- * fractional cell units, radius is in cell widths, invAspect is the cell
- * height divided by the cell width (so the bump is round on screen).
- */
-export function addDrop(buf, w, h, cx, cy, amp, radius, invAspect) {
-  const ry = radius / invAspect;
-  const x0 = Math.max(1, Math.floor(cx - radius));
-  const x1 = Math.min(w - 2, Math.ceil(cx + radius));
-  const y0 = Math.max(1, Math.floor(cy - ry));
-  const y1 = Math.min(h - 2, Math.ceil(cy + ry));
+export function addHill(buf, w, h, cx, cy, amp, sigma, reach, invAspect) {
+  const R = sigma * reach;
+  const ry = R / invAspect;
+  const x0 = Math.max(0, Math.floor(cx - R));
+  const x1 = Math.min(w - 1, Math.ceil(cx + R));
+  const y0 = Math.max(0, Math.floor(cy - ry));
+  const y1 = Math.min(h - 1, Math.ceil(cy + ry));
+  const k = 1 / (2 * sigma * sigma);
+  const R2 = R * R;
+  const floor = Math.exp(-reach * reach * 0.5);
+  const norm = amp / (1 - floor);
   for (let y = y0; y <= y1; y++) {
     const dy = (y + 0.5 - cy) * invAspect;
-    for (let x = x0; x <= x1; x++) {
+    const dy2 = dy * dy;
+    let i = y * w + x0;
+    for (let x = x0; x <= x1; x++, i++) {
       const dx = x + 0.5 - cx;
-      const d = Math.sqrt(dx * dx + dy * dy);
-      if (d < radius) buf[y * w + x] += amp * 0.5 * (1 + Math.cos((Math.PI * d) / radius));
+      const d2 = dx * dx + dy2;
+      if (d2 < R2) buf[i] += norm * (Math.exp(-d2 * k) - floor);
     }
   }
+}
+
+/**
+ * Critically damped smoothing (the closed form behind "smooth damp"): moves
+ * `s.v` toward `target` with no jump in value or in velocity. `omega` is
+ * roughly 4.7 / (time to get within 5% of the target). State lives in `s` so
+ * nothing is allocated.
+ */
+export function smoothTo(s, target, omega, dt) {
+  const x = omega * dt;
+  const e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const change = s.v - target;
+  const temp = (s.vel + omega * change) * dt;
+  s.vel = (s.vel - omega * temp) * e;
+  s.v = target + (change + temp) * e;
 }
 
 /* ------------------------------------------------------------------------ *
@@ -163,410 +119,527 @@ export function addDrop(buf, w, h, cx, cy, amp, radius, invAspect) {
  * cell is a single drawImage; the field stays quieter than body text.
  * ------------------------------------------------------------------------ */
 
-const WATER_GLYPHS = [
+// topo: index = 1 + shape * 2 + (index contour ? 1 : 0); shapes: - | / \
+// (tall strokes carry more ink per cell, so they get a little less alpha)
+const TOPO_GLYPHS = [
   ['', 0],
-  ['.', 0.34],
-  ['·', 0.38],
-  [':', 0.42],
-  ['-', 0.46],
-  ['=', 0.5],
-  ['+', 0.55],
-  ['*', 0.6],
+  ['-', 0.17],
+  ['-', 0.32],
+  ['|', 0.13],
+  ['|', 0.26],
+  ['/', 0.15],
+  ['/', 0.3],
+  ['\\', 0.15],
+  ['\\', 0.3],
 ];
 
-const WIND_GLYPHS = (() => {
-  const g = [
-    ['', 0],
-    ['.', 0.3],
-    [',', 0.34],
-    ["'", 0.38],
-  ];
-  // index = 4 + shape * 3 + tier; shapes: - ~ / | \ (tall strokes read heavier, so they get less alpha)
-  const light = [0.38, 0.46, 0.55];
-  const tall = [0.32, 0.4, 0.48];
-  for (const ch of ['-', '~']) for (const a of light) g.push([ch, a]);
-  for (const ch of ['/', '|', '\\']) for (const a of tall) g.push([ch, a]);
-  return g;
-})();
+const WATER_GLYPHS = [
+  ['', 0],
+  ['.', 0.14],
+  ['·', 0.18],
+  [':', 0.22],
+  ['-', 0.27],
+];
+
+/* ------------------------------------------------------------------------ *
+ * Preset: topo
+ *
+ * Height field: three octaves of 2D gradient noise whose lattice gradients
+ * slowly rotate, which makes the landscape evolve without ever jittering.
+ * Heights are in contour intervals, so a contour sits at every integer and
+ * every fifth integer is an index contour.
+ *
+ * Contours: for each cell the height h and the gradient (gx, gy), both per
+ * cell, give the distance to the nearest integer level. The level crosses the
+ * cell when |h - level| <= 0.5 * max(|gx|, |gy|). That is the digital-line
+ * rule of marching squares for a locally linear field: exactly one cell per
+ * column on shallow lines and one per row on steep ones, so lines are thin,
+ * unbroken and 8-connected. The glyph comes from the gradient direction.
+ * ------------------------------------------------------------------------ */
+
+const TOPO = {
+  fps: 20,
+  cell: 1.1, // cell height, multiples of the font size; tight, so | and / chains read as one line
+  baseDt: 0.1, // the landscape is recomputed at 10 Hz; contours move a few px a second
+  relief: 4.3, // contour intervals per unit of noise; sets how dense the map is (about 8% of cells lit)
+  octaves: [
+    // size: lattice spacing in css px; amp: weight; spin: gradient rotation, rad/s
+    { size: 640, amp: 1, spin: 0.028, salt: 1 },
+    { size: 290, amp: 0.4, spin: 0.036, salt: 2 },
+    { size: 140, amp: 0.13, spin: 0.045, salt: 3 },
+  ],
+  every: 5, // index contour period
+  band: 0.5, // half-width of a line, in cells along its major axis
+  steep: 0.3, // below this cols-per-row a steep line is |, above it / or \
+  shallow: 0.3, // below this rows-per-col a shallow line is -, above it / or \
+  hill: { levels: 2.4, sigma: 6.4, reach: 2.6, rise: 4.6, fall: 1.6, follow: 7 },
+  staticT: 41, // the landscape at rest, for reduced motion
+};
+
+export function createTopo(seed) {
+  const sd = seed === undefined ? (Math.random() * 1024) | 0 : seed | 0;
+  const oct = TOPO.octaves.map((o) => ({
+    size: o.size,
+    amp: o.amp * TOPO.relief,
+    spin: o.spin,
+    salt: o.salt + sd * 16,
+    nw: 0,
+    nh: 0,
+    ph: null, // lattice node: gradient phase and spin
+    sp: null,
+    gx: null, // lattice node: current gradient
+    gy: null,
+    cix: null, // per column: lattice cell, fraction, fade
+    cfx: null,
+    cu: null,
+    riy: null, // per row
+    rfy: null,
+    rv: null,
+  }));
+  let w = 0;
+  let h = 0;
+  let base = null; // landscape, in contour intervals
+  let hh = null; // landscape plus the pointer hill
+  let coarse = null; // the landscape on every second cell
+  let cw2 = 0;
+  let ch2 = 0;
+  let inv = 2.08; // cell height / cell width
+  let t = 0;
+  let acc = 0;
+  let dirty = true;
+  let hillWas = false;
+  let started = false;
+
+  // the pointer hill
+  const amp = { v: 0, vel: 0 };
+  const hx = { v: 0, vel: 0 };
+  const hy = { v: 0, vel: 0 };
+  let want = false;
+  let px = 0;
+  let py = 0;
+
+  const fade = (f) => f * f * f * (f * (f * 6 - 15) + 10);
+
+  // The landscape is smooth, so it is evaluated on a lattice of every second
+  // cell and interpolated: a quarter of the noise work for the same lines.
+  function layoutOctave(o, cols, rows, cellW, cellH, ox, oy) {
+    const cw = (cols >> 1) + 2;
+    const ch = (rows >> 1) + 2;
+    const nw = Math.floor((ox + 2 * cw * cellW) / o.size) + 2;
+    const nh = Math.floor((oy + 2 * ch * cellH) / o.size) + 2;
+    if (nw !== o.nw || nh !== o.nh) {
+      o.nw = nw;
+      o.nh = nh;
+      o.ph = new Float32Array(nw * nh);
+      o.sp = new Float32Array(nw * nh);
+      o.gx = new Float32Array(nw * nh);
+      o.gy = new Float32Array(nw * nh);
+      for (let j = 0; j < nh; j++) {
+        for (let i = 0; i < nw; i++) {
+          o.ph[j * nw + i] = hash2(i, j, o.salt * 2) * 6.283185307;
+          const s = hash2(i, j, o.salt * 2 + 1);
+          o.sp[j * nw + i] = (s < 0.5 ? -1 : 1) * o.spin * (0.45 + 0.55 * Math.abs(s * 2 - 1));
+        }
+      }
+    }
+    if (!o.cix || o.cix.length !== cw) {
+      o.cix = new Int32Array(cw);
+      o.cfx = new Float32Array(cw);
+      o.cu = new Float32Array(cw);
+    }
+    if (!o.riy || o.riy.length !== ch) {
+      o.riy = new Int32Array(ch);
+      o.rfy = new Float32Array(ch);
+      o.rv = new Float32Array(ch);
+    }
+    for (let c = 0; c < cw; c++) {
+      const p = (ox + (2 * c + 0.5) * cellW) / o.size;
+      const i = Math.floor(p);
+      o.cix[c] = i;
+      o.cfx[c] = p - i;
+      o.cu[c] = fade(p - i);
+    }
+    for (let r = 0; r < ch; r++) {
+      const p = (oy + (2 * r + 0.5) * cellH) / o.size;
+      const j = Math.floor(p);
+      o.riy[r] = j;
+      o.rfy[r] = p - j;
+      o.rv[r] = fade(p - j);
+    }
+    if (!coarse || coarse.length !== cw * ch) coarse = new Float32Array(cw * ch);
+    cw2 = cw;
+    ch2 = ch;
+  }
+
+  function fillBase() {
+    const cw = cw2;
+    const ch = ch2;
+    for (let n = 0; n < oct.length; n++) {
+      const o = oct[n];
+      const gx = o.gx;
+      const gy = o.gy;
+      for (let k = 0; k < gx.length; k++) {
+        const a = o.ph[k] + o.sp[k] * t;
+        gx[k] = Math.cos(a);
+        gy[k] = Math.sin(a);
+      }
+      const nw = o.nw;
+      const cix = o.cix;
+      const cfx = o.cfx;
+      const cu = o.cu;
+      const gain = o.amp;
+      const add = n > 0;
+      for (let r = 0; r < ch; r++) {
+        const fy = o.rfy[r];
+        const fy1 = fy - 1;
+        const v = o.rv[r];
+        const r0 = o.riy[r] * nw;
+        const r1 = r0 + nw;
+        let i = r * cw;
+        for (let c = 0; c < cw; c++, i++) {
+          const a = r0 + cix[c];
+          const b = r1 + cix[c];
+          const fx = cfx[c];
+          const fx1 = fx - 1;
+          const n00 = gx[a] * fx + gy[a] * fy;
+          const n10 = gx[a + 1] * fx1 + gy[a + 1] * fy;
+          const n01 = gx[b] * fx + gy[b] * fy1;
+          const n11 = gx[b + 1] * fx1 + gy[b + 1] * fy1;
+          const u = cu[c];
+          const top = n00 + u * (n10 - n00);
+          const val = (top + v * (n01 + u * (n11 - n01) - top)) * gain;
+          coarse[i] = add ? coarse[i] + val : val;
+        }
+      }
+    }
+    // interpolate up to every cell
+    for (let y = 0; y < h; y++) {
+      const r0 = (y >> 1) * cw;
+      const r1 = r0 + cw;
+      const fy = (y & 1) * 0.5;
+      let i = y * w;
+      for (let x = 0; x < w; x++, i++) {
+        const c = r0 + (x >> 1);
+        const d = r1 + (x >> 1);
+        const fx = (x & 1) * 0.5;
+        const top = coarse[c] + fx * (coarse[c + 1] - coarse[c]);
+        const bot = coarse[d] + fx * (coarse[d + 1] - coarse[d]);
+        base[i] = top + fy * (bot - top);
+      }
+    }
+  }
+
+  return {
+    glyphs: TOPO_GLYPHS,
+    fps: TOPO.fps,
+    cell: TOPO.cell,
+
+    /** ox, oy: where the grid starts inside the viewport, css px. The landscape is pinned to the viewport, not the grid. */
+    resize(cols, rows, cellW, cellH, ox, oy) {
+      if (cols !== w || rows !== h || !base) {
+        w = cols;
+        h = rows;
+        base = new Float32Array(w * h);
+        hh = new Float32Array(w * h);
+      }
+      inv = cellH / cellW;
+      for (let n = 0; n < oct.length; n++) layoutOctave(oct[n], w, h, cellW, cellH, ox || 0, oy || 0);
+      dirty = true;
+    },
+
+    /** The first call picks a start time; `still` (reduced motion) pins the landscape and drops the hill. */
+    settle(still) {
+      if (!started) {
+        started = true;
+        t = 40 + Math.random() * 3000;
+      }
+      if (still) {
+        t = TOPO.staticT;
+        amp.v = amp.vel = 0;
+        want = false;
+      }
+      dirty = true;
+    },
+
+    step(dt) {
+      t += dt;
+      acc += dt;
+      if (acc >= TOPO.baseDt) {
+        acc = 0;
+        dirty = true;
+      }
+      const H = TOPO.hill;
+      if (want) {
+        smoothTo(hx, px, H.follow, dt);
+        smoothTo(hy, py, H.follow, dt);
+      }
+      smoothTo(amp, want ? 1 : 0, want ? H.rise : H.fall, dt);
+      if (!want && amp.v < 0.002 && Math.abs(amp.vel) < 0.002) amp.v = amp.vel = 0;
+      if (amp.v < 0) amp.v = 0; // the smoothing can overshoot a hair when released mid-rise
+    },
+
+    render(out) {
+      const hillOn = amp.v > 0.001;
+      if (!dirty && !hillOn && !hillWas) return; // nothing moved since last time
+      if (dirty) {
+        fillBase();
+        dirty = false;
+      }
+      hillWas = hillOn;
+      hh.set(base);
+      if (hillOn) addHill(hh, w, h, hx.v, hy.v, TOPO.hill.levels * amp.v, TOPO.hill.sigma, TOPO.hill.reach, inv);
+
+      const every = TOPO.every;
+      const band = TOPO.band;
+      const steep = TOPO.steep;
+      const shallow = TOPO.shallow;
+      out.fill(0);
+      for (let y = 1; y < h - 1; y++) {
+        let i = y * w + 1;
+        for (let x = 1; x < w - 1; x++, i++) {
+          const v = hh[i] + 1000; // biased positive, and 1000 is a multiple of every
+          const k = (v + 0.5) | 0; // nearest level
+          let d = v - k;
+          if (d < 0) d = -d;
+          let gx = (hh[i + 1] - hh[i - 1]) * 0.5;
+          let gy = (hh[i + w] - hh[i - w]) * 0.5;
+          const sgn = gx * gy; // > 0: the level climbs towards lower right, so the line runs /
+          if (gx < 0) gx = -gx;
+          if (gy < 0) gy = -gy;
+          const m = gx > gy ? gx : gy;
+          if (d > band * m) continue;
+          let shape;
+          if (gx >= gy) shape = gy < gx * steep ? 1 : sgn > 0 ? 2 : 3; // steep line: | / \
+          else shape = gx < gy * shallow ? 0 : sgn > 0 ? 2 : 3; // shallow line: - / \
+          out[i] = 1 + shape * 2 + (k % every === 0 ? 1 : 0);
+        }
+      }
+    },
+
+    /** Called every frame while a pointer is over the page; cx, cy are in cell units. */
+    pointer(cx, cy, moved) {
+      px = cx;
+      py = cy;
+      if (!want) {
+        // a fresh arrival: a hill that is not up yet starts under the pointer instead of sliding in
+        if (amp.v < 0.04) {
+          hx.v = cx;
+          hy.v = cy;
+          hx.vel = hy.vel = 0;
+        }
+        want = true;
+      }
+    },
+
+    pointerLeave() {
+      want = false;
+    },
+
+    time() {
+      return t;
+    },
+
+    /** Debug: the hill's current strength, 0..1. */
+    hill() {
+      return amp.v;
+    },
+  };
+}
 
 /* ------------------------------------------------------------------------ *
  * Preset: water
+ *
+ * Calm water: a still, blank surface. Nothing moves until something falls in
+ * it, and then only a ring does: a soft crest that opens slowly from the spot
+ * and fades as it goes. The pointer drops one now and then (rate limited, and
+ * never closer than a few cells to the last one), and a rare drop falls on its
+ * own. Rings are drawn, not simulated: each is one analytic crest, and
+ * overlapping rings take the stronger of the two, so there is no interference,
+ * no wake and no speckle, and the surface is blank most of the time.
  * ------------------------------------------------------------------------ */
 
 const WATER = {
-  kx: 0.17, // squared Courant number along x (wave speed ~0.41 cells/step)
-  damp: 0.988, // per-step damping, gentle: a ring lasts around 5 s
-  crest: 3.4, // height -> brightness gain for crests
-  trough: 1.8, // ... and for troughs (dimmer, so rings read as light and dark)
-  dither: 0.4, // static per-cell wobble of the thresholds, breaks up banding
-  swellAmp: 0.9,
-  swellThresh: 0.28,
-  threshold: 0.12, // brightness below this stays blank
-  ratio: 1.85, // each ramp step needs this much more brightness than the last
-  spacing: 3.2, // pointer drop spacing, in cell widths
-  edge: 0.2, // extra damping at the border (a soft sponge), so ripples fade out there
-  band: 7, // ... over this many cell widths
+  fps: 30,
+  cell: 1.25,
+  max: 24, // rings alive at once; the oldest is reused
+  open: 1.2, // a ring starts this many cell widths wide
+  grow: 0.04, // crest width, in cell widths: grow * radius + base
+  base: 0.95,
+  steps: [0.08, 0.17, 0.3, 0.5], // crest strength needed for ramp steps . · : -; below the first the cell stays blank
+  fade: 0.35, // seconds a ring takes to come in
+  pointer: { gap: 0.12, jitter: 0.08, dist: 14, amp: 0.5, life: 3.4, speed: 4.6 }, // one ring per 120-200 ms of movement; speed in cell widths a second
+  ambient: { gap: 6, jitter: 4, first: 1.5, amp: 0.62, ampJitter: 0.1, life: 7.5, lifeJitter: 1.5, speed: 4.2 }, // one drop every 6-10 s
 };
 
-// brightness (in hundredths) -> ramp level. No logs or branches per cell.
+// strength (in hundredths) -> ramp level. No logs or branches per cell.
 const WATER_LUT = (() => {
   const lut = new Uint8Array(256);
   for (let k = 0; k < 256; k++) {
     const v = k / 100;
-    lut[k] = v < WATER.threshold ? 0 : Math.min(7, 1 + Math.floor(Math.log(v / WATER.threshold) / Math.log(WATER.ratio)));
+    let lv = 0;
+    for (let s = 0; s < WATER.steps.length; s++) if (v >= WATER.steps[s]) lv = s + 1;
+    lut[k] = lv;
   }
   return lut;
 })();
 
 export function createWater(seed) {
-  const noise = createNoise3(1337);
   const rnd = mulberry32(seed === undefined ? (Math.random() * 4294967296) >>> 0 : seed);
+  const M = WATER.max;
+  const rx = new Float32Array(M); // ring centre, cells
+  const ry = new Float32Array(M);
+  const born = new Float32Array(M);
+  const life = new Float32Array(M); // 0: slot is free
+  const amp = new Float32Array(M);
+  const speed = new Float32Array(M);
   let w = 0;
   let h = 0;
-  let u0 = null; // previous state, overwritten by each step
-  let u1 = null; // current state
-  let jit = null;
-  let sponge = null;
-  let sx = 0.084; // noise units per cell, x
-  let sy = 0.175; // ... y
+  let buf = null; // crest strength per cell
   let inv = 2.08; // cell height / cell width
-  let kx = WATER.kx;
-  let ky = WATER.kx / (inv * inv);
   let t = 0;
   let nextDrop = 0;
-  let carry = 0;
   let nextPtr = 0;
+  let lastX = -1e3; // where the pointer last dropped something, cells
+  let lastY = -1e3;
+  let any = false; // something was drawn last time
 
-  // A drop goes into the current buffer only, so it carries momentum (an
-  // impulse): the ring it throws is much stronger than a plain displacement.
-  function drop(cx, cy, amp, radius) {
-    addDrop(u1, w, h, cx, cy, amp, radius, inv);
+  // a free slot, else the ring closest to the end of its life
+  function drop(cx, cy, a, l, v, age) {
+    let k = 0;
+    let least = Infinity;
+    for (let i = 0; i < M; i++) {
+      const rest = life[i] === 0 ? -1 : life[i] - (t - born[i]);
+      if (rest < least) {
+        least = rest;
+        k = i;
+      }
+      if (rest <= 0) break;
+    }
+    rx[k] = cx;
+    ry[k] = cy;
+    born[k] = t - (age || 0);
+    life[k] = l;
+    amp[k] = a;
+    speed[k] = v;
   }
 
   function ambient() {
-    const r = 3.6 + rnd() * 2.2;
-    const mx = r + 2;
-    const my = (r + 2) / inv;
+    const A = WATER.ambient;
+    const mx = 6;
+    const my = 6 / inv;
     const cx = mx + rnd() * Math.max(1, w - 2 * mx);
     const cy = my + rnd() * Math.max(1, h - 2 * my);
-    drop(cx, cy, 0.28 + rnd() * 0.2, r);
+    drop(cx, cy, A.amp + rnd() * A.ampJitter, A.life + rnd() * A.lifeJitter, A.speed);
   }
 
   return {
     glyphs: WATER_GLYPHS,
+    fps: WATER.fps,
+    cell: WATER.cell,
 
     resize(cols, rows, cellW, cellH) {
-      if (cols !== w || rows !== h || !u0) {
+      if (cols !== w || rows !== h || !buf) {
         w = cols;
         h = rows;
-        u0 = new Float32Array(w * h);
-        u1 = new Float32Array(w * h);
-        jit = new Float32Array(w * h);
-        const r = mulberry32(99);
-        for (let i = 0; i < jit.length; i++) jit[i] = (r() - 0.5) * WATER.dither;
+        buf = new Float32Array(w * h);
+        life.fill(0);
+        any = true;
       }
-      sx = cellW / 100;
-      sy = cellH / 100;
-      const nextInv = cellH / cellW;
-      if (!sponge || sponge.length !== w * h || Math.abs(nextInv - inv) > 1e-6) {
-        inv = nextInv;
-        sponge = makeSponge(w, h, WATER.damp, WATER.edge, WATER.band, inv);
-      }
-      ky = WATER.kx / (inv * inv);
-      kx = WATER.kx;
+      inv = cellH / cellW;
     },
 
-    /** Reset to a pleasing, already-moving state (also the static frame). */
-    settle() {
-      u0.fill(0);
-      u1.fill(0);
+    /** A blank surface. `still` (reduced motion) leaves one faint ring, mid-way through its life. */
+    settle(still) {
+      life.fill(0);
       t = 0;
-      const plan = [
-        [0, 0.3, 0.46, 0.4, 4.8],
-        [22, 0.7, 0.6, 0.32, 4.2],
-        [40, 0.52, 0.2, 0.28, 3.6],
-      ];
-      for (let s = 0; s < 74; s++) {
-        for (let k = 0; k < plan.length; k++) {
-          if (plan[k][0] === s) drop(plan[k][1] * w, plan[k][2] * h, plan[k][3], plan[k][4]);
-        }
-        rippleStep(u0, u1, w, h, kx, ky, WATER.damp, sponge);
-        const tmp = u0;
-        u0 = u1;
-        u1 = tmp;
+      any = true;
+      lastX = lastY = -1e3;
+      if (still) {
+        const A = WATER.ambient;
+        drop(0.68 * w, 0.42 * h, A.amp, A.life, A.speed, 3);
       }
-      t = 11.7;
-      nextDrop = t + 1.2 + rnd() * 1.5;
+      nextDrop = t + WATER.ambient.first + rnd() * 2;
     },
 
     step(dt) {
       t += dt;
       if (t >= nextDrop) {
         ambient();
-        nextDrop = t + 2 + rnd() * 2;
-      }
-      rippleStep(u0, u1, w, h, kx, ky, WATER.damp, sponge);
-      const tmp = u0;
-      u0 = u1;
-      u1 = tmp;
-    },
-
-    render(out) {
-      const crest = WATER.crest;
-      const trough = WATER.trough;
-      const sa = WATER.swellAmp;
-      const st = WATER.swellThresh;
-      const tz = t * 0.055;
-      let i = 0;
-      for (let y = 0; y < h; y++) {
-        const ny = y * sy * 0.55;
-        for (let x = 0; x < w; x++, i++) {
-          const hv = u1[i];
-          let v = hv > 0 ? hv * crest : -hv * trough;
-          // very slow, low-amplitude swell so the surface is never fully still
-          const s = noise(x * sx * 0.5 - t * 0.04, ny, tz);
-          if (s > st) v += (s - st) * sa;
-          let k = (v * (1 + jit[i]) * 100) | 0;
-          if (k > 255) k = 255;
-          out[i] = WATER_LUT[k];
-        }
-      }
-    },
-
-    pointer(cx, cy, px, py, had) {
-      if (!had) return;
-      const dx = cx - px;
-      const dy = (cy - py) * inv;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 0.01) return;
-      let s = WATER.spacing - carry;
-      let n = 0;
-      while (s <= dist && n < 3) {
-        if (t >= nextPtr) {
-          const f = s / dist;
-          drop(px + dx * f, py + (cy - py) * f, 0.11, 2.8);
-          nextPtr = t + 0.06;
-        }
-        s += WATER.spacing;
-        n++;
-      }
-      carry = n === 0 ? Math.min(WATER.spacing, carry + dist) : dist - (s - WATER.spacing);
-      if (carry < 0) carry = 0;
-    },
-
-    /** A tap or click: one soft drop (touch screens rarely send moves). */
-    tap(cx, cy) {
-      drop(cx, cy, 0.3, 3.4);
-    },
-
-    time() {
-      return t;
-    },
-  };
-}
-
-/* ------------------------------------------------------------------------ *
- * Preset: wind
- * ------------------------------------------------------------------------ */
-
-const WIND = {
-  base: 0.1, // resting energy (the sparse dots of calm grass)
-  gust: 0.62, // added by a gust
-  reach: 2.2, // how much of the field a gust covers (higher = more)
-  detail: 0.3, // fine structure inside gusts
-  flutter: 0.045, // per-cell shimmer
-  jitter: 0.12, // static per-cell wobble of the thresholds (stippled gust edges)
-  speed: 0.55, // gust drift, noise units per second (rightwards)
-  tCalm1: 0.15,
-  tCalm2: 0.25,
-  tCalm3: 0.34,
-  tDir: 0.44, // above this a cell draws a directional glyph
-  tWave: 0.62, // above this a horizontal glyph becomes ~
-  ripple: 0.16, // size of the wave that rides through gusts
-  decay: 0.955, // pointer wake, per frame
-  push: 1.15, // pointer wake peak strength
-};
-
-export function createWind() {
-  const noise = createNoise3(4242);
-  let w = 0;
-  let h = 0;
-  let wx = null; // pointer wake (flow offset), physical units
-  let wy = null;
-  let jit = null;
-  let ph = null;
-  let ce = null; // coarse lattice: resting energy
-  let cth = null; // coarse lattice: flow angle
-  let cw2 = 0;
-  let ch2 = 0;
-  let sx = 0.084;
-  let sy = 0.175;
-  let inv = 2.08;
-  let t = 0;
-  let wake = 0; // 0 when the wake is fully faded; skips all wake work
-
-  function stamp(cx, cy) {
-    const R = PTR_RADIUS;
-    const x0 = Math.max(0, Math.floor(cx - R));
-    const x1 = Math.min(w - 1, Math.ceil(cx + R));
-    const y0 = Math.max(0, Math.floor(cy - R / inv));
-    const y1 = Math.min(h - 1, Math.ceil(cy + R / inv));
-    for (let y = y0; y <= y1; y++) {
-      const dy = (y + 0.5 - cy) * inv;
-      for (let x = x0; x <= x1; x++) {
-        const dx = x + 0.5 - cx;
-        const d2 = dx * dx + dy * dy;
-        if (d2 >= R * R) continue;
-        const d = Math.sqrt(d2) || 0.001;
-        let f = 1 - d / R;
-        f = f * f * (3 - 2 * f);
-        const i = y * w + x;
-        const k = f * 0.5;
-        wx[i] += ((dx / d) * WIND.push * f - wx[i]) * k;
-        wy[i] += ((dy / d) * WIND.push * f - wy[i]) * k;
-      }
-    }
-    wake = 1;
-  }
-
-  return {
-    glyphs: WIND_GLYPHS,
-
-    resize(cols, rows, cellW, cellH) {
-      if (cols !== w || rows !== h || !wx) {
-        w = cols;
-        h = rows;
-        wx = new Float32Array(w * h);
-        wy = new Float32Array(w * h);
-        jit = new Float32Array(w * h);
-        ph = new Float32Array(w * h);
-        // the noise fields are smooth, so they are sampled on a lattice of every
-        // second cell and interpolated: a quarter of the noise evaluations
-        cw2 = ((w - 1) >> 1) + 2;
-        ch2 = ((h - 1) >> 1) + 2;
-        ce = new Float32Array(cw2 * ch2);
-        cth = new Float32Array(cw2 * ch2);
-        const r = mulberry32(77);
-        for (let i = 0; i < jit.length; i++) {
-          jit[i] = r() - 0.5;
-          ph[i] = r();
-        }
-        wake = 0;
-      }
-      sx = cellW / 100;
-      sy = cellH / 100;
-      inv = cellH / cellW;
-    },
-
-    settle() {
-      wx.fill(0);
-      wy.fill(0);
-      wake = 0;
-      t = 6.4;
-    },
-
-    step(dt) {
-      t += dt;
-      if (wake > 0) {
-        wake *= WIND.decay;
-        if (wake < 0.004) {
-          wx.fill(0);
-          wy.fill(0);
-          wake = 0;
-        } else {
-          const d = WIND.decay;
-          for (let i = 0; i < wx.length; i++) {
-            wx[i] *= d;
-            wy[i] *= d;
-          }
-        }
+        nextDrop = t + WATER.ambient.gap + rnd() * WATER.ambient.jitter;
       }
     },
 
     render(out) {
-      const tt = t;
-      const useWake = wake > 0;
-      const drift = tt * WIND.speed;
-
-      // 1. noise on the coarse lattice
-      let c = 0;
-      for (let j = 0; j < ch2; j++) {
-        const ny = j * 2 * sy;
-        for (let i = 0; i < cw2; i++, c++) {
-          const adv = i * 2 * sx - drift;
-          // slow, mostly horizontal flow direction, with a little faster swirl on top
-          const th = noise(adv * 0.3, ny * 0.45, tt * 0.06) * 0.85 + noise(adv * 1.0 + 3.3, ny * 1.2, tt * 0.3 + 7) * 0.55;
-          cth[c] = th < -1.4 ? -1.4 : th > 1.4 ? 1.4 : th;
-          // drifting gust envelope, with finer streaks inside it
-          let g = noise(adv * 0.3 + 31.7, ny * 0.65, tt * 0.045 + 5.1) * WIND.reach;
-          g = g < 0 ? 0 : g > 1 ? 1 : g;
-          g = g * g * (3 - 2 * g);
-          const dn = noise((adv - drift * 0.5) * 1.3 + 9.3, ny * 1.5, tt * 0.22 + 2.2);
-          ce[c] = WIND.base + g * (WIND.gust + WIND.detail * dn);
+      buf.fill(0);
+      let live = false;
+      for (let n = 0; n < M; n++) {
+        const l = life[n];
+        if (l === 0) continue;
+        const age = t - born[n];
+        if (age >= l) continue;
+        live = true;
+        const u = 1 - age / l;
+        let env = amp[n] * u * Math.sqrt(u);
+        if (age < WATER.fade) {
+          const f = age / WATER.fade;
+          env *= f * f * (3 - 2 * f);
         }
-      }
-
-      // 2. per cell: interpolate, add flutter and the pointer wake, pick a glyph
-      let k = 0;
-      for (let y = 0; y < h; y++) {
-        const row0 = (y >> 1) * cw2;
-        const row1 = row0 + cw2;
-        const fy = (y & 1) * 0.5;
-        for (let x = 0; x < w; x++, k++) {
-          const a = row0 + (x >> 1);
-          const b = row1 + (x >> 1);
-          const fx = (x & 1) * 0.5;
-          const e0 = (ce[a] * (1 - fx) + ce[a + 1] * fx) * (1 - fy) + (ce[b] * (1 - fx) + ce[b + 1] * fx) * fy;
-          const th = (cth[a] * (1 - fx) + cth[a + 1] * fx) * (1 - fy) + (cth[b] * (1 - fx) + cth[b + 1] * fx) * fy;
-          // flutter: a cheap triangle wave with a per-cell phase
-          let f = ph[k] + tt * 0.21;
-          f -= Math.floor(f);
-          const e = e0 + WIND.flutter * (f < 0.5 ? f * 4 - 1 : 3 - f * 4);
-          // cos and sin by polynomial: th is within +-1.4, error stays under 0.01
-          const t2 = th * th;
-          let vx = e * (1 - t2 * (0.5 - t2 * (1 / 24 - t2 / 720)));
-          let vy = e * th * (1 - t2 * (1 / 6 - t2 * (1 / 120 - t2 / 5040)));
-          if (useWake) {
-            vx += wx[k];
-            vy += wy[k];
-          }
-          const es = Math.sqrt(vx * vx + vy * vy) + jit[k] * WIND.jitter;
-          if (es < WIND.tCalm1) {
-            out[k] = 0;
-          } else if (es < WIND.tDir) {
-            out[k] = es < WIND.tCalm2 ? 1 : es < WIND.tCalm3 ? 2 : 3;
-          } else {
-            // a faint wave rides through the gust, drifting with the wind
-            let wv = x * 0.23 - tt * 0.9 + ph[k] * 0.4;
-            wv -= Math.floor(wv);
-            const ew = es + WIND.ripple * (wv < 0.5 ? wv * 4 - 1 : 3 - wv * 4);
-            const ax = vx < 0 ? -vx : vx;
-            const ay = vy < 0 ? -vy : vy;
-            let shape;
-            if (ay < ax * 0.4142) shape = ew >= WIND.tWave ? 1 : 0; // ~ or -
-            else if (ay > ax * 2.4142) shape = 3; // |
-            else shape = vx * vy > 0 ? 4 : 2; // \ or /
-            const tier = ew < WIND.tDir + 0.2 ? 0 : ew < WIND.tDir + 0.42 ? 1 : 2;
-            out[k] = 4 + shape * 3 + tier;
+        const r = WATER.open + speed[n] * age;
+        const sig = WATER.base + WATER.grow * r;
+        const sf = sig * 0.7; // a crisper leading edge...
+        const sb = sig * 1.4; // ... and a softer back
+        const outer = r + 3 * sf;
+        const inner = r - 3 * sb;
+        const o2 = outer * outer;
+        const i2 = inner > 0 ? inner * inner : -1;
+        const cx = rx[n];
+        const cy = ry[n];
+        const x0 = Math.max(0, Math.floor(cx - outer));
+        const x1 = Math.min(w - 1, Math.ceil(cx + outer));
+        const y0 = Math.max(0, Math.floor(cy - outer / inv));
+        const y1 = Math.min(h - 1, Math.ceil(cy + outer / inv));
+        for (let y = y0; y <= y1; y++) {
+          const dy = (y + 0.5 - cy) * inv;
+          const dy2 = dy * dy;
+          let i = y * w + x0;
+          for (let x = x0; x <= x1; x++, i++) {
+            const dx = x + 0.5 - cx;
+            const d2 = dx * dx + dy2;
+            if (d2 > o2 || d2 < i2) continue;
+            const e = Math.sqrt(d2) - r;
+            const q = e > 0 ? e / sf : e / sb;
+            const v = env * Math.exp(-q * q);
+            if (v > buf[i]) buf[i] = v;
           }
         }
       }
-    },
-
-    pointer(cx, cy, px, py, had) {
-      if (!had) {
-        stamp(cx, cy);
+      if (!live) {
+        if (any) out.fill(0);
+        any = false;
         return;
       }
-      const dx = cx - px;
-      const dy = (cy - py) * inv;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const n = Math.min(12, Math.ceil(dist / 2));
-      for (let k = 1; k <= n; k++) stamp(px + ((cx - px) * k) / n, py + ((cy - py) * k) / n);
+      any = true;
+      for (let i = 0, n = w * h; i < n; i++) {
+        const k = (buf[i] * 100) | 0;
+        out[i] = WATER_LUT[k > 255 ? 255 : k];
+      }
     },
 
-    tap(cx, cy) {
-      stamp(cx, cy);
+    /** Called every frame while a pointer is over the page; cx, cy are in cell units. */
+    pointer(cx, cy, moved) {
+      const P = WATER.pointer;
+      if (!moved || t < nextPtr) return;
+      const dx = cx - lastX;
+      const dy = (cy - lastY) * inv;
+      if (dx * dx + dy * dy < P.dist * P.dist) return; // not far enough from the last ring: a slow pointer stays sparse
+      drop(cx, cy, P.amp, P.life, P.speed);
+      lastX = cx;
+      lastY = cy;
+      nextPtr = t + P.gap + rnd() * P.jitter;
+    },
+
+    pointerLeave() {
+      lastX = lastY = -1e3;
     },
 
     time() {
@@ -575,8 +648,10 @@ export function createWind() {
   };
 }
 
-function makePreset(name) {
-  return name === 'wind' ? createWind() : createWater();
+const PRESETS = { topo: createTopo, water: createWater };
+
+function presetName(value) {
+  return Object.prototype.hasOwnProperty.call(PRESETS, value) ? value : DEFAULT_PRESET;
 }
 
 /* ------------------------------------------------------------------------ *
@@ -616,13 +691,17 @@ export function mountField(root) {
   let raf = 0;
   let last = 0;
   let cost = 0; // moving average of the work per frame, ms
-  let costDraw = 0; // ... of which drawing
+  let costRender = 0; // ... of which the preset's render
+  let costDraw = 0; // ... and of which drawing
+  let lit = 0; // share of cells showing a glyph, 0..1
 
-  let presetName = html.dataset.field === 'wind' ? 'wind' : 'water';
-  let preset = makePreset(presetName);
+  let name = presetName(html.dataset.field);
+  let preset = PRESETS[name]();
+  let frameMs = 1000 / preset.fps;
 
   // metrics
   let styleKey = '';
+  let sig = '';
   let dpr = 1;
   let cwD = 0; // cell size in device pixels
   let chD = 0;
@@ -636,7 +715,7 @@ export function mountField(root) {
   let shown = null; // what is currently on the canvas
   let forceFull = true;
 
-  const ptr = { active: false, dirty: false, tap: false, has: false, x: 0, y: 0, cx: 0, cy: 0 };
+  const ptr = { inside: false, moved: false, had: false, x: 0, y: 0 };
 
   /* ---- atlas ---- */
 
@@ -647,7 +726,7 @@ export function mountField(root) {
     measure.font = font;
     const m = measure.measureText('M');
     cwD = Math.max(3, Math.round(m.width));
-    chD = Math.max(4, Math.round(fpx * CELL_H));
+    chD = Math.max(4, Math.round(fpx * (preset.cell || CELL_H)));
     cellW = cwD / dpr;
     cellH = chD / dpr;
     atlas.width = cwD * defs.length;
@@ -681,7 +760,10 @@ export function mountField(root) {
     const cs = getComputedStyle(root);
     const size = parseFloat(cs.fontSize) || 14;
     const ratio = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-    const key = [presetName, cs.fontFamily, size, cs.fontWeight, cs.color, ratio].join('|');
+    const key = [name, cs.fontFamily, size, cs.fontWeight, cs.color, ratio].join('|');
+    const now = key + '|' + cw + 'x' + ch;
+    if (now === sig && sized) return; // nothing changed (the observer and the window both report a resize)
+    sig = now;
     if (key !== styleKey) {
       styleKey = key;
       dpr = ratio;
@@ -726,8 +808,8 @@ export function mountField(root) {
       shown = new Uint8Array(cols * rows);
       forceFull = true;
     }
-    preset.resize(cols, rows, cellW, cellH);
-    if (fresh) preset.settle();
+    preset.resize(cols, rows, cellW, cellH, offX / dpr, offY / dpr);
+    if (fresh || reduced) preset.settle(reduced);
     sized = true;
     paint();
     updateRunning();
@@ -735,76 +817,64 @@ export function mountField(root) {
 
   /* ---- pointer ---- */
 
-  function gridOrigin(rr) {
-    return {
-      x: rr.left + root.clientLeft + offX / dpr,
-      y: rr.top + root.clientTop + offY / dpr,
-    };
-  }
-
   function onPointerMove(e) {
     ptr.x = e.clientX;
     ptr.y = e.clientY;
-    ptr.active = true;
-    ptr.dirty = true;
-  }
-  function onPointerDown(e) {
-    onPointerMove(e);
-    ptr.tap = true;
+    ptr.inside = true;
+    ptr.moved = true;
   }
   function onPointerUp(e) {
-    if (e.pointerType !== 'mouse') {
-      ptr.active = false;
-      ptr.has = false;
-    }
+    if (e.pointerType !== 'mouse') onPointerGone();
+  }
+  function onPointerOut(e) {
+    if (!e.relatedTarget) onPointerGone(); // left the window
   }
   function onPointerGone() {
-    ptr.active = false;
-    ptr.has = false;
+    ptr.inside = false;
+    ptr.moved = false;
   }
 
+  // The root is fixed to the viewport, so clientX/Y are already root coordinates.
   function tickPointer() {
-    if (!ptr.dirty) return;
-    const tap = ptr.tap;
-    ptr.dirty = false;
-    ptr.tap = false;
-    if (!ptr.active) return;
-    const rr = root.getBoundingClientRect();
-    if (ptr.x < rr.left || ptr.x >= rr.right || ptr.y < rr.top || ptr.y >= rr.bottom) {
-      ptr.has = false;
+    if (!ptr.inside) {
+      if (ptr.had) {
+        ptr.had = false;
+        preset.pointerLeave();
+      }
       return;
     }
-    const o = gridOrigin(rr);
-    const cx = (ptr.x - o.x) / cellW;
-    const cy = (ptr.y - o.y) / cellH;
-    if (cx < 0 || cy < 0 || cx >= cols || cy >= rows) {
-      ptr.has = false;
-      return;
-    }
-    if (tap) preset.tap(cx, cy);
-    else preset.pointer(cx, cy, ptr.has ? ptr.cx : cx, ptr.has ? ptr.cy : cy, ptr.has);
-    ptr.cx = cx;
-    ptr.cy = cy;
-    ptr.has = true;
+    let cx = (ptr.x - offX / dpr) / cellW;
+    let cy = (ptr.y - offY / dpr) / cellH;
+    cx = cx < 0 ? 0 : cx > cols ? cols : cx;
+    cy = cy < 0 ? 0 : cy > rows ? rows : cy;
+    preset.pointer(cx, cy, ptr.moved);
+    ptr.moved = false;
+    ptr.had = true;
   }
 
   /* ---- drawing ---- */
 
   function paint() {
     if (!sized) return;
-    preset.render(idx);
     const t0 = performance.now();
+    preset.render(idx);
+    const t1 = performance.now();
     draw();
-    costDraw = costDraw * 0.92 + (performance.now() - t0) * 0.08;
+    costRender = costRender * 0.92 + (t1 - t0) * 0.08;
+    costDraw = costDraw * 0.92 + (performance.now() - t1) * 0.08;
   }
 
   function draw() {
     const n = cols * rows;
     let changed = 0;
-    if (!forceFull) {
-      for (let i = 0; i < n; i++) if (idx[i] !== shown[i]) changed++;
-      if (changed === 0) return;
+    let on = 0;
+    for (let i = 0; i < n; i++) {
+      const k = idx[i];
+      if (k !== shown[i]) changed++;
+      if (k !== 0) on++;
     }
+    lit = on / n;
+    if (!forceFull && changed === 0) return;
     ctx.imageSmoothingEnabled = false;
     if (forceFull || changed * 3 > n) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -834,24 +904,16 @@ export function mountField(root) {
     }
   }
 
-  /** One settled frame for prefers-reduced-motion. */
-  function paintStatic() {
-    if (!sized) return;
-    preset.settle();
-    forceFull = true;
-    paint();
-  }
-
   /* ---- loop ---- */
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
-    if (now - last < FRAME_MS - 1.5) return;
-    last += FRAME_MS;
-    if (now - last > FRAME_MS) last = now;
+    if (now - last < frameMs - 1.5) return;
+    last += frameMs;
+    if (now - last > frameMs) last = now;
     const t0 = performance.now();
     tickPointer();
-    preset.step(STEP_DT);
+    preset.step(frameMs / 1000);
     paint();
     cost = cost * 0.92 + (performance.now() - t0) * 0.08;
   }
@@ -886,15 +948,16 @@ export function mountField(root) {
     later(layout, 350);
   }
 
-  function setPreset(name) {
-    if (name === presetName) return;
-    presetName = name;
-    preset = makePreset(name);
+  function setPreset(next) {
+    if (next === name) return;
+    name = next;
+    preset = PRESETS[name]();
+    frameMs = 1000 / preset.fps;
     styleKey = '';
+    sig = '';
     cols = 0; // forces the new preset to size and settle itself
-    ptr.has = false;
+    ptr.had = false;
     layout();
-    if (reduced) paintStatic();
   }
 
   function onMutation(records) {
@@ -905,23 +968,21 @@ export function mountField(root) {
       if (a === 'data-theme') theme = true;
       else if (a === 'data-field') field = true;
     }
-    if (field) setPreset(html.dataset.field === 'wind' ? 'wind' : 'water');
+    if (field) setPreset(presetName(html.dataset.field));
     if (theme) refreshTheme();
-  }
-
-  function onResize() {
-    layout();
-    if (reduced) paintStatic();
   }
 
   function onMotionChange() {
     reduced = mqReduce.matches;
-    ptr.active = false;
-    ptr.has = false;
+    onPointerGone();
     attachPointer(!reduced);
     if (reduced) {
       stopLoop();
-      paintStatic();
+      if (sized) {
+        preset.settle(true);
+        forceFull = true;
+        paint();
+      }
     } else {
       updateRunning();
     }
@@ -934,8 +995,8 @@ export function mountField(root) {
 
   function onFontsDone() {
     styleKey = '';
+    sig = '';
     layout();
-    if (reduced) paintStatic();
   }
 
   let pointerOn = false;
@@ -945,17 +1006,19 @@ export function mountField(root) {
     const m = on ? 'addEventListener' : 'removeEventListener';
     const opts = { passive: true };
     window[m]('pointermove', onPointerMove, opts);
-    window[m]('pointerdown', onPointerDown, opts);
+    window[m]('pointerdown', onPointerMove, opts);
     window[m]('pointerup', onPointerUp, opts);
     window[m]('pointercancel', onPointerUp, opts);
     window[m]('blur', onPointerGone, opts);
+    document[m]('pointerout', onPointerOut, opts);
     html[m]('pointerleave', onPointerGone, opts);
   }
 
   /* ---- wire up ---- */
 
-  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(onResize) : null;
+  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(layout) : null;
   if (ro) ro.observe(root);
+  // a fixed root is always intersecting; this only matters if a page hides or clips it
   const io =
     typeof IntersectionObserver === 'function'
       ? new IntersectionObserver((entries) => {
@@ -972,7 +1035,7 @@ export function mountField(root) {
   listen(mqReduce, onMotionChange);
   listen(mqDark, refreshTheme);
   document.addEventListener('visibilitychange', onVisibility);
-  window.addEventListener('resize', onResize);
+  window.addEventListener('resize', layout);
   if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', onFontsDone);
   attachPointer(!reduced);
 
@@ -982,7 +1045,7 @@ export function mountField(root) {
         const cs = getComputedStyle(root);
         const wait = new Promise((r) => later(r, 2500));
         await Promise.race([
-          Promise.all([document.fonts.load(cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily, 'M.-~'), document.fonts.ready]),
+          Promise.all([document.fonts.load(cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily, 'M.-|/\\'), document.fonts.ready]),
           wait,
         ]);
       }
@@ -992,7 +1055,6 @@ export function mountField(root) {
     if (destroyed) return;
     ready = true;
     layout();
-    if (reduced) paintStatic();
   })();
 
   const api = {
@@ -1007,7 +1069,7 @@ export function mountField(root) {
       unlisten(mqReduce, onMotionChange);
       unlisten(mqDark, refreshTheme);
       document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', layout);
       if (document.fonts && document.fonts.removeEventListener) document.fonts.removeEventListener('loadingdone', onFontsDone);
       timers.forEach(clearTimeout);
       timers.clear();
@@ -1015,7 +1077,7 @@ export function mountField(root) {
     },
     /** Debug info for the playground. */
     stats() {
-      return { preset: presetName, cols, rows, cellW, cellH, dpr, ms: cost, drawMs: costDraw, running: !!raf, reduced };
+      return { preset: name, cols, rows, cellW, cellH, dpr, fps: preset.fps, ms: cost, renderMs: costRender, drawMs: costDraw, lit, running: !!raf, reduced };
     },
   };
   mounts.set(root, api);
