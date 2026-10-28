@@ -40,8 +40,7 @@ defmodule Site.Render do
     page(context, "/", inner,
       title: Site.Config.home_title(),
       description: content.home.description,
-      page_key: "home",
-      scripts: [@theme_script, %{src: "/assets/js/field.js", module: true}]
+      page_key: "home"
     )
   end
 

@@ -68,6 +68,45 @@ defmodule Site.TemplatesTest do
     end
   end
 
+  test "the layout has the field backdrop between the skip link and the header, on every page" do
+    layout = File.read!("templates/layout.html.eex")
+
+    backdrop =
+      ~S(<div class="field" data-field-root aria-hidden="true">) <>
+        ~S(<canvas class="field-canvas"></canvas></div>)
+
+    assert layout =~
+             ~r/<a class="skip-link" href="#main">[^<]*<\/a>\n#{Regex.escape(backdrop)}\n<%= header\(/
+
+    assert length(Regex.scan(~r/data-field-root/, layout)) == 1
+  end
+
+  test "the layout defaults the field to topo and loads field.js as a module" do
+    layout = File.read!("templates/layout.html.eex")
+
+    assert layout =~ ~S(<html lang="en" data-field="topo">)
+    assert layout =~ ~S(<script type="module" src="/assets/js/field.js"></script>)
+    refute layout =~ "wind"
+  end
+
+  test "no page template but the layout knows about the field" do
+    for file <- @template_files, Path.basename(file) != "layout.html.eex" do
+      source = File.read!(file)
+      refute source =~ "data-field", file
+      refute source =~ "canvas", file
+      refute source =~ "field.js", file
+    end
+  end
+
+  test "the home template is an intro and the log, with no hero or field section" do
+    home = File.read!("templates/home.html.eex")
+
+    refute home =~ "hero"
+    refute home =~ "field"
+    assert home =~ ~S(<div class="intro">)
+    assert home =~ ~S(<section class="log-section" aria-labelledby="log-h">)
+  end
+
   test "the home template only puts rendered Markdown through raw" do
     assert File.read!("templates/home.html.eex") =~ "raw(@doc.html)"
     refute File.read!("templates/home.html.eex") =~ "raw(@doc.title)"

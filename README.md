@@ -21,7 +21,7 @@ mix test           # run the test suite
 
 `mix site.build` also accepts `--drafts`, `--content DIR` and `--out DIR`.
 
-The field preset is chosen with a query parameter: `?field=water` (the default) or `?field=wind`, e.g. `http://localhost:4000/?field=wind`. The choice is kept for the session, so it holds when you navigate back home.
+The field is a quiet backdrop on every page. Its preset is chosen with a query parameter: `?field=topo` (the default, topographic contour lines) or `?field=water`, e.g. `http://localhost:4000/?field=water`. The choice is kept for the session, so it holds as you navigate.
 
 `mix site.serve` applies the headers from `dist/_headers`, so a Content Security Policy violation shows locally in the same way it does in production.
 

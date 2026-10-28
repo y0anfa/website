@@ -17,9 +17,9 @@ It shows who he is, what he thinks, and what he makes.
 | Topic | Decision |
 |---|---|
 | Pages | home (with intro), essays, notes, projects, uses, cv, 404. No about page, no now page, no RSS, no colophon. |
-| Home | Split screen: the field and intro on the left, the log on the right. (A "field is the nav" prototype was tried and dropped at review.) |
+| Home | One centred column: a compact, quiet intro, then the log as the main content. No hero. (A split screen with the field on the left, and a "field is the nav" prototype, were tried and dropped at review.) |
 | Feed | A "git log" list. Each row is: real short commit hash (linked to GitHub), date, type, title. |
-| Signature | An abstract ASCII field, peaceful and a bit retro. Two presets compared via `?field=water` (default) or `?field=wind`. |
+| Signature | An abstract ASCII field, peaceful and a bit retro, as a quiet fixed backdrop behind every page: on the home it shows behind everything, on inner pages only in the side margins. Two presets compared via `?field=topo` (default, topographic contour lines) or `?field=water`. |
 | Type | JetBrains Mono everywhere, self-hosted. |
 | Color | Monochrome only. Light and dark follow the system, with a manual toggle. |
 | Motion | Only the field moves. Everything else is static. `prefers-reduced-motion` gets a static field frame. |
@@ -103,7 +103,7 @@ status: active | wip | archived
 ```yaml
 title: string
 description: string
-tagline: string      # optional; home only — rendered under the h1, kept clear of the field
+tagline: string      # optional; home only — rendered under the h1
 ```
 
 Raw HTML in Markdown is **not** rendered: MDEx runs with `unsafe: false`. Use GFM extensions: tables, strikethrough, autolink, footnotes, and heading ids. There is no syntax colouring; code blocks are plain monochrome `<pre><code>`.
@@ -129,29 +129,39 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 
 **Global shell**
 - A skip link to `#main`.
+- Immediately after it, on every page, the field backdrop root (field.js depends on it; see §9):
+
+```html
+<div class="field" data-field-root aria-hidden="true"><canvas class="field-canvas"></canvas></div>
+```
+
 - `header.site-header`: `a.brand` "yoan faure" on the left; `nav.site-nav` on the right with lowercase links `essays notes projects uses cv` (`aria-current="page"` on the active one) and `button.theme-toggle` (aria-label "Toggle theme").
 - `main#main`.
 - `footer.site-footer`: `hello@yoanfau.re · linkedin` on the left; `built from <a>a3f9c21</a>` on the right, linking to the HEAD commit (`-dirty` suffix if the tree is dirty, `unversioned` with no git).
 - `<title>`: `<Page> — Yoan Faure` (home: `Yoan Faure — security engineer who builds`). Also meta description, canonical, `og:title/description/url/type`, `twitter:card=summary`, favicon, and a preload for the Regular font.
-
-**Home**
-- `<html data-field="water">` by default. The inline head script (`assets/js/head.js`) does three things:
-  - Reads `?field=water|wind`, sets it on `<html>` and remembers it in `sessionStorage`, so navigating back home keeps the preset during review.
+- `<html lang="en" data-field="topo">` by default. The inline head script (`assets/js/head.js`) does three things:
+  - Reads `?field=topo|water`, sets it on `<html>` and remembers it in `sessionStorage`, so navigating between pages keeps the preset during review.
   - Without the param, falls back to `sessionStorage`.
   - Applies `localStorage.theme` (`light` / `dark`) to `data-theme`.
-- DOM contract (field.js depends on it):
+- `<script type="module" src="/assets/js/field.js">` is loaded on every page, from the shared layout.
+
+**Backdrop and column**
+- The field is a fixed, full-viewport layer behind the page (`z-index: 0`, no pointer events). The skip link, header, main and footer sit above it (`position: relative; z-index: 1`).
+- Header, main and footer share one centred column, so their edges line up: 72ch of body text (plus gutters) on reading pages (article, project, uses, cv, 404) and 88ch on the home and the list pages.
+- **Home:** the column is transparent. The field shows behind everything, and text carries a soft halo of the background colour so a line of the field never cuts through a word.
+- **Inner pages** (essays, notes, projects, uses, cv, list pages, 404): the header, main and footer are painted with `var(--bg)` and have 1px `--rule` edges on both sides. The column reads as plain paper and the field shows only in the side margins. When the viewport is no wider than the column, the field is not visible at all.
+
+**Home**
+- DOM contract (the layout supplies the backdrop; the home has no hero and no field section):
 
 ```html
-<section class="hero">
-  <div class="field" data-field-root>
-    <canvas class="field-canvas" aria-hidden="true"></canvas>
-  </div>
-  <div class="intro"> h1 "Yoan Faure" + p.tagline + rendered home.md + contact line </div>
-</section>
+<div class="intro"> h1 "Yoan Faure" + p.tagline + rendered home.md + p.contact </div>
 <section class="log-section" aria-labelledby="log-h"> <h2 id="log-h">log</h2> <ol class="log">…</ol> </section>
 ```
 
-- **Layout:** at ≥ 960px, two columns. The left column is sticky at 100vh: field on top (~60%), intro below. The right column scrolls the log. Below 960px: field band (~45vh), then intro, then log.
+- **Layout:** one centred column on every viewport.
+  - The intro is compact and quiet. The name stays the page's `<h1>` but is modest (1.375rem, no display heading). The tagline is 1rem bold; the intro text and the contact line are 0.875rem in `--muted`, at most 64ch wide.
+  - The log is the dominant element, at 1.125rem with about 0.95rem of padding above and below each row. Its grid is the one in §6, so under ~600px each row is still two lines.
 
 **Article (essay, note):** `article.prose`, max 72ch. A meta line `essay · 2026-03-28 · <hash link>`, then h1, then body, then a `← essays` / `← notes` back link.
 **Project:** h1, tagline, a meta line `status · stack · link`, then the body.
@@ -169,9 +179,10 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 ```
 
 - **Theming:** no `data-theme` means follow `prefers-color-scheme`; `[data-theme=light|dark]` forces it. `theme.js` toggles the effective theme and stores it in `localStorage`.
-- **Font:** JetBrains Mono 400, 400 italic, 700 and 800, all `font-display: swap`. Body is 15px (16px at ≥ 960px) with line-height 1.65. Headings are 800 weight with tight tracking. h1 is `clamp(1.9rem, 1.2rem + 3vw, 3.25rem)`.
+- **Font:** JetBrains Mono 400, 400 italic, 700 and 800, all `font-display: swap`. Body is 15px (16px at ≥ 960px) with line-height 1.65. Headings are 800 weight with tight tracking. h1 is `clamp(1.9rem, 1.2rem + 3vw, 3.25rem)`, except the home name, which is a modest 1.375rem.
 - **Links:** `color: inherit`, 1px underline with 0.2em offset. Hover and focus invert (`background: var(--fg); color: var(--bg)`). Focus-visible gets a 2px solid outline in `--fg`. Selection inverts.
 - **Rules:** 1px `--rule`. Generous whitespace, lowercase UI labels, and nothing decorative except the field.
+- **Layering:** the field (`z-index: 0`) sits behind header, main and footer (`z-index: 1`). Inner pages paint an opaque `var(--bg)` column over it, with `--rule` hairline edges; the home paints nothing. See §7.
 - **Contrast:** `--muted` must keep ≥ 4.5:1 against `--bg` in both themes.
 
 ## 9. The ASCII field (`assets/js/field.js`)

@@ -85,10 +85,66 @@ defmodule Site.CSSTest do
     assert block(".field") =~ "color: var(--fg);"
   end
 
-  test "the home splits into two columns at 960px, with no variant switch left" do
-    assert @css =~ "@media (min-width: 960px)"
+  test "the field is a fixed, full-viewport layer behind the page that never takes the pointer" do
+    field = block(".field")
+
+    for declaration <- [
+          "position: fixed;",
+          "inset: 0;",
+          "z-index: 0;",
+          "pointer-events: none;",
+          "overflow: hidden;"
+        ] do
+      assert field =~ declaration, "`.field` lacks #{declaration}"
+    end
+
+    canvas = block(".field-canvas")
+    assert canvas =~ "position: absolute;"
+    assert canvas =~ "inset: 0;"
+    assert canvas =~ "display: block;"
+  end
+
+  test "header, main and footer sit above the field" do
+    shell = block(".site-header,\nmain,\n.site-footer")
+    assert shell =~ "position: relative;"
+    assert shell =~ "z-index: 1;"
+
+    # the skip link stays on top of everything
+    assert block(".skip-link") =~ "z-index: 100;"
+  end
+
+  test "inner pages paint an opaque column, the home paints nothing" do
+    # the shell is painted with --paper, which is the background colour by default ...
+    assert block(":root") =~ "--paper: var(--bg);"
+    assert block(".site-header,\nmain,\n.site-footer") =~ "background: var(--paper);"
+
+    # ... and which only the home turns transparent
+    assert block(~S|body[data-page="home"]|) =~ "--paper: transparent;"
+    assert length(Regex.scan(~r/--paper:/, @css)) == 2
+  end
+
+  test "the page column is one width for header, main and footer, in rem" do
+    assert block(":root") =~ ~r/--column: calc\([\d.]+rem \+ 2 \* var\(--gutter\)\);/
+    assert block(".site-header,\nmain,\n.site-footer") =~ "max-width: var(--column);"
+    assert block(".site-header,\nmain,\n.site-footer") =~ "margin-inline: auto;"
+  end
+
+  test "the split layout is gone: no hero, no sticky column, no field band" do
+    refute @css =~ ".hero"
+    refute @css =~ "sticky"
+    refute @css =~ "minmax(0, 5fr)"
+    refute @css =~ "45vh"
     refute @css =~ "data-home"
     refute @css =~ "hotspot"
+  end
+
+  test "the home intro is modest and the log is the larger element" do
+    refute block(".intro h1") =~ "clamp(",
+           "the home name must not be a display heading"
+
+    assert block(".intro p") =~ "color: var(--muted);"
+    assert block(".log-section .log") =~ "font-size: 1.125rem;"
+    assert block(".log-section .log-row") =~ ~r/padding: 0\.9\d*rem 0;/
   end
 
   test "the log grid is in ch units and collapses under 600px" do

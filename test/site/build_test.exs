@@ -137,7 +137,14 @@ defmodule Site.BuildTest do
     end
 
     test "the page sets the lang and the default field preset", %{tree: tree} do
-      assert page(tree, "index.html") =~ ~s(<html lang="en" data-field="water">)
+      for path <- @pages do
+        assert page(tree, path) =~ ~s(<html lang="en" data-field="topo">), path
+      end
+    end
+
+    test "head.js offers the topo and water presets, topo first, and no wind" do
+      assert @head_js =~ ~r/field: \['topo', 'water'\]/
+      refute @head_js =~ "wind"
     end
 
     test "the stylesheet is linked and no script is deferred wrongly", %{tree: tree} do
@@ -203,44 +210,85 @@ defmodule Site.BuildTest do
     end
   end
 
+  describe "the field backdrop (SPEC section 7)" do
+    @backdrop ~s(<div class="field" data-field-root aria-hidden="true">) <>
+                ~s(<canvas class="field-canvas"></canvas></div>)
+
+    test "every page has one backdrop root, right after the skip link and before the header",
+         %{tree: tree} do
+      for path <- @pages do
+        html = page(tree, path)
+        assert length(Regex.scan(~r/data-field-root/, html)) == 1, path
+        assert length(Regex.scan(~r/<canvas/, html)) == 1, path
+
+        {skip, _} = :binary.match(html, ~s(<a class="skip-link"))
+        {field, _} = :binary.match(html, @backdrop)
+        {header, _} = :binary.match(html, ~s(<header class="site-header">))
+        {main, _} = :binary.match(html, ~s(<main id="main">))
+        assert skip < field and field < header and header < main, path
+
+        # the backdrop belongs to the page, not to its content
+        refute html |> String.split(~s(<main id="main">)) |> List.last() =~ "data-field-root",
+               path
+      end
+    end
+
+    test "every page loads field.js as a module, and only field.js", %{tree: tree} do
+      for path <- @pages do
+        html = page(tree, path)
+
+        assert length(
+                 Regex.scan(~r{<script type="module" src="/assets/js/field\.js"></script>}, html)
+               ) ==
+                 1,
+               path
+
+        assert length(Regex.scan(~r/field\.js/, html)) == 1, path
+        assert length(Regex.scan(~r/type="module"/, html)) == 1, path
+      end
+    end
+
+    test "no page has a hero or a second field", %{tree: tree} do
+      for path <- @pages do
+        html = page(tree, path)
+        refute html =~ ~s(class="hero"), path
+        refute html =~ "data-hotspot", path
+      end
+    end
+  end
+
   describe "home (SPEC section 7)" do
-    test "has the DOM contract field.js depends on", %{tree: tree} do
+    test "is an intro and the log, with no hero or field section", %{tree: tree} do
       html = page(tree, "index.html")
 
-      assert html =~ ~s(<section class="hero">)
-      assert html =~ ~s(<div class="field" data-field-root>)
-      assert html =~ ~s(<canvas class="field-canvas" aria-hidden="true"></canvas>)
       assert html =~ ~s(<div class="intro">)
       assert html =~ ~s(<section class="log-section" aria-labelledby="log-h">)
       assert html =~ ~s(<h2 id="log-h">log</h2>)
       assert html =~ ~s(<ol class="log">)
 
-      refute html =~ "data-hotspot"
-      assert length(Regex.scan(~r/data-field-root/, html)) == 1
+      [_, main] = String.split(html, ~s(<main id="main">))
+      refute main =~ "hero"
+      refute main =~ "field"
+      refute main =~ "canvas"
+      assert length(Regex.scan(~r/<section/, main)) == 1
+      assert length(Regex.scan(~r/<h1/, html)) == 1
     end
 
-    test "the hero comes before the log, and the intro holds h1, the Markdown and the contact line",
+    test "the intro comes before the log and holds h1, tagline, the Markdown and the contact line",
          %{tree: tree} do
       html = page(tree, "index.html")
-      {hero, _} = :binary.match(html, ~s(<section class="hero">))
-      {field, _} = :binary.match(html, ~s(data-field-root))
+      {main, _} = :binary.match(html, ~s(<main id="main">))
       {intro, _} = :binary.match(html, ~s(<div class="intro">))
       {log, _} = :binary.match(html, ~s(<section class="log-section"))
-      assert hero < field and field < intro and intro < log
+      assert main < intro and intro < log
 
-      assert html =~
-               ~r{<div class="intro">\s*<h1>Test Person</h1>\s*<p class="tagline">Fixture tagline for the home page.</p>}
+      [_, intro_html] = Regex.run(~r{<div class="intro">(.*?)<section class="log-section"}s, html)
 
-      assert html =~ ~s(<p class="contact"><a href="mailto:hello@yoanfau.re">)
-    end
+      assert intro_html =~
+               ~r{\A\s*<h1>Test Person</h1>\s*<p class="tagline">Fixture tagline for the home page.</p>}
 
-    test "loads field.js as a module on the home page only", %{tree: tree} do
-      assert page(tree, "index.html") =~
-               ~s(<script type="module" src="/assets/js/field.js"></script>)
-
-      for path <- @pages -- ["index.html"] do
-        refute page(tree, path) =~ "field.js", path
-      end
+      assert intro_html =~ ~s(<p>This is the intro paragraph.)
+      assert intro_html =~ ~s(<p class="contact"><a href="mailto:hello@yoanfau.re">)
     end
 
     test "the log lists every entry in order, hashes as dots", %{tree: tree} do
