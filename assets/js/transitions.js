@@ -103,6 +103,17 @@
     return document.querySelector('main .prose > h1');
   }
 
+  // A skipped transition (a hidden page, say) is not an error. Every transition
+  // the browser hands us gets its promises handled first, whatever path we take
+  // after, so a skip never surfaces as an uncaught rejection.
+  function quiet(vt) {
+    if (!vt) return;
+    var ignore = function () {};
+    if (vt.ready) vt.ready.catch(ignore);
+    if (vt.finished) vt.finished.catch(ignore);
+    if (vt.updateCallbackDone) vt.updateCallbackDone.catch(ignore);
+  }
+
   function mark(vt, type, side) {
     if (vt.types && typeof vt.types.add === 'function') {
       vt.types.add(type);
@@ -110,11 +121,10 @@
     }
     // clear on any outcome: finished, skipped, or a rejected promise
     vt.finished.then(clear, clear);
-    // a skipped transition (a hidden page, say) is not an error
-    vt.ready.catch(function () {});
   }
 
   window.addEventListener('pageswap', function (event) {
+    quiet(event.viewTransition);
     clear(); // a page restored from the cache may still carry a name
     try {
       var vt = event.viewTransition;
@@ -131,6 +141,7 @@
   });
 
   window.addEventListener('pagereveal', function (event) {
+    quiet(event.viewTransition);
     clear();
     try {
       var vt = event.viewTransition;
