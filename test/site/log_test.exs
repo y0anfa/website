@@ -52,7 +52,7 @@ defmodule Site.LogTest do
     assert String.length(row.hash) == 7
     assert row.commit_url == nil
     assert row.date == "2026-03-28"
-    assert row.type == "essay"
+    refute Map.has_key?(row, :type)
     assert row.href == "/x/"
   end
 

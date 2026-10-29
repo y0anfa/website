@@ -144,10 +144,14 @@ defmodule Site.CSSTest do
     assert block(".field") =~ "font-family: var(--font-mono);"
   end
 
-  test "the log's type and title are sans: they set no font of their own" do
-    for selector <- [".log-type", ".log-title", ".log-row", ".log"] do
+  test "the log's title is sans: it sets no font of its own" do
+    for selector <- [".log-title", ".log-row", ".log"] do
       refute block(selector) =~ "font-family", "#{selector} sets a font"
     end
+  end
+
+  test "the log shows no type: there is no .log-type rule" do
+    refute @css =~ ".log-type"
   end
 
   test "the field has the metrics field.js reads" do
@@ -281,19 +285,18 @@ defmodule Site.CSSTest do
     assert @css =~ ~r/\n\.log-hash \{\s*width: 7ch;/
     assert @css =~ ~r/\n\.log-date \{\s*width: 10ch;/
 
-    # ... and the grid sizes them to that, then gives the sans type a fixed track in em
+    # ... and the grid sizes them to that, then gives the title the rest
     assert block(".log-row") =~
-             "grid-template-columns: max-content max-content 3.75em minmax(0, 1fr);"
+             "grid-template-columns: max-content max-content minmax(0, 1fr);"
 
-    # two lines under 600px: hash and date, then type and title
+    # two lines under 600px: hash and date, then the title across the full width
     assert @css =~ "@media (max-width: 599.98px)"
     assert @css =~ "grid-template-columns: 4em minmax(0, 1fr);"
 
     for {cell, area} <- [
           {".log-hash", "1 / 1"},
           {".log-date", "1 / 2"},
-          {".log-type", "2 / 1"},
-          {".log-title", "2 / 2"}
+          {".log-title", "2 / 1 / 3 / 3"}
         ] do
       assert @css =~ ~r/#{Regex.escape(cell)} \{\s*grid-area: #{Regex.escape(area)};/
     end

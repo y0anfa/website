@@ -3,7 +3,7 @@ defmodule Site.Log do
   The git-log style list of entries.
 
   Sorted by date descending, then type (essay, project, note), then title
-  ascending. Each row carries the short hash of the last commit that touched the
+  ascending. The type only orders the list; it is not shown. Each row carries the short hash of the last commit that touched the
   entry's file, linked to GitHub, or seven middle dots when there is none.
   """
 
@@ -15,7 +15,6 @@ defmodule Site.Log do
           hash: String.t(),
           commit_url: String.t() | nil,
           date: String.t(),
-          type: String.t(),
           title: String.t(),
           href: String.t()
         }
@@ -43,7 +42,6 @@ defmodule Site.Log do
       hash: hash(entry),
       commit_url: entry.commit && Site.Git.commit_url(entry.commit),
       date: Date.to_iso8601(entry.date),
-      type: Atom.to_string(entry.type),
       title: entry.title,
       href: Entry.path(entry)
     }

@@ -28,7 +28,7 @@ defmodule Site.TwinTest do
   end
 
   describe "the twin of an essay or a note" do
-    test "is the title, one line saying what and where it is, and the original Markdown body",
+    test "is the title, one line saying when and where it is, and the original Markdown body",
          %{tree: tree} do
       {:ok, _meta, body} =
         fixtures()
@@ -38,7 +38,7 @@ defmodule Site.TwinTest do
 
       assert Map.fetch!(tree, "first-essay.md") ==
                "# First essay\n\n" <>
-                 "essay · 2026-03-28 · https://yoanfaure.com/first-essay/\n\n" <>
+                 "2026-03-28 · https://yoanfaure.com/first-essay/\n\n" <>
                  String.trim(body) <> "\n"
     end
 
@@ -58,7 +58,7 @@ defmodule Site.TwinTest do
 
     test "a note is the same shape", %{tree: tree} do
       assert Map.fetch!(tree, "small-note.md") ==
-               "# Small note\n\nnote · 2026-10-28 · https://yoanfaure.com/small-note/\n\n" <>
+               "# Small note\n\n2026-10-28 · https://yoanfaure.com/small-note/\n\n" <>
                  "One idea, said once.\n"
     end
 
@@ -79,7 +79,7 @@ defmodule Site.TwinTest do
 
     test "an empty body leaves no trailing blank line" do
       twin = Twin.render(entry(body: "\n\n"))
-      assert twin == "# X\n\nnote · 2026-10-28 · https://yoanfaure.com/x/\n"
+      assert twin == "# X\n\n2026-10-28 · https://yoanfaure.com/x/\n"
     end
   end
 
@@ -87,7 +87,7 @@ defmodule Site.TwinTest do
     test "adds the tagline and the link after the meta line", %{tree: tree} do
       assert Map.fetch!(tree, "widget.md") ==
                "# widget\n\n" <>
-                 "project · 2026-10-28 · https://yoanfaure.com/widget/\n\n" <>
+                 "2026-10-28 · https://yoanfaure.com/widget/\n\n" <>
                  "> A small widget for the fixtures.\n\n" <>
                  "link: https://example.com/widget\n\n" <>
                  "Widget is a fixture project.\n\n- one\n- two\n"

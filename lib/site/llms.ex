@@ -1,8 +1,8 @@
 defmodule Site.Llms do
   @moduledoc """
   `llms.txt`, in the llmstxt.org format: the name as an h1, a one-line summary
-  as a quote, a short paragraph, then one section per entry type, each entry a
-  link to its Markdown twin with its description.
+  as a quote, a short paragraph, then one section with every entry, each a link
+  to its Markdown twin with its description.
 
       # Yoan Faure
 
@@ -10,16 +10,14 @@ defmodule Site.Llms do
 
       I work on the balance between security and productivity. …
 
-      ## Essays
+      ## Log
 
       - [Title](https://yoanfaure.com/slug.md): description
 
-  Sections without entries are left out. Entries are in log order.
+  The section is left out when there are no entries. Entries are in log order.
   """
 
   alias Site.{Content, Doc, Entry, Log}
-
-  @sections [{"Essays", :essay}, {"Projects", :project}, {"Notes", :note}]
 
   @doc "Renders `llms.txt` for the loaded content."
   @spec render(Content.t()) :: String.t()
@@ -33,10 +31,9 @@ defmodule Site.Llms do
     ]
 
     sections =
-      for {heading, type} <- @sections,
-          group = entries |> Enum.filter(&(&1.type == type)) |> Log.sort(),
-          group != [] do
-        "## #{heading}\n\n" <> Enum.map_join(group, "\n", &item/1)
+      case Log.sort(entries) do
+        [] -> []
+        sorted -> ["## Log\n\n" <> Enum.map_join(sorted, "\n", &item/1)]
       end
 
     (head ++ sections)

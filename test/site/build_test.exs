@@ -343,7 +343,6 @@ defmodule Site.BuildTest do
                5
 
       assert html =~ ~s(<time class="log-date" datetime="2026-10-28">2026-10-28</time>)
-      assert html =~ ~s(<span class="log-type">project</span>)
     end
 
     test "the log is the only list: no list pages, and no link to one", %{tree: tree} do
@@ -358,12 +357,11 @@ defmodule Site.BuildTest do
       end
     end
 
-    test "each row says what the entry is: essay, note or project", %{tree: tree} do
+    test "no row says what kind of entry it is: the type is not shown", %{tree: tree} do
       html = page(tree, "index.html")
 
-      assert length(Regex.scan(~r{<span class="log-type">essay</span>}, html)) == 2
-      assert length(Regex.scan(~r{<span class="log-type">note</span>}, html)) == 2
-      assert length(Regex.scan(~r{<span class="log-type">project</span>}, html)) == 1
+      refute html =~ "log-type"
+      refute html =~ ~r{>(essay|note|project)</}
     end
 
     test "an empty log says so" do
@@ -383,7 +381,7 @@ defmodule Site.BuildTest do
       assert html =~ ~s(<article class="prose">)
 
       assert html =~
-               ~s(<p class="meta"><span>essay</span> · <time datetime="2026-03-28">2026-03-28</time> · <span>·······</span></p>)
+               ~s(<p class="meta"><time datetime="2026-03-28">2026-03-28</time> · <span>·······</span></p>)
 
       assert html =~ ~s(<h1>First essay</h1>)
       assert html =~ ~s(<h2 id="a-heading">)
@@ -395,7 +393,7 @@ defmodule Site.BuildTest do
       assert note =~ ~s(<p class="back"><a href="/">← log</a></p>)
 
       assert note =~
-               ~s(<p class="meta"><span>note</span> · <time datetime="2026-10-28">2026-10-28</time> · <span>·······</span></p>)
+               ~s(<p class="meta"><time datetime="2026-10-28">2026-10-28</time> · <span>·······</span></p>)
     end
 
     test "raw HTML in Markdown is never rendered", %{tree: tree} do

@@ -29,7 +29,7 @@ defmodule Site.Twin do
   def file(%Entry{slug: slug}), do: slug <> ".md"
 
   @doc """
-  The twin of one entry: `# <title>`, a `<type> · <date> · <url>` line, then the
+  The twin of one entry: `# <title>`, a `<date> · <url>` line, then the
   body. A project also gets its tagline (as a quote) and its link.
   """
   @spec render(Entry.t()) :: String.t()
@@ -37,7 +37,7 @@ defmodule Site.Twin do
     blocks =
       [
         "# " <> one_line(entry.title),
-        "#{entry.type} · #{Date.to_iso8601(entry.date)} · #{Site.Config.absolute(Entry.path(entry))}"
+        "#{Date.to_iso8601(entry.date)} · #{Site.Config.absolute(Entry.path(entry))}"
       ] ++ project_lines(entry) ++ [String.trim(entry.body || "")]
 
     blocks

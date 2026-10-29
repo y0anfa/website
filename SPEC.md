@@ -18,8 +18,8 @@ It shows who he is, what he thinks, and what he makes.
 |---|---|
 | Pages | The home (intro and log), one page per entry (essay, note or project), and the 404. There are no list pages (`/essays/`, `/notes/`, `/projects/`), no uses page and no cv page: the home log is the only list, and the career line lives in the home intro. No about page, no now page, no RSS, no colophon. |
 | Home | One centred column: a compact, quiet intro (who, where, off-hours), then the log as the main content. No hero. (A split screen with the field on the left, and a "field is the nav" prototype, were tried and dropped at review.) |
-| Feed | A "git log" list, the only list on the site. Essays, notes and projects share it. Each row is: real short commit hash (linked to GitHub), date, type, title. |
-| URLs | Flat: every entry lives at `/<slug>/`, whatever its type. The content folder sets the type (a label in the log and in the entry's meta line), not the URL. Slugs are unique across all types. The old Hugo URLs are redirected (§4). |
+| Feed | A "git log" list, the only list on the site. Essays, notes and projects share it. Each row is: real short commit hash (linked to GitHub), date, title. The type is not shown anywhere. |
+| URLs | Flat: every entry lives at `/<slug>/`, whatever its type. The content folder sets the type (which only orders the log and picks the project template), not the URL. Slugs are unique across all types. The old Hugo URLs are redirected (§4). |
 | Signature | A quiet backdrop of topographic contour lines in ASCII, fixed behind every page: on the home it shows behind everything, on inner pages only in the side margins. (Water and wind presets were tried and dropped at review.) |
 | Type | Inter (variable, self-hosted) for all text and UI. JetBrains Mono 400, self-hosted, only for code, the log's hash and date, and the backdrop field. |
 | Color | Monochrome only. Light and dark follow the system, with a manual toggle. |
@@ -88,14 +88,14 @@ Also emit `robots.txt` (allow all), `_headers` (§11) and `_redirects`. There is
 ```
 # <title>
 
-<type> · <date> · https://yoanfaure.com/<slug>/
+<date> · https://yoanfaure.com/<slug>/
 
 <the entry's original Markdown body, frontmatter stripped>
 ```
 
 A project adds its tagline (as a `> ` quote) and a `link: <url>` line after the second line. Each entry page points at its twin with `<link rel="alternate" type="text/markdown" href="/<slug>.md">` in the `<head>`. Drafts have no twin.
 
-`dist/llms.txt` follows [llmstxt.org](https://llmstxt.org): `# Yoan Faure`, a one-line `> ` summary (the home description), a short plain-text paragraph (the home intro), then `## Essays`, `## Projects` and `## Notes` (in that order, entries in log order, empty sections left out). Each entry is `- [Title](https://yoanfaure.com/<slug>.md): description`.
+`dist/llms.txt` follows [llmstxt.org](https://llmstxt.org): `# Yoan Faure`, a one-line `> ` summary (the home description), a short plain-text paragraph (the home intro), then one `## Log` section with every entry in log order (left out when there are none). Each entry is `- [Title](https://yoanfaure.com/<slug>.md): description`.
 
 A `<slug>.md` cannot collide with a page or a site file: `llms` and `llms.txt` are reserved slugs (§5), as is every other site path. `_headers` (§11) gives the twins and `llms.txt` an explicit `Content-Type` (`text/markdown; charset=utf-8` and `text/plain; charset=utf-8`).
 
@@ -176,10 +176,10 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 ```
 
 - **hash:** the first 7 characters of `git log -1 --format=%H -- <file>`. It links to `https://github.com/y0anfa/website/commit/<full sha>`. An untracked or uncommitted file, or no git at all, shows `·······` (7 middle dots) with no link.
-- **date:** `YYYY-MM-DD`. **type:** `essay` / `note` / `project`, the label for the folder the entry lives in. **title:** links to the entry at `/<slug>/`.
-- **Markup:** `<ol class="log">` > `<li class="log-row">` > `<a class="log-hash">`, `<time class="log-date">`, `<span class="log-type">`, `<a class="log-title">` (the title the `title` transition moves, §7).
-- **Fonts:** the hash and the date are JetBrains Mono (`.log-hash`, `.log-date`, at 0.8em, muted). The type and the title are Inter: the type is muted and regular, the title is 600 weight.
-- **Layout:** a CSS grid: `max-content max-content 3.75em 1fr`. The mono cells are `7ch` and `10ch` wide, in their own font, so the two mono columns line up in every row whatever the row's font; the sans type gets a fixed track in `em`. Under ~600px it becomes two lines: hash and date, then type and title (a `4em` first track, so the title stays aligned with the date).
+- **date:** `YYYY-MM-DD`. **title:** links to the entry at `/<slug>/`.
+- **Markup:** `<ol class="log">` > `<li class="log-row">` > `<a class="log-hash">`, `<time class="log-date">`, `<a class="log-title">` (the title the `title` transition moves, §7).
+- **Fonts:** the hash and the date are JetBrains Mono (`.log-hash`, `.log-date`, at 0.8em, muted). The title is Inter, 600 weight.
+- **Layout:** a CSS grid: `max-content max-content 1fr`. The mono cells are `7ch` and `10ch` wide, in their own font, so the two mono columns line up in every row whatever the row's font. Under ~600px it becomes two lines: hash and date, then the title across the full width.
 - There are no list pages: the log appears on the home only.
 
 ## 7. Layout and pages
@@ -272,7 +272,7 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   ```
 
-- **Where mono is allowed.** The body and all prose and UI use the sans. Mono is used only for `code`/`pre`/`kbd`, for the log's hash and date (`.log-hash`, `.log-date`, wherever the log appears), and for the backdrop field. `.field` sets `font-family: var(--font-mono)` itself, because field.js builds its character grid from the field root's computed font (§9) and would otherwise inherit the sans. The type label, the title, the meta line and the footer are sans. A test pins this list.
+- **Where mono is allowed.** The body and all prose and UI use the sans. Mono is used only for `code`/`pre`/`kbd`, for the log's hash and date (`.log-hash`, `.log-date`, wherever the log appears), and for the backdrop field. `.field` sets `font-family: var(--font-mono)` itself, because field.js builds its character grid from the field root's computed font (§9) and would otherwise inherit the sans. The title, the meta line and the footer are sans. A test pins this list.
 - **Type scale:** the root is 16px (17px at ≥ 960px). Body is 1rem with line-height 1.6; the entry body is 1.125rem with line-height 1.7. Headings are 700 weight with slightly negative tracking (-0.02em, h1 -0.03em). h1 is `clamp(1.875rem, 1.3rem + 2.2vw, 2.5rem)`, except the home name, which is a modest 1.5rem. Bold text and table heads are 650, the log title and the project tagline 600. Monochrome, bold but simple.
 - **Links:** `color: inherit`, 1px underline with 0.2em offset. Hover and focus invert (`background: var(--fg); color: var(--bg)`). Focus-visible gets a 2px solid outline in `--fg`. Selection inverts.
 - **Rules:** 1px `--rule`. Generous whitespace, lowercase UI labels, and nothing decorative except the field.

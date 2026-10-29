@@ -4,7 +4,7 @@ defmodule Site.OG do
   and `og/home.png` for the home page.
 
   Each image is drawn as an SVG string in the light palette: faint topographic
-  contour lines seeded from the slug, a small mono line with the type and date,
+  contour lines seeded from the slug, a small mono line with the date,
   the title in Inter Bold, and the name and domain along the bottom. The SVG is
   rasterised at build time by `resvg` (a precompiled Rust NIF) with only the two
   fonts in `priv/og-fonts/`; system fonts are never read, so the output does not
@@ -89,7 +89,7 @@ defmodule Site.OG do
       key: entry.slug,
       kind: :entry,
       title: entry.title,
-      kicker: "#{entry.type} · #{Date.to_iso8601(entry.date)}"
+      kicker: Date.to_iso8601(entry.date)
     }
   end
 

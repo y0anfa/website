@@ -26,7 +26,7 @@ defmodule Site.LlmsTest do
                  "> Fixture home page for the test suite.\n\n" <>
                  "This is the intro paragraph. It has a link and some inline code. " <>
                  "A second paragraph keeps the intro honest about wrapping.\n\n" <>
-                 "## Essays\n"
+                 "## Log\n"
              )
     end
 
@@ -37,15 +37,14 @@ defmodule Site.LlmsTest do
       refute intro =~ "example.com"
     end
 
-    test "lists Essays, Projects, Notes, in that order, in log order", %{llms: llms} do
-      assert Regex.scan(~r/^## (.+)$/m, llms) |> Enum.map(&List.last/1) ==
-               ["Essays", "Projects", "Notes"]
+    test "lists every entry in one Log section, in log order, with no type", %{llms: llms} do
+      assert Regex.scan(~r/^## (.+)$/m, llms) |> Enum.map(&List.last/1) == ["Log"]
 
       links =
         Regex.scan(~r{^- \[.*?\]\(https://yoanfaure\.com/([a-z0-9-]+)\.md\)}m, llms)
         |> Enum.map(&List.last/1)
 
-      assert links == ~w(second-essay first-essay widget small-note escape-me)
+      assert links == ~w(second-essay widget small-note escape-me first-essay)
     end
 
     test "every item is a link to a Markdown twin, then a colon and the description", %{
@@ -85,12 +84,11 @@ defmodule Site.LlmsTest do
       refute llms =~ ~r/\n{3,}/
     end
 
-    test "a section without entries is left out" do
+    test "one entry is one Log section with one item, whatever its type" do
       llms = render(%{"notes/a.md" => @note})
 
-      assert llms =~ "## Notes\n\n- [A note](https://yoanfaure.com/a.md): Said once.\n"
-      refute llms =~ "## Essays"
-      refute llms =~ "## Projects"
+      assert llms =~ "## Log\n\n- [A note](https://yoanfaure.com/a.md): Said once.\n"
+      refute llms =~ "## Notes"
     end
 
     test "an empty log is the name, the summary and the intro" do

@@ -26,13 +26,12 @@ defmodule Site.View do
     }
   end
 
-  @doc "Meta line of an essay or note: `essay · 2026-03-28 · a3f9c21`."
+  @doc "Meta line of an essay or note: `2026-03-28 · a3f9c21`."
   @spec article_meta(Entry.t()) :: [part()]
   def article_meta(%Entry{} = entry) do
     date = Date.to_iso8601(entry.date)
 
     [
-      %{text: Atom.to_string(entry.type)},
       %{text: date, datetime: date},
       %{text: Log.hash(entry), href: entry.commit && Site.Git.commit_url(entry.commit)}
     ]
