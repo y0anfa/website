@@ -2,7 +2,8 @@ defmodule Site.Headers do
   @moduledoc """
   The `_headers` file (Cloudflare format) and the Content Security Policy.
 
-  The CSP allows exactly one inline script, `assets/js/head.js`, by its sha256.
+  The CSP allows exactly two inline scripts, by their sha256: `assets/js/head.js`
+  and the Speculation Rules (`Site.Speculation`).
   Cloudflare Web Analytics runs on automatic setup: Cloudflare injects the beacon
   at the edge, so the CSP always allows its two hosts, the one third-party
   exception.
@@ -30,12 +31,17 @@ defmodule Site.Headers do
     "sha256-" <> Base.encode64(:crypto.hash(:sha256, script))
   end
 
-  @doc "The Content Security Policy for a given inline-script hash."
-  @spec csp(String.t()) :: String.t()
-  def csp(script_hash) do
+  @doc """
+  The Content Security Policy for the hashes of the inline scripts: one hash or a
+  list. The site has exactly two, `head.js` and the Speculation Rules.
+  """
+  @spec csp(String.t() | [String.t()]) :: String.t()
+  def csp(script_hashes) do
+    hashes = script_hashes |> List.wrap() |> Enum.map_join(" ", &"'#{&1}'")
+
     [
       "default-src 'none'",
-      "script-src 'self' '#{script_hash}' #{@beacon_script}",
+      "script-src 'self' #{hashes} #{@beacon_script}",
       "style-src 'self'",
       "img-src 'self'",
       "font-src 'self'",
@@ -49,13 +55,20 @@ defmodule Site.Headers do
     |> Enum.join("; ")
   end
 
-  @doc "Renders the `_headers` file."
-  @spec render(String.t()) :: String.t()
-  def render(script_hash) do
-    all = [{"Content-Security-Policy", csp(script_hash)} | @security]
+  @doc """
+  Renders the `_headers` file. Takes the inline-script hash, or a list of them.
+
+  The Markdown twins and `llms.txt` get an explicit `Content-Type`, so they are
+  served as text with a charset whatever the platform guesses from the extension.
+  """
+  @spec render(String.t() | [String.t()]) :: String.t()
+  def render(script_hashes) do
+    all = [{"Content-Security-Policy", csp(script_hashes)} | @security]
 
     sections = [
       {"/*", all},
+      {"/*.md", [{"Content-Type", "text/markdown; charset=utf-8"}]},
+      {"/llms.txt", [{"Content-Type", "text/plain; charset=utf-8"}]},
       {"/assets/fonts/*", [{"Cache-Control", "public, max-age=31536000, immutable"}]}
     ]
 

@@ -22,7 +22,8 @@ defmodule Site.Templates do
     not_found: "404.html.eex",
     footer: "_footer.html.eex",
     log: "_log.html.eex",
-    meta: "_meta.html.eex"
+    meta: "_meta.html.eex",
+    entry_links: "_entry_links.html.eex"
   ]
 
   # Nothing to interpolate: these take no assigns.

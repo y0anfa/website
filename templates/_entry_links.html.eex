@@ -1,0 +1,1 @@
+<p class="entry-links"><a href="<%= escape(@links.markdown) %>">markdown</a> · <a href="<%= escape(@links.ask) %>" rel="noopener">ask claude ↗</a></p>

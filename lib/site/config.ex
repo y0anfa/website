@@ -22,7 +22,7 @@ defmodule Site.Config do
   ]
 
   # Top-level names of files and directories the build writes.
-  @site_paths ~w(assets 404 404.html index index.html robots.txt _headers _redirects)
+  @site_paths ~w(assets 404 404.html home index index.html llms llms.txt og robots.txt _headers _redirects)
 
   def name, do: "Yoan Faure"
   def home_title, do: "Yoan Faure — security engineer who builds"

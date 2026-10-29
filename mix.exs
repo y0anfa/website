@@ -19,6 +19,7 @@ defmodule Site.MixProject do
     [
       {:mdex, "~> 0.14"},
       {:yaml_elixir, "~> 2.12"},
+      {:resvg, "~> 0.6.0"},
       {:bandit, "~> 1.14", only: :dev},
       {:plug, "~> 1.20", only: :dev}
     ]

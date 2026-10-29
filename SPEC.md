@@ -46,6 +46,7 @@ It shows who he is, what he thinks, and what he makes.
 │   └── mix/tasks/…            mix site.build | site.serve | site.verify
 ├── test/                      ExUnit tests + test/fixtures/content/…
 ├── templates/                 EEx templates (*.html.eex) and partials (_*.html.eex)
+├── priv/og-fonts/             Inter-Bold.ttf, JetBrainsMono-Regular.ttf + OFL licences: build-only, for the share images (never copied to dist)
 ├── content/                   all words live here: home.md and essays/, notes/, projects/ (see §5)
 ├── assets/                    copied verbatim to dist/assets/
 │   ├── css/site.css
@@ -53,9 +54,11 @@ It shows who he is, what he thinks, and what he makes.
 │   ├── js/theme.js            theme toggle
 │   ├── js/field.js            the ASCII field (ES module)
 │   ├── js/404.js              fills the missing path on the 404 page
+│   ├── js/favicon.js          swaps the favicon to the sleeping one while the tab is hidden
 │   ├── fonts/InterVariable.woff2, InterVariable-Italic.woff2 + Inter-OFL.txt
 │   ├── fonts/JetBrainsMono-Regular.woff2 + JetBrainsMono-OFL.txt
-│   └── favicon.svg
+│   ├── favicon.svg
+│   └── favicon-sleep.svg      the same mark with a sleeping prompt (`>` and a z z)
 ├── lab/field.html             standalone playground for field.js (never built/deployed)
 ├── wrangler.jsonc             the site Worker (yoanfaure.com)
 ├── redirect/                  worker.js + wrangler.jsonc: 301s yoanfau.re and www to yoanfaure.com
@@ -70,11 +73,38 @@ It shows who he is, what he thinks, and what he makes.
 | `/` | `content/home.md` + every entry | `home.html.eex` |
 | `/<slug>/` | one essay or note (`content/essays/*.md`, `content/notes/*.md`) | `article.html.eex` |
 | `/<slug>/` | one project (`content/projects/*.md`) | `project.html.eex` |
+| `/<slug>.md` | the Markdown twin of the same entry (see below) | `Site.Twin` |
+| `/llms.txt` | an index of the twins, for language models | `Site.Llms` |
 | `/404.html` | — | `404.html.eex` |
 
 Every page is written as `<path>/index.html`. Slug = filename without `.md` and without a leading `YYYY-MM-DD-` prefix.
 The content folder (`essays/`, `notes/`, `projects/`) sets the entry's type, not its URL: `content/essays/2026-03-28-threat-modeling-with-claude-code.md` is `/threat-modeling-with-claude-code/`, and `content/projects/rhino.md` is `/rhino/`. There are no `/essays/`, `/notes/`, `/projects/`, `/uses/` or `/cv/` pages.
 Also emit `robots.txt` (allow all), `_headers` (§11) and `_redirects`. There is no sitemap and no feed.
+
+**Markdown twins and `llms.txt`.** Every entry (essay, note, project) is also written as `dist/<slug>.md`, served at `/<slug>.md`, so a person or a model can read the words without the page. It is plain text built from the content, with no timestamps:
+
+```
+# <title>
+
+<type> · <date> · https://yoanfaure.com/<slug>/
+
+<the entry's original Markdown body, frontmatter stripped>
+```
+
+A project adds its tagline (as a `> ` quote) and a `link: <url>` line after the second line. Each entry page points at its twin with `<link rel="alternate" type="text/markdown" href="/<slug>.md">` in the `<head>`. Drafts have no twin.
+
+`dist/llms.txt` follows [llmstxt.org](https://llmstxt.org): `# Yoan Faure`, a one-line `> ` summary (the home description), a short plain-text paragraph (the home intro), then `## Essays`, `## Projects` and `## Notes` (in that order, entries in log order, empty sections left out). Each entry is `- [Title](https://yoanfaure.com/<slug>.md): description`.
+
+A `<slug>.md` cannot collide with a page or a site file: `llms` and `llms.txt` are reserved slugs (§5), as is every other site path. `_headers` (§11) gives the twins and `llms.txt` an explicit `Content-Type` (`text/markdown; charset=utf-8` and `text/plain; charset=utf-8`).
+
+**Share images.** Every entry has a 1200×630 PNG at `dist/og/<slug>.png`, and the home has `dist/og/home.png` (`Site.OG`). Each page points at its own with `og:image` (absolute URL), `og:image:width` 1200, `og:image:height` 630 and `og:image:alt` (the page title); `twitter:card` is `summary_large_image`. The 404 has no image and keeps `twitter:card=summary`. An image is drawn as an SVG in the light palette (§8) and rasterised at build time by `resvg`:
+
+- Background: a few faint topographic contour lines in `--rule`, in the spirit of the site's backdrop. A smooth height field (three octaves of value noise plus one round hill) is seeded from the slug by SHA-256, contoured with marching squares, and written as smoothed SVG paths. Index lines (every fourth) are slightly heavier.
+- An entry: a mono (JetBrains Mono) kicker `essay · 2026-03-28` in `--muted`, then the title in Inter Bold, `--fg`, -0.02em, left-aligned. The title takes the largest of 96, 84, 72, 62 and 54px that fits in three lines (lines balanced); past three lines at 54px it ends with `…`. `Yoan Faure` bottom-left (Inter Bold), `yoanfaure.com` bottom-right (mono, `--muted`).
+- The home: the name from `home.md` large (152px), the tagline under it in `--muted`, and `yoanfaure.com` bottom-left.
+- Text is measured from the font files' glyph advances (`Site.OG.Text`, no kerning, so lines are never too wide) and a character the font lacks is dropped, never drawn as a box.
+- Fonts: only `priv/og-fonts/Inter-Bold.ttf` and `JetBrainsMono-Regular.ttf` (resvg cannot read WOFF2), loaded with `skip_system_fonts`, so no system font ever changes an image. They sit outside `assets/` because the build uses them and the site does not publish them.
+- Deterministic: no timestamps and no random state, and the PNG has only `IHDR`, `IDAT` and `IEND` chunks, so `mix site.verify` covers the images too. They are not cached between builds, so that it does.
 
 **`_redirects`** sends the old Hugo URLs to the flat ones. It is written to `dist/_redirects` (Cloudflare Workers static assets read it from the assets directory), is the same on every build, and is generated from `Site.Config.redirects/0`:
 
@@ -118,7 +148,19 @@ tagline: string      # optional; rendered under the h1
 
 Raw HTML in Markdown is **not** rendered: MDEx runs with `unsafe: false`. Use GFM extensions: tables, strikethrough, autolink, footnotes, and heading ids. There is no syntax colouring; code blocks are plain monochrome `<pre><code>`.
 
-**Slugs.** Every entry lives at `/<slug>/`, so a slug may be used once across **all** types: an essay and a note cannot share one. A skipped draft does not count. Some slugs are reserved because `/<slug>/` would collide with a site path or be taken over by a legacy redirect: `assets`, `404`, `404.html`, `index`, `index.html`, `robots.txt`, `_headers`, `_redirects`, `blog`, `projects` and `resume` (`Site.Config.reserved_slugs/0`; the last three come from the redirects in §4).
+**Stat callouts.** A fenced code block with the info string `stats` is a row of big numbers, one `value | label` per line:
+
+````
+```stats
+91% | only read or react
+0%  | chose "I comment"
+82  | respondents
+```
+````
+
+`Site.Markdown` post-processes MDEx's HTML: `<pre><code class="language-stats">` becomes `<dl class="stats"><div><dt>91%</dt><dd>only read or react</dd></div>…</dl>`. Values and labels are trimmed, split at the first `|`, and stay HTML-escaped exactly as MDEx wrote them (a `<script>` in a label is text, never markup). If any non-blank line has no `|`, or an empty value or label, or the block is empty, the whole block stays a plain code block, so a typo is visible instead of silently dropped. Only the exact info string `stats` counts. In `site.css`, `.stats` is a grid of `repeat(auto-fit, minmax(8.5rem, 1fr))`: up to four columns in the reading column, two on a phone (an odd last item takes the full row). Each cell has a `--rule` hairline on top, the `dl` one underneath. The value (`dt`) is Inter 700 at `clamp(2.25rem, 1.8rem + 1.6vw, 2.75rem)`, -0.03em, line-height 1. The label (`dd`) is 0.875rem in `--muted`. Monochrome, set in Inter.
+
+**Slugs.** Every entry lives at `/<slug>/`, so a slug may be used once across **all** types: an essay and a note cannot share one. A skipped draft does not count. Some slugs are reserved because `/<slug>/` would collide with a site path or be taken over by a legacy redirect: `assets`, `404`, `404.html`, `home`, `index`, `index.html`, `llms`, `llms.txt`, `og`, `robots.txt`, `_headers`, `_redirects`, `blog`, `projects` and `resume` (`Site.Config.reserved_slugs/0`; the last three come from the redirects in §4).
 
 The build fails loudly on a missing required field, a bad date, a duplicate slug (naming every file that uses it, for example `essays/same.md, notes/same.md`), or a reserved slug (naming the file).
 
@@ -151,9 +193,11 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 - `header.site-header`: `a.brand` "yoan faure", linking home, on the left; `button.theme-toggle` (aria-label "Toggle theme") on the right. There is no nav: no `nav` element, no links to sections, no `aria-current`.
 - `main#main`.
 - `footer.site-footer`: `hi@yoanfaure.com · linkedin` on the left; `built from <a>a3f9c21</a>` on the right, linking to the HEAD commit (`-dirty` suffix if the tree is dirty, `unversioned` with no git).
-- `<title>`: `<Page> — Yoan Faure` (home: `Yoan Faure — security engineer who builds`). Also meta description, canonical, `og:title/description/url/type`, `twitter:card=summary`, favicon, and a preload for the Inter variable font (`/assets/fonts/InterVariable.woff2`, with `crossorigin`).
+- `<title>`: `<Page> — Yoan Faure` (home: `Yoan Faure — security engineer who builds`). Also meta description, canonical, `og:title/description/url/type`, `og:image` with its width, height and alt, and `twitter:card` (`summary_large_image`; the 404 has no image and keeps `summary`; share images, §4), favicon, and a preload for the Inter variable font (`/assets/fonts/InterVariable.woff2`, with `crossorigin`). An entry page also has `<link rel="alternate" type="text/markdown" href="/<slug>.md">` (§4).
 - `<html lang="en">`. The inline head script (`assets/js/head.js`) only applies `localStorage.theme` (`light` / `dark`) to `data-theme`, before first paint.
-- `<script type="module" src="/assets/js/field.js">` is loaded on every page, from the shared layout. `theme.js` (and `404.js` on the 404) are plain `defer` scripts.
+- A second inline script, `<script type="speculationrules">`, is in every page's `<head>`. Its text is the constant in `Site.Speculation`: prerender same-origin page links (`href_matches: "/*"`) with `eagerness: "moderate"` (a hover or focus hint), except `/*.md`, `/llms.txt`, `/assets/*` and any link with `rel~=nofollow`. The CSP allows it by its sha256 (§11). Browsers without Speculation Rules ignore it.
+- `<script type="module" src="/assets/js/field.js">` is loaded on every page, from the shared layout. `theme.js` and `favicon.js` (and `404.js` on the 404) are plain `defer` scripts.
+- **Favicon.** `assets/favicon.svg` is the mark: a 32×32 rounded square with a `>_` prompt, light and dark by media query. `assets/favicon-sleep.svg` is the same square with a sleeping prompt: the `>` and a small z z, drawn with paths only. `favicon.js` swaps the `link[rel=icon]` href to the sleeping one when the tab becomes hidden (`visibilitychange`) and back when it is visible. It touches no markup.
 
 **Backdrop and column**
 - The field is a fixed, full-viewport layer behind the page (`z-index: 0`, no pointer events). The skip link, header, main and footer sit above it (`position: relative; z-index: 1`).
@@ -176,6 +220,10 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 **Entries** are a centred reading column. The page column is 38rem of text (about 68 characters of Inter). The opaque "paper" column stays, so the field shows only in the side margins; the header and footer align to the same column.
 - **Article (essay, note):** `article.prose`. A small, muted meta line `essay · 2026-03-28 · <hash link>` (0.875rem) above the h1, then h1, then the body, then a `← log` back link to `/`. The body is 1.125rem with line-height 1.7, paragraphs 1.35em apart, h2 at 1.5rem with 2.75rem above it. Lists use plain markers, tables are ruled, and code is mono (`pre` 0.875rem).
 - **Project:** `article.prose.project`. h1, tagline, a meta line `status · stack · link`, then the body and the same `← log` back link.
+- **Entry links (article and project).** Under the body, one quiet row (`div.entry-end`, on the back link's hairline): the `← log` back link on the left, and on the right, in 0.875rem muted lowercase, `markdown` and `ask claude ↗` (`p.entry-links`, separated by ` · `).
+  - `markdown` links to `/<slug>.md`, the entry's twin (§4).
+  - `ask claude ↗` links to `https://claude.ai/new?q=<prompt>`, with `rel="noopener"`, no `target` (same tab). The prompt is `Read https://yoanfaure.com/<slug>/ by Yoan Faure, a security engineer. Using only what is on that page, summarize the main argument in a few sentences, then tell me where you would push back.` For a project, the end is `summarize what the project does and why, then suggest one improvement.`
+  - The prompt is URI-encoded (everything but unreserved characters, so a space is `%20`) in `Site.View.ask_url/1`, then HTML-escaped as an attribute by the template.
 
 **404:** two `<pre>` lines (so they are mono): `zsh: no such file or directory: <span data-path></span>`, then `% cd ~` with `cd ~` linking home. `404.js` fills `data-path` via `textContent`.
 
@@ -219,7 +267,7 @@ A quiet, fixed, full-viewport layer behind every page: a watermark you notice af
 ## 10. Build (Elixir)
 
 - **Mix project `:site`.** Deps pinned in `mix.lock`:
-  - `mdex` and `yaml_elixir` (runtime);
+  - `mdex`, `yaml_elixir` and `resvg` (runtime). `resvg` is a Rust NIF with precompiled binaries (macOS arm64, Linux x86_64 GNU), fetched on first compile like MDEx's; it rasterises the share images (§4) and pins `rustler_precompiled` to 0.8.x;
   - `bandit` and `plug`, `only: :dev`, for the dev server.
   - Nothing else.
 - **`mix site.build [--drafts] [--content DIR] [--out DIR]`:**
@@ -228,18 +276,18 @@ A quiet, fixed, full-viewport layer behind every page: a watermark you notice af
   3. Read git info (`System.cmd("git", …)`).
   4. Render the EEx templates. **EEx does not escape:** every interpolated string goes through `Site.HTML.escape/1`, and only rendered Markdown is inserted raw.
   5. Copy `assets/` to `dist/assets/` as is (no fingerprinting).
-  6. Inline `assets/js/head.js` (trimmed) into `<head>` and compute its `sha256-…` for the CSP.
-  7. Write `_headers` (§11), `_redirects` (§4), `robots.txt` and `404.html`.
+  6. Inline `assets/js/head.js` (trimmed) into `<head>` and compute its `sha256-…` for the CSP. Compute the `sha256-…` of the speculation rules (`Site.Speculation.rules/0`) too.
+  7. Write `_headers` (§11), `_redirects` (§4), `robots.txt`, `404.html`, the Markdown twin of every entry, `llms.txt` and the share images in `og/` (§4).
 - **Deterministic:** no build timestamps; sorted iteration everywhere; identical output for identical commit and env.
 - **`mix site.verify`:** builds twice into temporary dirs, compares a SHA-256 over every file path and content, fails on mismatch, and prints the tree hash.
 - **`mix site.serve [--port 4000]`:** builds, serves `dist/` with Bandit and Plug, and applies the headers parsed from `dist/_headers`, so CSP violations show up locally exactly as in production. It polls `content/`, `templates/`, `assets/` and `lib/` mtimes every second and rebuilds on change (no file_system dep). Missing paths serve `404.html` with status 404, and `/x/` serves `/x/index.html`.
-- **Tests:** frontmatter parsing and validation, flat URLs, slugs (global uniqueness and reserved slugs), `_redirects`, escaping, log ordering, no nav and no list pages, the font and mono-only CSS rules, CSP hash, and a determinism smoke test, all using `test/fixtures/content`.
+- **Tests:** frontmatter parsing and validation, flat URLs, slugs (global uniqueness and reserved slugs), `_redirects`, escaping, log ordering, no nav and no list pages, the font and mono-only CSS rules, CSP hashes (head.js and the speculation rules), the Markdown twins and `llms.txt`, the entry links and their escaping, the favicon pair and its script, the share images (size, no metadata chunks, determinism, text wrapping, contours, meta tags), the `stats` callouts (rendering, escaping, CSS), and a determinism smoke test, all using `test/fixtures/content`.
 
 ## 11. Security headers (`dist/_headers`)
 
 ```
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self' '<head.js sha256>' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'none'; script-src 'self' '<head.js sha256>' '<speculation rules sha256>' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=63072000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
@@ -247,13 +295,21 @@ A quiet, fixed, full-viewport layer behind every page: a watermark you notice af
   Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
+/*.md
+  Content-Type: text/markdown; charset=utf-8
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
 /assets/fonts/*
   Cache-Control: public, max-age=31536000, immutable
 ```
 
+**Two inline scripts, two hashes.** `script-src` carries exactly two `sha256-…` sources: `assets/js/head.js` and the Speculation Rules (`<script type="speculationrules">`, §7). The build hashes the exact text of each, so the same JSON always gives the same hash, and `'inline-speculation-rules'` is not used. A change to either script changes its hash in the same build.
+
+**Content-Type.** The Cloudflare Workers static assets docs say the defaults it sends, `Content-Type` included, can be overridden by a `_headers` rule ("Headers defined in the `_headers` file override what Cloudflare ordinarily sends"), so the `.md` and `llms.txt` rules pin the types. `mix site.serve` applies them too, and falls back to the file extension's type for everything else. If a deploy ever shows a duplicated or wrong `Content-Type`, delete those two rules and Cloudflare's own types apply.
+
 The two Cloudflare hosts are always in the CSP, because Web Analytics runs on automatic setup: Cloudflare injects `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"…"}'></script>` into the HTML at the edge. The build never writes that tag, so no built page contains `beacon.min.js` or `data-cf-beacon`.
 The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `dist/_redirects` (§4) sits next to `_headers`; Cloudflare reads both from the assets directory, and the build writes both.
-**Never** use inline `style=""` attributes, inline `<style>`, inline event handlers, or any inline script other than head.js.
+**Never** use inline `style=""` attributes, inline `<style>`, inline event handlers, or any inline script other than head.js and the speculation rules.
 
 ## 12. Hosting and deploy
 

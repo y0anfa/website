@@ -177,12 +177,26 @@ if Code.ensure_loaded?(Plug.Conn) and Code.ensure_loaded?(Bandit) do
         {:ok, body} ->
           conn
           |> put_rules(rules)
-          |> put_resp_header("content-type", content_type(path))
+          |> put_content_type(status, path)
           |> send_resp(status, body)
 
         {:error, _} ->
           conn |> put_rules(rules) |> send_resp(404, "not found (run mix site.build)")
       end
+    end
+
+    # A found file keeps the Content-Type its `_headers` rule gives it (the Markdown
+    # twins and llms.txt), as on Cloudflare; the extension is the fallback. The 404
+    # page is always HTML, whatever path was asked for.
+    defp put_content_type(conn, 200, path) do
+      case get_resp_header(conn, "content-type") do
+        [] -> put_resp_header(conn, "content-type", content_type(path))
+        _given -> conn
+      end
+    end
+
+    defp put_content_type(conn, _status, path) do
+      put_resp_header(conn, "content-type", content_type(path))
     end
 
     defp put_rules(conn, rules) do

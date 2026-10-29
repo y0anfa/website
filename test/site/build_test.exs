@@ -18,7 +18,25 @@ defmodule Site.BuildTest do
     widget/index.html
   )
 
-  @extras ~w(_headers _redirects robots.txt)
+  # Besides the pages: the site files, llms.txt, the Markdown twin of each entry and
+  # the share image (og/) of the home and of each entry.
+  @extras ~w(
+    _headers
+    _redirects
+    robots.txt
+    llms.txt
+    escape-me.md
+    first-essay.md
+    second-essay.md
+    small-note.md
+    widget.md
+    og/escape-me.png
+    og/first-essay.png
+    og/home.png
+    og/second-essay.png
+    og/small-note.png
+    og/widget.png
+  )
 
   # One shared, read-only build of the fixtures; tests that change things build their own.
   setup_all do
@@ -140,7 +158,7 @@ defmodule Site.BuildTest do
                ~s(<meta property="og:url" content="https://yoanfaure.com/second-essay/">)
 
       assert html =~ ~s(<meta property="og:type" content="article">)
-      assert html =~ ~s(<meta name="twitter:card" content="summary">)
+      assert html =~ ~s(<meta name="twitter:card" content="summary_large_image">)
       assert html =~ ~s(<link rel="icon" href="/assets/favicon.svg")
 
       assert html =~
@@ -433,7 +451,8 @@ defmodule Site.BuildTest do
           Regex.scan(~r{<script(?![^>]*\ssrc=)[^>]*>(.*?)</script>}s, html)
           |> Enum.map(&List.last/1)
 
-        assert inline == [@head_js], "#{path}: inline scripts other than head.js"
+        assert inline == [@head_js, Site.Speculation.rules()],
+               "#{path}: inline scripts other than head.js and the speculation rules"
       end
     end
   end
@@ -459,11 +478,12 @@ defmodule Site.BuildTest do
   end
 
   describe "_headers and the CSP" do
-    test "the CSP allows exactly the sha256 of the inline head script", %{tree: tree} do
+    test "the CSP allows exactly the sha256 of the two inline scripts", %{tree: tree} do
       expected = "sha256-" <> Base.encode64(:crypto.hash(:sha256, @head_js))
+      rules = "sha256-" <> Base.encode64(:crypto.hash(:sha256, Site.Speculation.rules()))
 
       assert page(tree, "_headers") =~
-               "script-src 'self' '#{expected}' https://static.cloudflareinsights.com;"
+               "script-src 'self' '#{expected}' '#{rules}' https://static.cloudflareinsights.com;"
 
       [inline] =
         Regex.scan(~r{<script>(.*?)</script>}s, page(tree, "index.html"))
@@ -473,7 +493,8 @@ defmodule Site.BuildTest do
     end
 
     test "_headers matches Headers.render/1", %{tree: tree} do
-      assert page(tree, "_headers") == Headers.render(Headers.script_hash(@head_js))
+      hashes = [Headers.script_hash(@head_js), Headers.script_hash(Site.Speculation.rules())]
+      assert page(tree, "_headers") == Headers.render(hashes)
     end
 
     test "_headers always allows the two Cloudflare Web Analytics hosts", %{tree: tree} do

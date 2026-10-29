@@ -12,7 +12,8 @@ defmodule Site.Render do
           required(:build) => %{label: String.t(), href: String.t() | nil}
         }
 
-  @theme_script "/assets/js/theme.js"
+  # Plain deferred scripts loaded on every page, in this order.
+  @scripts ["/assets/js/theme.js", "/assets/js/favicon.js"]
 
   @doc "Renders every page of the site."
   @spec pages(Content.t(), context()) :: [{Path.t(), String.t()}]
@@ -37,6 +38,7 @@ defmodule Site.Render do
     page(context, "/", inner,
       title: Site.Config.home_title(),
       description: content.home.description,
+      og_image: Site.OG.url(Site.OG.home_key()),
       page_key: "home"
     )
   end
@@ -50,7 +52,7 @@ defmodule Site.Render do
         description: "This page does not exist.",
         url: nil,
         page_key: "404",
-        scripts: [@theme_script, "/assets/js/404.js"]
+        scripts: @scripts ++ ["/assets/js/404.js"]
       )
 
     {"404.html", html}
@@ -58,15 +60,22 @@ defmodule Site.Render do
 
   defp entry_pages(content, context) do
     for %Entry{} = entry <- Content.entries(content) do
+      links = View.entry_links(entry)
+
       inner =
         case entry.type do
-          :project -> Templates.project(%{entry: entry, meta: View.project_meta(entry)})
-          _ -> Templates.article(%{entry: entry, meta: View.article_meta(entry)})
+          :project ->
+            Templates.project(%{entry: entry, meta: View.project_meta(entry), links: links})
+
+          _ ->
+            Templates.article(%{entry: entry, meta: View.article_meta(entry), links: links})
         end
 
       page(context, Entry.path(entry), inner,
         title: "#{entry.title} — #{Site.Config.name()}",
         description: entry.description,
+        markdown: links.markdown,
+        og_image: Site.OG.url(entry.slug),
         og_type: if(entry.type == :project, do: "website", else: "article"),
         page_key: "#{entry.type}"
       )
@@ -85,10 +94,13 @@ defmodule Site.Render do
       title: Keyword.fetch!(opts, :title),
       description: Keyword.fetch!(opts, :description),
       url: Keyword.fetch!(opts, :url),
+      og_image: Keyword.get(opts, :og_image),
       og_type: Keyword.get(opts, :og_type, "website"),
       page_key: Keyword.fetch!(opts, :page_key),
-      scripts: Keyword.get(opts, :scripts, [@theme_script]),
+      scripts: Keyword.get(opts, :scripts, @scripts),
+      markdown: Keyword.get(opts, :markdown),
       head_js: context.head_js,
+      speculation: Site.Speculation.rules(),
       build: context.build,
       content: inner
     })

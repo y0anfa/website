@@ -3,15 +3,15 @@ defmodule Site.TemplatesTest do
 
   # Every `<%= expr %>` in a template must be one of:
   #   * escape(...)                       interpolating a value
-  #   * raw(@content | @head_js | @doc.html | @entry.html)   already-safe HTML
-  #   * header() | footer(...) | log(...) | meta(...)    partials (linted themselves)
+  #   * raw(@content | @head_js | @speculation | @doc.html | @entry.html)   already-safe HTML
+  #   * header() | footer(...) | log(...) | meta(...) | entry_links(...)    partials (linted themselves)
   #   * a block opener: for / if / cond / case / unless
   # Anything else would put an unescaped value into a page.
   @allowed [
     ~r/\Aescape\(.+\)\z/s,
-    ~r/\Araw\(@(content|head_js|doc\.html|entry\.html)\)\z/,
+    ~r/\Araw\(@(content|head_js|speculation|doc\.html|entry\.html)\)\z/,
     ~r/\Aheader\(\)\z/,
-    ~r/\A(footer|log|meta)\(%\{[^}]*\}\)\z/,
+    ~r/\A(footer|log|meta|entry_links)\(%\{[^}]*\}\)\z/,
     ~r/\A(for|if|cond|case|unless)\s/
   ]
 
@@ -54,17 +54,22 @@ defmodule Site.TemplatesTest do
     end
   end
 
-  test "the layout has exactly one inline script, and it is the head.js slot" do
+  test "the layout has two inline scripts: the head.js slot and the speculation rules" do
     layout = File.read!("templates/layout.html.eex")
+    rules = ~S|<script type="speculationrules"><%= raw(@speculation) %></script>|
 
-    # a <script> without attributes is an inline script
+    # a <script> without attributes is the head.js inline script
     assert Regex.scan(~r{<script>(.*?)</script>}s, layout) |> Enum.map(&List.last/1) ==
              ["<%= raw(@head_js) %>"]
+
+    # the other inline script is the speculation rules, and nothing else
+    assert Regex.scan(~r{<script type="speculationrules">(.*?)</script>}s, layout)
+           |> Enum.map(&List.last/1) == ["<%= raw(@speculation) %>"]
 
     # every other script tag points at a file
     for line <- String.split(layout, "\n"),
         line =~ "<script",
-        line != "<script><%= raw(@head_js) %></script>" do
+        line not in ["<script><%= raw(@head_js) %></script>", rules] do
       assert line =~ "src=", "inline script without src: #{line}"
     end
   end
@@ -165,7 +170,12 @@ defmodule Site.TemplatesTest do
     assert html =~ "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"
     refute html =~ "<script>"
 
-    article = Site.Templates.article(%{entry: entry, meta: Site.View.article_meta(entry)})
+    article =
+      Site.Templates.article(%{
+        entry: entry,
+        meta: Site.View.article_meta(entry),
+        links: Site.View.entry_links(entry)
+      })
 
     refute article =~ "<script>"
     assert article =~ "<p>ok</p>"

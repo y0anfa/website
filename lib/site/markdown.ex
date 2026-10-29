@@ -6,6 +6,18 @@ defmodule Site.Markdown do
   raw HTML is never rendered (`unsafe: false`, and escaped as text so nothing
   vanishes silently), and there is no syntax highlighting: code blocks come out as
   plain `<pre><code class="language-x">`.
+
+  One fenced block gets special treatment: with the info string `stats`, each line
+  is `value | label` and the block becomes a row of stat callouts,
+
+      ```stats
+      91% | only read or react
+      82  | respondents
+      ```
+
+  rendered as `<dl class="stats"><div><dt>91%</dt><dd>only read or react</dd></div>…</dl>`.
+  A block with a line that is not `value | label` stays a plain code block, so a
+  typo shows up as code instead of vanishing.
   """
 
   @options [
@@ -33,9 +45,43 @@ defmodule Site.Markdown do
     document = MDEx.parse_document!(markdown, @options)
 
     %{
-      html: MDEx.to_html!(document, @options),
+      html: document |> MDEx.to_html!(@options) |> stats(),
       summary: document.nodes |> first_paragraph() |> truncate(@description_limit)
     }
+  end
+
+  # Turns each `stats` code block of MDEx's HTML into a definition list. The text
+  # inside is already HTML-escaped by MDEx and is only trimmed and split here,
+  # never unescaped, so it goes back in as it came out.
+  defp stats(html) do
+    block = ~r{<pre><code class="language-stats">(.*?)</code></pre>}s
+    Regex.replace(block, html, &stats_block/2)
+  end
+
+  defp stats_block(whole, body) do
+    rows = body |> String.split("\n") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+    pairs = Enum.map(rows, &stat/1)
+
+    if pairs != [] and :error not in pairs do
+      items = Enum.map_join(pairs, fn {value, label} -> stat_item(value, label) end)
+      ~s(<dl class="stats">#{items}</dl>)
+    else
+      whole
+    end
+  end
+
+  defp stat_item(value, label), do: "<div><dt>#{value}</dt><dd>#{label}</dd></div>"
+
+  # `value | label`, split at the first bar; both sides must be non-empty.
+  defp stat(row) do
+    with [value, label] <- String.split(row, "|", parts: 2),
+         value = String.trim(value),
+         label = String.trim(label),
+         true <- value != "" and label != "" do
+      {value, label}
+    else
+      _ -> :error
+    end
   end
 
   @doc """

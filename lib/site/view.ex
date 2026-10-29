@@ -52,6 +52,42 @@ defmodule Site.View do
   end
 
   @doc """
+  The two quiet links at the end of an entry page: its Markdown twin and a
+  prefilled "ask claude" chat. Both are plain values; the template escapes them.
+  """
+  @spec entry_links(Entry.t()) :: %{markdown: String.t(), ask: String.t()}
+  def entry_links(%Entry{} = entry) do
+    %{markdown: Entry.markdown_path(entry), ask: ask_url(entry)}
+  end
+
+  @doc """
+  The claude.ai link that starts a chat about an entry. The prompt names the page
+  and tells Claude to rely only on it. It is URI-encoded here (everything but the
+  unreserved characters, so a space is `%20`); the template then HTML-escapes the
+  whole attribute.
+  """
+  @spec ask_url(Entry.t()) :: String.t()
+  def ask_url(%Entry{} = entry) do
+    "https://claude.ai/new?q=" <> URI.encode(ask_prompt(entry), &URI.char_unreserved?/1)
+  end
+
+  @doc "The prompt behind `ask_url/1`."
+  @spec ask_prompt(Entry.t()) :: String.t()
+  def ask_prompt(%Entry{type: type} = entry) do
+    task =
+      case type do
+        :project ->
+          "summarize what the project does and why, then suggest one improvement."
+
+        _ ->
+          "summarize the main argument in a few sentences, then tell me where you would push back."
+      end
+
+    "Read #{Site.Config.absolute(Entry.path(entry))} by #{Site.Config.name()}, " <>
+      "a security engineer. Using only what is on that page, #{task}"
+  end
+
+  @doc """
   A URL without scheme or trailing slash, for display.
 
       iex> Site.View.display_url("https://github.com/y0anfa/rhino/")

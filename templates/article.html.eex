@@ -2,5 +2,8 @@
 <%= meta(%{parts: @meta}) %>
   <h1><%= escape(@entry.title) %></h1>
 <%= raw(@entry.html) %>
-  <p class="back"><a href="/">← log</a></p>
+  <div class="entry-end">
+    <p class="back"><a href="/">← log</a></p>
+<%= entry_links(%{links: @links}) %>
+  </div>
 </article>

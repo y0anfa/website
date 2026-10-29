@@ -67,8 +67,12 @@ defmodule Site.HeadersTest do
     end
 
     test "parses patterns and headers", %{rules: rules} do
-      assert [%{pattern: "/*", headers: all}, %{pattern: "/assets/fonts/*", headers: fonts}] =
-               rules
+      assert [
+               %{pattern: "/*", headers: all},
+               %{pattern: "/*.md"},
+               %{pattern: "/llms.txt"},
+               %{pattern: "/assets/fonts/*", headers: fonts}
+             ] = rules
 
       assert {"X-Frame-Options", "DENY"} in all
       assert {"Content-Security-Policy", Headers.csp(@hash)} in all

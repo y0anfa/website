@@ -655,3 +655,75 @@ main a[href]:is(:hover, :focus-visible),
 .log-section .log-row {
   padding: 0.95rem 0;
 }
+
+/* ---------- entry end: back link, markdown twin, ask claude ----------
+   One quiet row under an entry: the back link on the left, two small muted links
+   on the right. The row keeps the hairline and the spacing the back link had on
+   its own. Added with the Markdown twins (SPEC section 7). */
+
+.entry-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  margin: 0 0 1.35em;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+}
+
+.entry-end .back {
+  margin: 0;
+  padding: 0;
+  border-top: 0;
+}
+
+.entry-end .entry-links {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* ---------- stat callouts (Markdown ```stats blocks) ----------
+   A fenced block with the info string `stats` becomes <dl class="stats">: one
+   <div> per `value | label` line, a big number over a small muted label, ruled
+   like the tables. Up to four columns in the reading column, two on a phone.
+   Sizes are in rem so the block looks the same inside .prose and the home intro.
+   Added with the share images (SPEC section 5). */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  margin: 2rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.stats > div {
+  min-width: 0;
+  padding: 1.1rem 1rem 1.2rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.stats dt {
+  font-size: clamp(2.25rem, 1.8rem + 1.6vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.stats dd {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* on a phone (two columns) an odd last stat takes the whole row, so its rule is as long as the others */
+@media (max-width: 27.5rem) {
+  .stats > div:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}

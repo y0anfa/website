@@ -8,6 +8,7 @@ defmodule Site.Entry do
     :date,
     :description,
     :html,
+    :body,
     :file,
     :commit,
     :tagline,
@@ -23,6 +24,7 @@ defmodule Site.Entry do
           date: Date.t(),
           description: String.t(),
           html: String.t(),
+          body: String.t(),
           file: Path.t(),
           commit: String.t() | nil,
           tagline: String.t() | nil,
@@ -34,18 +36,23 @@ defmodule Site.Entry do
   @doc "URL path of the entry, flat and with a trailing slash: `/rhino/`."
   @spec path(t()) :: String.t()
   def path(%__MODULE__{slug: slug}), do: "/#{slug}/"
+
+  @doc "URL path of the entry's Markdown twin: `/rhino.md`."
+  @spec markdown_path(t()) :: String.t()
+  def markdown_path(%__MODULE__{slug: slug}), do: "/#{slug}.md"
 end
 
 defmodule Site.Doc do
   @moduledoc "A single page written in Markdown: the home intro."
 
-  defstruct [:title, :description, :tagline, :html, :file]
+  defstruct [:title, :description, :tagline, :html, :body, :file]
 
   @type t :: %__MODULE__{
           title: String.t(),
           description: String.t(),
           tagline: String.t() | nil,
           html: String.t(),
+          body: String.t(),
           file: Path.t()
         }
 end
@@ -146,6 +153,7 @@ defmodule Site.Content do
          description: description,
          tagline: tagline,
          html: html,
+         body: body,
          file: file
        }}
     end
@@ -186,6 +194,7 @@ defmodule Site.Content do
              date: date,
              description: description || extra[:tagline] || summary,
              html: html,
+             body: body,
              file: file,
              commit: Site.Git.last_commit(file)
            })

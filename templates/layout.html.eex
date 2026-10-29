@@ -11,10 +11,17 @@
 <% end %><meta property="og:title" content="<%= escape(@title) %>">
 <meta property="og:description" content="<%= escape(@description) %>">
 <meta property="og:type" content="<%= escape(@og_type) %>">
-<meta name="twitter:card" content="summary">
-<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
+<%= if @og_image do %><meta property="og:image" content="<%= escape(@og_image) %>">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="<%= escape(@title) %>">
+<meta name="twitter:card" content="summary_large_image">
+<% else %><meta name="twitter:card" content="summary">
+<% end %><link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<%= if @markdown do %><link rel="alternate" type="text/markdown" href="<%= escape(@markdown) %>">
+<% end %><link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>
 <script><%= raw(@head_js) %></script>
+<script type="speculationrules"><%= raw(@speculation) %></script>
 <link rel="stylesheet" href="/assets/css/site.css">
 <script type="module" src="/assets/js/field.js"></script>
 <%= for src <- @scripts do %><script defer src="<%= escape(src) %>"></script>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <style>
+    .bg { fill: #262523; }
+    .stroke { stroke: #f4efe4; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #f4efe4; }
+      .stroke { stroke: #262523; }
+    }
+  </style>
+  <rect class="bg" x="0" y="0" width="32" height="32" rx="6"/>
+  <g class="stroke" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="2.5" d="M8.5 13.5 L14.5 19 L8.5 24.5"/>
+    <path stroke-width="2" d="M18 14 H23.5 L18 20 H23.5"/>
+    <path stroke-width="1.75" d="M23.5 6 H27 L23.5 10 H27"/>
+  </g>
+</svg>

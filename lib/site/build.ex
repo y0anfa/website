@@ -5,8 +5,8 @@ defmodule Site.Build do
   1. Load and validate `content/` (nothing is written if this fails).
   2. Read git info for the footer.
   3. Render the pages.
-  4. Clean the output directory and write pages, assets, `_headers`, `_redirects`
-     and `robots.txt`.
+  4. Clean the output directory and write pages, assets, `_headers`, `_redirects`,
+     `robots.txt`, the Markdown twin of every entry and `llms.txt`.
 
   The output is deterministic: no timestamps, sorted iteration, so the same
   commit, content and environment always produce byte-identical trees.
@@ -54,11 +54,15 @@ defmodule Site.Build do
 
     pages = Render.pages(content, context)
 
-    extras = [
-      {"_headers", Headers.render(Headers.script_hash(head_js))},
-      {"_redirects", Redirects.render()},
-      {"robots.txt", "User-agent: *\nAllow: /\n"}
-    ]
+    # The CSP allows exactly two inline scripts: head.js and the Speculation Rules.
+    script_hashes = [Headers.script_hash(head_js), Site.Speculation.hash()]
+
+    extras =
+      [
+        {"_headers", Headers.render(script_hashes)},
+        {"_redirects", Redirects.render()},
+        {"robots.txt", "User-agent: *\nAllow: /\n"}
+      ] ++ Site.Twin.files(content) ++ Site.OG.files(content)
 
     File.rm_rf!(out)
     File.mkdir_p!(out)
