@@ -255,7 +255,7 @@ The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `di
 
 ## 12. Hosting and deploy
 
-- **`wrangler.jsonc`:** an assets-only Worker named `yoanfau-re` with `assets.directory: ./dist`, `not_found_handling: "404-page"` and `html_handling: "auto-trailing-slash"`. The `yoanfau.re` custom-domain route stays **commented out** until the DNS cutover.
+- **`wrangler.jsonc`:** an assets-only Worker named `yoanfau-re` with `assets.directory: ./dist`, `not_found_handling: "404-page"` and `html_handling: "auto-trailing-slash"`. `yoanfau.re` is its custom domain (`routes`), so Cloudflare owns the apex record and certificate. `www` is a proxied CNAME redirected to the apex by a Redirect Rule.
 - **`.github/workflows/deploy.yml`** runs on push to `main` and on `workflow_dispatch`, with least-privilege permissions. **Every third-party action is pinned to a full commit SHA** with a `# vX.Y.Z` comment.
   - The **build** job: checkout with `fetch-depth: 0` (needed for per-file hashes), then `erlef/setup-beam` with `version-file: .tool-versions` and `version-type: strict`, a deps cache, `mix format --check-formatted`, `mix test`, `MIX_ENV=prod mix site.verify`, and `MIX_ENV=prod mix site.build` with `CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}`. It uploads `dist`.
   - The **deploy** job (only on `main`) runs `cloudflare/wrangler-action` with secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
@@ -264,7 +264,7 @@ The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `di
   2. Create an API token and add the repo secrets.
   3. Create the Web Analytics site and add the repo variable `CF_BEACON_TOKEN`.
   4. Create `hello@` as an OVH redirection. Mail stays on OVH, so no Cloudflare Email Routing.
-  5. Uncomment the route and deploy.
+  5. Turn off Email Address Obfuscation, delete the GitHub Pages A records, then deploy with the route; point `www` at the apex with a redirect rule.
   6. Disable GitHub Pages.
   7. Add the SSH key on GitHub as a *signing* key.
 

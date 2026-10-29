@@ -61,7 +61,7 @@ A push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.ym
 1. **build** checks out the full history, which the commit hashes need. It sets up Erlang and Elixir from `.tool-versions`, restores the dependency and `_build` cache, then runs the format check, the tests, `site.verify` and `site.build` in `prod` mode. The `dist/` directory is uploaded as an artifact. The Web Analytics beacon is included only when the repo variable `CF_BEACON_TOKEN` is set.
 2. **deploy** runs only for `main`, in the `production` environment. It downloads `dist/` and runs `wrangler deploy` with a pinned wrangler version. The Cloudflare secrets are used only in this job.
 
-`wrangler.jsonc` defines an assets-only Worker. Its custom domain route stays commented out until the cutover below.
+`wrangler.jsonc` defines an assets-only Worker with `yoanfau.re` as its custom domain.
 
 ## Cutover checklist
 
@@ -72,7 +72,7 @@ These are one-time steps for the owner, in order.
 3. Create an API token from the "Edit Cloudflare Workers" template, scoped to the account and the `yoanfau.re` zone. Add it as the GitHub repo secret `CLOUDFLARE_API_TOKEN`, and add the account ID as the repo secret `CLOUDFLARE_ACCOUNT_ID`.
 4. In Cloudflare Web Analytics, add the site. Put its token in the GitHub repo *variable* `CF_BEACON_TOKEN`. It is a variable, not a secret, because the beacon sends it to the browser.
 5. Mail stays on OVH (MX Plan): keep the OVH MX and SPF records in Cloudflare, and don't enable Cloudflare Email Routing, which would replace them. Create `hello@yoanfau.re` as an OVH redirection (Web Cloud → Emails → yoanfau.re → Redirections) to your inbox.
-6. Uncomment the `routes` line in `wrangler.jsonc` and push. Once the Worker serves `yoanfau.re`, delete the old GitHub Pages A records (`185.199.108.153` to `185.199.111.153`) and disable GitHub Pages in the repo settings.
+6. Turn off Email Address Obfuscation for the zone (it rewrites `mailto:` links and injects a script). Delete the old GitHub Pages A records (`185.199.108.153` to `185.199.111.153`) first, since a custom domain can't attach while they exist, then push with the `routes` line in `wrangler.jsonc`. Make `www` a proxied CNAME to `yoanfau.re` with the "Redirect from WWW to root" rule, and unpublish GitHub Pages.
 7. Add the SSH key to GitHub as a signing key, so commits show as verified:
 
    ```sh

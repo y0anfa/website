@@ -4,10 +4,9 @@
   "name": "yoanfau-re",
   "compatibility_date": "2026-10-01",
 
-  // DNS cutover only: uncomment this line when the yoanfau.re zone is on
-  // Cloudflare and the old GitHub Pages records are gone. Until then the
-  // Worker stays on its workers.dev hostname.
-  // "routes": [{ "pattern": "yoanfau.re", "custom_domain": true }],
+  // The apex is a Workers custom domain: Cloudflare owns its DNS record and
+  // certificate. www is a proxied CNAME redirected to the apex by a rule.
+  "routes": [{ "pattern": "yoanfau.re", "custom_domain": true }],
 
   "assets": {
     "directory": "./dist",
