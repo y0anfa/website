@@ -1,5 +1,5 @@
 <article class="prose project">
-  <h1 class="<%= escape(Site.Transitions.class(@entry.slug)) %>"><%= escape(@entry.title) %></h1>
+  <h1><%= escape(@entry.title) %></h1>
   <p class="tagline"><%= escape(@entry.tagline) %></p>
 <%= meta(%{parts: @meta}) %>
 <%= raw(@entry.html) %>

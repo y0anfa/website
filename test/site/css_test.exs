@@ -321,7 +321,7 @@ defmodule Site.CSSTest do
 
     # the keyframes are the page transitions' own ...
     names = Regex.scan(~r/@keyframes\s+([\w-]+)/, css) |> Enum.map(&List.last/1)
-    assert Enum.sort(names) == ["vt-fade-out", "vt-rise-in"]
+    assert Enum.sort(names) == ["vt-fade-in", "vt-fade-out", "vt-in"]
 
     # ... and an `animation` property is only ever set on a ::view-transition-* pseudo-element
     for [_, selector, body] <- Regex.scan(~r/([^{}]+)\{([^{}]*)\}/, css),

@@ -42,9 +42,16 @@
   --gutter: clamp(1rem, 4vw, 2.5rem);
   --header-h: 3.5rem;
 
-  /* page transitions (see the end of this file) */
+  /* page transitions (see the end of this file). The theme toggle keeps its own
+     200ms cross-fade. A navigation enters in 400ms, decelerating, and leaves in 40%
+     of that, accelerating; the new content starts a beat after the title. */
   --vt-duration: 200ms;
   --vt-ease: ease-out;
+  --vt-enter: 400ms;
+  --vt-exit: 160ms;
+  --vt-stagger: 70ms;
+  --vt-ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --vt-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
 
   /* The page column: header, main and footer share one width, centred, on
      every page, so the brand never moves. 38rem of text is about 68 characters
@@ -91,6 +98,10 @@
 }
 
 html {
+  /* the page colour on the root itself, not only on body: the root image of a view
+     transition and anything transparent in it then start from the page, never from
+     the browser's white canvas */
+  background: var(--bg);
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
@@ -732,106 +743,240 @@ main a[href]:is(:hover, :focus-visible),
   }
 }
 
+/* ---------- entry pages: the margins go back ----------
+   On an entry page the side margins, where the field shows, are a way back to the
+   log: transitions.js goes back on a click there. The cursor says so, on devices
+   with a fine pointer only; the paper keeps the normal cursor. */
+
+@media (pointer: fine) {
+  body:is([data-page="essay"], [data-page="note"], [data-page="project"]) {
+    cursor: zoom-out;
+  }
+
+  body:is([data-page="essay"], [data-page="note"], [data-page="project"])
+    :is(.site-header, main, .site-footer) {
+    cursor: auto;
+  }
+}
+
 /* ---------- page transitions ----------
    Cross-document view transitions (SPEC section 7, Transitions): the browser
-   keeps the old page on screen, loads the new one and animates between the two.
-   No JavaScript runs on navigation, and a browser without support (Firefox)
-   simply navigates. Three prototypes are under review, picked by html[data-vt]:
-   the layout sets morph, and head.js sets it from ?vt= and keeps it for the tab.
-   Every page rule waits for the "page" type, so the theme toggle (type "theme",
-   set by theme.js) never gets them. The shared names of the morph live in the
-   generated assets/css/transitions.css. The field is not part of any of this: it
-   stays in the page's image and cross-fades with it (SPEC section 7). */
+   keeps the old page on screen, loads the new one and animates between the two. A
+   browser without support (Firefox) simply navigates. transitions.js adds the type
+   "forward" (home to an entry) or "back" (an entry to the home), and "leaving" to the
+   old page and "arriving" to the new one, and names the one shared title; every other
+   navigation has no type and gets the browser's own cross-fade. The theme toggle has
+   its own type, "theme".
+
+   The clicked log title travels to the entry's h1 and grows into it, and back; the
+   content around it rises 12px as it arrives. Going into an entry and coming back
+   mirror each other.
+
+   The fixed things never move: the field, the header, the footer and the column's
+   paper stay in the page's root image. The new root fades in over the old one (both
+   opaque, ordinary blending), so the two never add up, and that fade is also how the
+   old content leaves: the old page names nothing, its content stays in its root
+   image. What moves is named on the page that arrives. The home's and an entry's names
+   differ, so no group ever pairs a page with itself.
+
+   Three things keep a white frame out, whatever the first frame looks like.
+   - The old page is never cut into tall pictures. An essay is thousands of pixels
+     high and, named, its old image is one picture that size, which the browser can
+     fail to draw (the whole frame comes out white). Only the new page's content is
+     named (a live element, not a picture), and the old page stays in its root image,
+     which is as big as the viewport.
+   - The page colour is under every transition (html, and ::view-transition), so
+     anything transparent shows the page and not the browser's white.
+   - An image that arrives is hidden until its animation runs (opacity 0 in the rule,
+     the animation goes to 1); the frame before the animations start is the old page and
+     nothing else. And no plus-lighter anywhere: it adds two images up, and a frame
+     with both at full opacity is white. */
 
 @media (prefers-reduced-motion: no-preference) {
   @view-transition {
     navigation: auto;
-    types: page;
   }
 }
 
-/* reduced motion: no transitions at all. The two media queries never match
-   together, so this does not depend on which @view-transition rule wins. */
+/* reduced motion: no navigation transitions at all. The two media queries never
+   match together, so this does not depend on which @view-transition rule wins. */
 @media (prefers-reduced-motion: reduce) {
   @view-transition {
     navigation: none;
   }
 }
 
-/* One timing for every group: old and new inherit it from their group. */
-:root:active-view-transition-type(page)::view-transition-group(*),
+/* The theme toggle: one soft cross-fade of the whole page. */
 :root:active-view-transition-type(theme)::view-transition-group(*) {
   animation-duration: var(--vt-duration);
   animation-timing-function: var(--vt-ease);
 }
 
-/* morph: the clicked log title glides and grows into the entry's h1, and
-   everything else cross-fades, which is what the browser does by default. The
-   shared name per entry is generated (assets/css/transitions.css). Two things
-   keep the glide clean:
-   - both ends are as wide as their text, so the image of the title is scaled by
-     about the same factor as the type is (a full-width box would not be);
-   - the pointer is still on the clicked title when the old page is captured, and
-     a hovered link is an inverted bar. The page type is already active in the old
-     page at that moment, so the title is captured as plain text instead. */
-:root[data-vt="morph"] .log-title {
-  justify-self: start;
-}
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
 
-:root[data-vt="morph"] .prose > h1[class] {
-  width: fit-content;
-  max-width: 100%;
-}
-
-:root[data-vt="morph"]:active-view-transition-type(page)
-  .log-title:is(:hover, :focus-visible, :active) {
-  background: none;
-  color: inherit;
-  text-shadow: var(--halo);
-}
-
-/* fade: only the main content cross-fades. The header and the footer get names of
-   their own, so they are not part of the page's image, and no glide between their
-   old and new boxes (a short page puts the footer in a different place). Where the
-   header and footer differ (the home is unpainted, the entry pages have paper), the
-   difference still fades. */
-:root[data-vt="fade"] .site-header {
-  view-transition-name: site-header;
-}
-
-:root[data-vt="fade"] .site-footer {
-  view-transition-name: site-footer;
-}
-
-:root[data-vt="fade"]:active-view-transition-type(page)::view-transition-group(site-header),
-:root[data-vt="fade"]:active-view-transition-type(page)::view-transition-group(site-footer) {
-  animation-name: none;
-}
-
-/* rise: the old page fades out, the new page fades in while it rises 12px. The
-   image behind the pages is the page background, so the strip the rising page
-   uncovers is not the browser's canvas colour. */
-:root[data-vt="rise"]:active-view-transition-type(page)::view-transition {
-  background: var(--bg);
-}
-
-:root[data-vt="rise"]:active-view-transition-type(page)::view-transition-old(root) {
-  animation-name: vt-fade-out;
-}
-
-:root[data-vt="rise"]:active-view-transition-type(page)::view-transition-new(root) {
-  animation-name: vt-rise-in;
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes vt-fade-out {
+  from {
+    opacity: 1;
+  }
+
   to {
     opacity: 0;
   }
 }
 
-@keyframes vt-rise-in {
+/* What arrives rises 12px and settles. What leaves only fades: an old image is a still
+   picture of the old page, often a tall one (an essay), and a picture that large must
+   not be moved or scaled while it fades, or the compositor can draw it as a white
+   rectangle. */
+@keyframes vt-in {
   from {
     opacity: 0;
     transform: translateY(12px);
   }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* names: the content that moves. Only the page that arrives names its content
+   (transitions.js adds the type "arriving" to it, "leaving" to the old page): the old
+   page's content stays in its root image, which is as big as the viewport, instead of
+   becoming one very tall picture (an essay is thousands of pixels high), which the
+   browser may fail to draw: a white frame. */
+:root:active-view-transition-type(arriving) .intro {
+  view-transition-name: home-intro;
+}
+
+:root:active-view-transition-type(arriving) .log-section {
+  view-transition-name: home-log;
+}
+
+:root:active-view-transition-type(arriving) .prose {
+  view-transition-name: entry-body;
+}
+
+/* One timing for everything that moves. The old image of a group leaves quickly and
+   accelerating, in place; the new one arrives after a beat, decelerating. The new
+   image is hidden in the rule itself and only the animation shows it, so it cannot
+   appear a frame early. Normal blending throughout. */
+:root:active-view-transition-type(forward, back)::view-transition-group(*) {
+  animation-duration: var(--vt-enter);
+  animation-timing-function: var(--vt-ease-enter);
+}
+
+:root:active-view-transition-type(forward, back)::view-transition-old(*) {
+  animation: vt-fade-out var(--vt-exit) var(--vt-ease-exit) both;
+  mix-blend-mode: normal;
+}
+
+:root:active-view-transition-type(forward, back)::view-transition-new(*) {
+  opacity: 0;
+  animation: vt-in var(--vt-enter) var(--vt-ease-enter) var(--vt-stagger) both;
+  mix-blend-mode: normal;
+}
+
+/* The root image holds what stays (the field, the header, the footer and the paper of
+   the column) and, on the old page, its content too. The old one stays as it is and
+   the new one fades in over it in the time of an exit, so the old content is covered
+   as fast as it would have left, and the header and the footer text never dip. Both
+   images are opaque, so the sum cannot go above one. */
+:root:active-view-transition-type(forward, back)::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:root:active-view-transition-type(forward, back)::view-transition-new(root) {
+  opacity: 0;
+  animation: vt-fade-in var(--vt-exit) var(--vt-ease-exit) both;
+  mix-blend-mode: normal;
+}
+
+/* Under every transition, the theme toggle's too: the page colour, not the white of
+   the canvas, for anything that is transparent. */
+::view-transition {
+  background: var(--bg);
+}
+
+/* The shared title. Both ends are as wide as their text (a short title is not a
+   full-width box), so the old and new images are about the same size. */
+.log-title {
+  justify-self: start;
+}
+
+.prose > h1 {
+  width: fit-content;
+  max-width: 100%;
+}
+
+/* The title's old and new images fill the group and scale as one piece from its
+   top left corner (object-fit), so the text is never stretched, only scaled, and the
+   last frame is the real h1 at its own size. A one-line row and a two-line heading
+   are not the same picture, so they dissolve into each other where the group is
+   already moving: going in, the row fades out in the first quarter and the heading
+   comes in as that ends; coming back, the mirror image. */
+:root:active-view-transition-type(forward, back)::view-transition-old(entry-title),
+:root:active-view-transition-type(forward, back)::view-transition-new(entry-title) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: left top;
+}
+
+:root:active-view-transition-type(forward)::view-transition-old(entry-title) {
+  animation: vt-fade-out calc(var(--vt-enter) * 0.25) linear both;
+}
+
+:root:active-view-transition-type(forward)::view-transition-new(entry-title) {
+  animation: vt-fade-in calc(var(--vt-enter) * 0.3) linear calc(var(--vt-enter) * 0.12) both;
+}
+
+:root:active-view-transition-type(back)::view-transition-old(entry-title) {
+  animation: vt-fade-out calc(var(--vt-enter) * 0.3) linear calc(var(--vt-enter) * 0.58) both;
+}
+
+:root:active-view-transition-type(back)::view-transition-new(entry-title) {
+  animation: vt-fade-in calc(var(--vt-enter) * 0.25) linear calc(var(--vt-enter) * 0.75) both;
+}
+
+/* On its way the title crosses the content that is fading in. It carries a halo of
+   the paper colour, so the lines under it do not show through; once it has landed
+   the halo is paper on paper and cannot be seen. */
+:root:active-view-transition-type(forward, back) .prose > h1 {
+  text-shadow: 0 0 0.25em var(--bg), 0 0 0.5em var(--bg), 0 0 0.5em var(--bg);
+}
+
+/* A title with no partner on the other page (its row or heading was not on screen) is
+   ordinary content: it leaves, or arrives, with the rest. */
+:root:active-view-transition-type(forward, back)::view-transition-old(entry-title):only-child {
+  width: 100%;
+  height: auto;
+  object-fit: fill;
+  animation: vt-fade-out var(--vt-exit) var(--vt-ease-exit) both;
+}
+
+:root:active-view-transition-type(forward, back)::view-transition-new(entry-title):only-child {
+  width: 100%;
+  height: auto;
+  object-fit: fill;
+  animation: vt-in var(--vt-enter) var(--vt-ease-enter) var(--vt-stagger) both;
+}
+
+/* The pointer is still on the clicked title when the old page is captured (and on
+   whatever is under it when the new one is), and a hovered link is an inverted bar:
+   during a transition the log titles are captured as plain text. */
+:root:active-view-transition-type(forward, back) .log-title:is(:hover, :focus-visible, :active) {
+  background: none;
+  color: inherit;
+  text-shadow: var(--halo);
+  outline: none;
 }

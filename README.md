@@ -14,7 +14,7 @@ Personal site of Yoan Faure. A static site built by a small Elixir generator and
 ```sh
 mix deps.get       # fetch dependencies
 mix site.serve     # build and serve at http://localhost:4000 (--port to change)
-mix site.build     # write the site to dist/ (pages, assets, _headers, _redirects, robots.txt, <slug>.md twins, llms.txt, og/ share images, the generated assets/css/transitions.css)
+mix site.build     # write the site to dist/ (pages, assets, _headers, _redirects, robots.txt, <slug>.md twins, llms.txt, og/ share images)
 mix site.verify    # build twice into temporary directories and compare; fails on any difference
 mix test           # run the test suite
 ```
@@ -23,7 +23,7 @@ mix test           # run the test suite
 
 The field is a quiet backdrop of topographic contour lines on every page: behind everything on the home, only in the side margins on entry pages.
 
-Pages change with a short view transition, in three prototypes under review: add `?vt=morph` (the default), `?vt=fade` or `?vt=rise` to any URL to compare them, and the choice sticks for the tab ([SPEC.md §7](SPEC.md#7-layout-and-pages), Transitions).
+Pages change with a calm, directional view transition: the clicked log title travels into the entry's heading, and back. On an entry page a click on the side margins, or Escape, goes back to the log ([SPEC.md §7](SPEC.md#7-layout-and-pages), Transitions).
 
 `mix site.serve` applies the headers from `dist/_headers`, so a Content Security Policy violation shows locally in the same way it does in production. It does not apply `dist/_redirects`: the old Hugo URLs only redirect on Cloudflare.
 

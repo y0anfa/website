@@ -718,6 +718,7 @@ export function mountField(root) {
 
   function onVisibility() {
     docVisible = document.visibilityState !== 'hidden';
+    if (docVisible) begin();
     updateRunning();
   }
 
@@ -767,23 +768,37 @@ export function mountField(root) {
   if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', onFontsDone);
   attachPointer(!reduced);
 
+  // The first frame is drawn the moment the field is allowed to be: at once when the
+  // font is already usable (whether or not the document is visible or prerendered),
+  // otherwise as soon as it is, and never later than the page being shown (activated
+  // from a prerender, or made visible), so a page that is revealed does not show an
+  // empty field.
+  function begin() {
+    if (ready || destroyed) return;
+    ready = true;
+    layout();
+  }
+
   (async function start() {
     try {
       if (document.fonts && document.fonts.load) {
         const cs = getComputedStyle(root);
-        const wait = new Promise((r) => later(r, 2500));
-        await Promise.race([
-          Promise.all([document.fonts.load(cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily, 'M.-|/\\'), document.fonts.ready]),
-          wait,
-        ]);
+        const face = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+        const usable = document.fonts.check && document.fonts.check(face, 'M.-|/\\');
+        if (!usable) {
+          const wait = new Promise((r) => later(r, 2500));
+          await Promise.race([Promise.all([document.fonts.load(face, 'M.-|/\\'), document.fonts.ready]), wait]);
+        }
       }
     } catch (err) {
       /* fall through with whatever font we have */
     }
-    if (destroyed) return;
-    ready = true;
-    layout();
+    begin();
   })();
+
+  // Being shown ends the wait: a prerendered page that is activated draws with the
+  // font it has (the atlas is rebuilt when the font arrives, see onFontsDone).
+  document.addEventListener('prerenderingchange', begin, { once: true });
 
   const api = {
     destroy() {
@@ -797,6 +812,7 @@ export function mountField(root) {
       unlisten(mqReduce, onMotionChange);
       unlisten(mqDark, refreshTheme);
       document.removeEventListener('visibilitychange', onVisibility);
+      document.removeEventListener('prerenderingchange', begin);
       window.removeEventListener('resize', layout);
       if (document.fonts && document.fonts.removeEventListener) document.fonts.removeEventListener('loadingdone', onFontsDone);
       timers.forEach(clearTimeout);

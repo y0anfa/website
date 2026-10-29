@@ -1,6 +1,6 @@
 <article class="prose">
 <%= meta(%{parts: @meta}) %>
-  <h1 class="<%= escape(Site.Transitions.class(@entry.slug)) %>"><%= escape(@entry.title) %></h1>
+  <h1><%= escape(@entry.title) %></h1>
 <%= raw(@entry.html) %>
   <div class="entry-end">
     <p class="back"><a href="/">← log</a></p>

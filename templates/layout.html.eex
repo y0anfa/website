@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-vt="morph">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,7 +23,7 @@
 <script><%= raw(@head_js) %></script>
 <script type="speculationrules"><%= raw(@speculation) %></script>
 <link rel="stylesheet" href="/assets/css/site.css">
-<link rel="stylesheet" href="/assets/css/transitions.css">
+<script defer blocking="render" src="/assets/js/transitions.js"></script>
 <script type="module" src="/assets/js/field.js"></script>
 <%= for src <- @scripts do %><script defer src="<%= escape(src) %>"></script>
 <% end %></head>
