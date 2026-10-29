@@ -11,9 +11,6 @@ defmodule Mix.Tasks.Site.Build do
     * `--drafts` - include entries marked `draft: true`
     * `--content DIR` - content directory (default `content`)
     * `--out DIR` - output directory, deleted first (default `dist`)
-
-  Set `CF_BEACON_TOKEN` to include the Cloudflare Web Analytics beacon and its
-  Content Security Policy entries.
   """
 
   use Mix.Task

@@ -91,7 +91,7 @@ defmodule Site.BuildTest do
       File.mkdir_p!(Path.join(out, "old-dir"))
       File.write!(Path.join(out, "old-dir/x.html"), "old")
 
-      Build.run(content: fixture_copy(), out: out, beacon_token: nil)
+      Build.run(content: fixture_copy(), out: out)
 
       refute File.exists?(Path.join(out, "stale.html"))
       refute File.exists?(Path.join(out, "old-dir"))
@@ -106,7 +106,7 @@ defmodule Site.BuildTest do
       File.write!(Path.join(assets, "js/ok.js"), "ok")
 
       out = Path.join(tmp_dir(), "dist")
-      Build.run(content: fixture_copy(), out: out, assets: assets, beacon_token: nil)
+      Build.run(content: fixture_copy(), out: out, assets: assets)
 
       assert Build.files(Path.join(out, "assets")) == ["js/head.js", "js/ok.js"]
     end
@@ -346,7 +346,7 @@ defmodule Site.BuildTest do
     test "an empty log says so" do
       dir = minimal_content()
       out = Path.join(tmp_dir(), "dist")
-      Build.run(content: dir, out: out, beacon_token: nil)
+      Build.run(content: dir, out: out)
 
       assert out |> Path.join("index.html") |> File.read!() =~
                ~s(<p class="empty">nothing here yet.</p>)
@@ -461,7 +461,9 @@ defmodule Site.BuildTest do
   describe "_headers and the CSP" do
     test "the CSP allows exactly the sha256 of the inline head script", %{tree: tree} do
       expected = "sha256-" <> Base.encode64(:crypto.hash(:sha256, @head_js))
-      assert page(tree, "_headers") =~ "script-src 'self' '#{expected}'; style-src 'self';"
+
+      assert page(tree, "_headers") =~
+               "script-src 'self' '#{expected}' https://static.cloudflareinsights.com;"
 
       [inline] =
         Regex.scan(~r{<script>(.*?)</script>}s, page(tree, "index.html"))
@@ -470,43 +472,29 @@ defmodule Site.BuildTest do
       assert "sha256-" <> Base.encode64(:crypto.hash(:sha256, inline)) == expected
     end
 
-    test "_headers matches Headers.render/2", %{tree: tree} do
-      assert page(tree, "_headers") ==
-               Headers.render(Headers.script_hash(@head_js), beacon: false)
+    test "_headers matches Headers.render/1", %{tree: tree} do
+      assert page(tree, "_headers") == Headers.render(Headers.script_hash(@head_js))
     end
 
-    test "without a beacon token there is no Cloudflare anywhere", %{tree: tree} do
-      for {_path, content} <- tree, is_binary(content) do
-        refute content =~ "cloudflareinsights"
-      end
-
-      refute Map.fetch!(tree, "_headers") =~ "cloudflare"
-    end
-
-    test "with a beacon token the script tag and both hosts appear" do
-      tree = [beacon_token: "abc123DEF-_9"] |> build_fixtures() |> read_tree()
-
-      for path <- @pages do
-        assert page(tree, path) =~
-                 ~s(<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"abc123DEF-_9"}'></script>),
-               path
-      end
-
+    test "_headers always allows the two Cloudflare Web Analytics hosts", %{tree: tree} do
       headers = page(tree, "_headers")
+
       assert headers =~ "script-src 'self' 'sha256-"
       assert headers =~ "' https://static.cloudflareinsights.com;"
       assert headers =~ "connect-src 'self' https://cloudflareinsights.com;"
     end
 
-    test "an odd beacon token is refused" do
-      assert_raise Site.Error, ~r/CF_BEACON_TOKEN/, fn ->
-        build_fixtures(beacon_token: ~s(x'"><script>))
+    test "no page carries a beacon, because Cloudflare injects it at the edge", %{tree: tree} do
+      for {path, content} <- tree do
+        refute content =~ "beacon.min.js", "#{path}: beacon script"
+        refute content =~ "data-cf-beacon", "#{path}: beacon token"
       end
     end
 
-    test "an empty beacon token means no beacon" do
-      tree = [beacon_token: "  "] |> build_fixtures() |> read_tree()
-      refute page(tree, "index.html") =~ "cloudflareinsights"
+    test "the Cloudflare hosts appear in _headers and nowhere else", %{tree: tree} do
+      for {path, content} <- tree, path != "_headers" do
+        refute content =~ "cloudflareinsights", "#{path}: Cloudflare host"
+      end
     end
   end
 
@@ -546,7 +534,7 @@ defmodule Site.BuildTest do
 
       for out <- [".", File.cwd!(), "..", "/", "assets", "templates", "lib", "test", content] do
         assert_raise Site.Error, ~r/refusing to use/, fn ->
-          Build.run(content: content, out: out, beacon_token: nil)
+          Build.run(content: content, out: out)
         end
       end
     end
@@ -555,7 +543,7 @@ defmodule Site.BuildTest do
       out = build_fixtures()
       bad = minimal_content(%{"notes/n.md" => "---\ntitle: x\n---\n"})
 
-      assert_raise Site.Error, fn -> Build.run(content: bad, out: out, beacon_token: nil) end
+      assert_raise Site.Error, fn -> Build.run(content: bad, out: out) end
       assert File.exists?(Path.join(out, "index.html"))
     end
 
@@ -568,7 +556,7 @@ defmodule Site.BuildTest do
       out = Path.join(tmp_dir(), "dist")
 
       error =
-        assert_raise Site.Error, fn -> Build.run(content: dir, out: out, beacon_token: nil) end
+        assert_raise Site.Error, fn -> Build.run(content: dir, out: out) end
 
       assert error.message =~ ~s(duplicate slug "same")
       assert error.message =~ "essays/same.md"
@@ -581,7 +569,7 @@ defmodule Site.BuildTest do
       out = Path.join(tmp_dir(), "dist")
 
       error =
-        assert_raise Site.Error, fn -> Build.run(content: dir, out: out, beacon_token: nil) end
+        assert_raise Site.Error, fn -> Build.run(content: dir, out: out) end
 
       assert error.message =~ ~s(slug "robots.txt" is reserved)
       refute File.exists?(out)
@@ -595,8 +583,7 @@ defmodule Site.BuildTest do
         Build.run(
           content: fixture_copy(),
           out: Path.join(tmp_dir(), "dist"),
-          assets: assets,
-          beacon_token: nil
+          assets: assets
         )
       end
     end
@@ -610,8 +597,7 @@ defmodule Site.BuildTest do
         Build.run(
           content: fixture_copy(),
           out: Path.join(tmp_dir(), "dist"),
-          assets: assets,
-          beacon_token: nil
+          assets: assets
         )
       end
     end

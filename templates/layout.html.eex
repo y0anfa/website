@@ -18,7 +18,6 @@
 <link rel="stylesheet" href="/assets/css/site.css">
 <script type="module" src="/assets/js/field.js"></script>
 <%= for src <- @scripts do %><script defer src="<%= escape(src) %>"></script>
-<% end %><%= if @beacon_token do %><script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"<%= escape(@beacon_token) %>"}'></script>
 <% end %></head>
 <body data-page="<%= escape(@page_key) %>">
 <a class="skip-link" href="#main">skip to content</a>

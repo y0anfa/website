@@ -3,7 +3,9 @@ defmodule Site.Headers do
   The `_headers` file (Cloudflare format) and the Content Security Policy.
 
   The CSP allows exactly one inline script, `assets/js/head.js`, by its sha256.
-  The Cloudflare Web Analytics hosts are only added when a beacon token is set.
+  Cloudflare Web Analytics runs on automatic setup: Cloudflare injects the beacon
+  at the edge, so the CSP always allows its two hosts, the one third-party
+  exception.
   """
 
   @beacon_script "https://static.cloudflareinsights.com"
@@ -28,22 +30,16 @@ defmodule Site.Headers do
     "sha256-" <> Base.encode64(:crypto.hash(:sha256, script))
   end
 
-  @doc """
-  The Content Security Policy for a given inline-script hash.
-
-  Options: `:beacon` (default `false`) adds the Cloudflare Web Analytics hosts.
-  """
-  @spec csp(String.t(), keyword()) :: String.t()
-  def csp(script_hash, opts \\ []) do
-    beacon? = Keyword.get(opts, :beacon, false)
-
+  @doc "The Content Security Policy for a given inline-script hash."
+  @spec csp(String.t()) :: String.t()
+  def csp(script_hash) do
     [
       "default-src 'none'",
-      "script-src 'self' '#{script_hash}'" <> if(beacon?, do: " " <> @beacon_script, else: ""),
+      "script-src 'self' '#{script_hash}' #{@beacon_script}",
       "style-src 'self'",
       "img-src 'self'",
       "font-src 'self'",
-      "connect-src 'self'" <> if(beacon?, do: " " <> @beacon_connect, else: ""),
+      "connect-src 'self' #{@beacon_connect}",
       "manifest-src 'self'",
       "base-uri 'none'",
       "form-action 'none'",
@@ -54,9 +50,9 @@ defmodule Site.Headers do
   end
 
   @doc "Renders the `_headers` file."
-  @spec render(String.t(), keyword()) :: String.t()
-  def render(script_hash, opts \\ []) do
-    all = [{"Content-Security-Policy", csp(script_hash, opts)} | @security]
+  @spec render(String.t()) :: String.t()
+  def render(script_hash) do
+    all = [{"Content-Security-Policy", csp(script_hash)} | @security]
 
     sections = [
       {"/*", all},

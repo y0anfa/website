@@ -13,27 +13,26 @@ defmodule Site.HeadersTest do
 
   test "the CSP has exactly the directives of the spec" do
     assert Headers.csp(@hash) ==
-             "default-src 'none'; script-src 'self' '#{@hash}'; style-src 'self'; img-src 'self'; " <>
-               "font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; " <>
-               "form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests"
+             "default-src 'none'; script-src 'self' '#{@hash}' https://static.cloudflareinsights.com; " <>
+               "style-src 'self'; img-src 'self'; font-src 'self'; " <>
+               "connect-src 'self' https://cloudflareinsights.com; manifest-src 'self'; " <>
+               "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; " <>
+               "upgrade-insecure-requests"
   end
 
-  test "the beacon adds the two Cloudflare hosts and nothing else" do
-    csp = Headers.csp(@hash, beacon: true)
+  test "the CSP always allows the two Cloudflare hosts and no other third party" do
+    csp = Headers.csp(@hash)
 
     assert csp =~ "script-src 'self' '#{@hash}' https://static.cloudflareinsights.com;"
     assert csp =~ "connect-src 'self' https://cloudflareinsights.com;"
 
-    assert String.replace(
-             csp,
-             [" https://static.cloudflareinsights.com", " https://cloudflareinsights.com"],
-             ""
-           ) ==
-             Headers.csp(@hash)
+    hosts = ~r{https?://[^\s;']+} |> Regex.scan(csp) |> List.flatten() |> Enum.sort()
+    assert hosts == ["https://cloudflareinsights.com", "https://static.cloudflareinsights.com"]
+    refute csp =~ "*"
   end
 
   test "the CSP never allows inline styles or eval" do
-    csp = Headers.csp(@hash, beacon: true)
+    csp = Headers.csp(@hash)
     refute csp =~ "unsafe-inline"
     refute csp =~ "unsafe-eval"
     refute csp =~ "style-src 'self' '"
@@ -43,6 +42,8 @@ defmodule Site.HeadersTest do
     text = Headers.render(@hash)
 
     assert String.starts_with?(text, "/*\n  Content-Security-Policy: default-src 'none'; ")
+    assert text =~ " https://static.cloudflareinsights.com; "
+    assert text =~ " https://cloudflareinsights.com; "
     assert text =~ "\n  Strict-Transport-Security: max-age=63072000; includeSubDomains\n"
     assert text =~ "\n  X-Content-Type-Options: nosniff\n"
     assert text =~ "\n  X-Frame-Options: DENY\n"

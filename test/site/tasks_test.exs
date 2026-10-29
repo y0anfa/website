@@ -51,24 +51,6 @@ defmodule Site.TasksTest do
     test "unknown options are rejected" do
       assert_raise OptionParser.ParseError, fn -> Mix.Tasks.Site.Build.run(["--nope"]) end
     end
-
-    test "CF_BEACON_TOKEN switches the beacon on" do
-      previous = System.get_env("CF_BEACON_TOKEN")
-      on_exit(fn -> restore_env("CF_BEACON_TOKEN", previous) end)
-
-      out = Path.join(tmp_dir(), "dist")
-      content = fixture_copy()
-
-      System.put_env("CF_BEACON_TOKEN", "tok123")
-      Mix.Tasks.Site.Build.run(["--content", content, "--out", out])
-      assert File.read!(Path.join(out, "index.html")) =~ ~s(data-cf-beacon='{"token":"tok123"}')
-      assert File.read!(Path.join(out, "_headers")) =~ "static.cloudflareinsights.com"
-
-      System.delete_env("CF_BEACON_TOKEN")
-      Mix.Tasks.Site.Build.run(["--content", content, "--out", out])
-      refute File.read!(Path.join(out, "index.html")) =~ "cloudflareinsights"
-      refute File.read!(Path.join(out, "_headers")) =~ "cloudflare"
-    end
   end
 
   describe "mix site.verify" do
@@ -91,7 +73,4 @@ defmodule Site.TasksTest do
   end
 
   defp tmp_verify_dirs, do: Path.wildcard(Path.join(System.tmp_dir!(), "site-verify-*"))
-
-  defp restore_env(name, nil), do: System.delete_env(name)
-  defp restore_env(name, value), do: System.put_env(name, value)
 end

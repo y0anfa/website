@@ -52,8 +52,7 @@ defmodule Site.TestHelpers do
   def build_fixtures(opts \\ []) do
     out = Path.join(tmp_dir("site-out"), "dist")
     content = Keyword.get_lazy(opts, :content, &fixture_copy/0)
-    opts = opts |> Keyword.delete(:content) |> Keyword.put_new(:beacon_token, nil)
-    Site.Build.run([content: content, out: out] ++ opts)
+    Site.Build.run([content: content, out: out] ++ Keyword.delete(opts, :content))
     out
   end
 end

@@ -58,7 +58,7 @@ Text is Inter (variable, `assets/fonts/InterVariable.woff2` and `InterVariable-I
 
 A push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml). It can also be started by hand with `workflow_dispatch`.
 
-1. **build** checks out the full history, which the commit hashes need. It sets up Erlang and Elixir from `.tool-versions`, restores the dependency and `_build` cache, then runs the format check, the tests, `site.verify` and `site.build` in `prod` mode. The `dist/` directory is uploaded as an artifact. The Web Analytics beacon is included only when the repo variable `CF_BEACON_TOKEN` is set.
+1. **build** checks out the full history, which the commit hashes need. It sets up Erlang and Elixir from `.tool-versions`, restores the dependency and `_build` cache, then runs the format check, the tests, `site.verify` and `site.build` in `prod` mode. The `dist/` directory is uploaded as an artifact. No repo variable or token is needed: Cloudflare Web Analytics runs on automatic setup, so Cloudflare injects the beacon at the edge.
 2. **deploy** runs only for `main`, in the `production` environment. It downloads `dist/`, runs `wrangler deploy` for the site, then for the redirect Worker, with a pinned wrangler version. The Cloudflare secrets are used only in this job.
 
 `wrangler.jsonc` defines an assets-only Worker with `yoanfaure.com` as its custom domain. A second step deploys the redirect Worker in `redirect/`, after the site.
@@ -74,14 +74,13 @@ Owner steps still open:
 
 1. In Cloudflare, turn on **Always Use HTTPS** and turn off **Email Address Obfuscation** for `yoanfaure.com`.
 2. Set up Email Routing for `hi@yoanfaure.com`.
-3. In Cloudflare Web Analytics, add `yoanfaure.com` and put its token in the GitHub repo *variable* `CF_BEACON_TOKEN`. It is a variable, not a secret, because the beacon sends it to the browser.
-4. Re-enable DNSSEC for both zones in Cloudflare, and add each DS record at its registrar.
-5. Optional, later: submit `yoanfaure.com` to the HSTS preload list. The list requires the `preload` directive, which the `Strict-Transport-Security` header in `_headers` does not have yet.
+3. Re-enable DNSSEC for both zones in Cloudflare, and add each DS record at its registrar.
+4. Optional, later: submit `yoanfaure.com` to the HSTS preload list. The list requires the `preload` directive, which the `Strict-Transport-Security` header in `_headers` does not have yet.
 
 ## Security
 
-- The Content Security Policy is strict. Scripts come only from `'self'` and one hashed inline script (`assets/js/head.js`), plus the beacon when it is enabled. There are no inline styles or event handlers.
-- There are no third-party assets. The one exception is the optional Cloudflare Web Analytics beacon, included only when `CF_BEACON_TOKEN` is set.
+- The Content Security Policy is strict. Scripts come only from `'self'` and one hashed inline script (`assets/js/head.js`), plus the Cloudflare Web Analytics beacon, which Cloudflare injects at the edge. There are no inline styles or event handlers.
+- There are no third-party assets. The one exception is the Cloudflare Web Analytics beacon: the CSP always allows `static.cloudflareinsights.com` (scripts) and `cloudflareinsights.com` (connections), and the built pages carry no beacon tag.
 - Commits are signed with an SSH key registered on GitHub as a signing key. Security headers are generated into `dist/_headers` at build time.
 - Every third-party action is pinned to a full commit SHA, with the release version in a comment.
 - The build is deterministic. `mix site.verify` checks it, and CI runs it before every deploy.

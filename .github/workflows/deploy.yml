@@ -49,13 +49,9 @@ jobs:
         run: MIX_ENV=prod mix deps.get
 
       - name: Verify build is deterministic
-        env:
-          CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
         run: MIX_ENV=prod mix site.verify
 
       - name: Build site
-        env:
-          CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
         run: MIX_ENV=prod mix site.build
 
       - name: Upload dist

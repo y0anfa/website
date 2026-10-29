@@ -9,7 +9,6 @@ defmodule Site.Render do
 
   @type context :: %{
           required(:head_js) => String.t(),
-          required(:beacon_token) => String.t() | nil,
           required(:build) => %{label: String.t(), href: String.t() | nil}
         }
 
@@ -90,7 +89,6 @@ defmodule Site.Render do
       page_key: Keyword.fetch!(opts, :page_key),
       scripts: Keyword.get(opts, :scripts, [@theme_script]),
       head_js: context.head_js,
-      beacon_token: context.beacon_token,
       build: context.build,
       content: inner
     })

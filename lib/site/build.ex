@@ -14,8 +14,6 @@ defmodule Site.Build do
 
   alias Site.{Content, Headers, Redirects, Render}
 
-  @beacon_token ~r/\A[A-Za-z0-9_-]+\z/
-
   @type result :: %{out: Path.t(), files: non_neg_integer()}
 
   @doc """
@@ -27,8 +25,6 @@ defmodule Site.Build do
     * `:out` - output directory, deleted first (default `"dist"`)
     * `:assets` - assets directory (default `"assets"`)
     * `:drafts` - include entries marked `draft: true` (default `false`)
-    * `:beacon_token` - Cloudflare Web Analytics token; defaults to the
-      `CF_BEACON_TOKEN` environment variable, `nil` leaves the beacon out
 
   Raises `Site.Error` when the content or the options are invalid.
   """
@@ -39,8 +35,7 @@ defmodule Site.Build do
         content: "content",
         out: "dist",
         assets: "assets",
-        drafts: false,
-        beacon_token: :env
+        drafts: false
       )
 
     content_dir = Keyword.fetch!(opts, :content)
@@ -51,18 +46,16 @@ defmodule Site.Build do
 
     content = Content.load(content_dir, drafts: Keyword.fetch!(opts, :drafts))
     head_js = read_head_js!(assets)
-    beacon_token = beacon_token(Keyword.fetch!(opts, :beacon_token))
 
     context = %{
       head_js: head_js,
-      beacon_token: beacon_token,
       build: Site.View.build_info(Site.Git.head("."))
     }
 
     pages = Render.pages(content, context)
 
     extras = [
-      {"_headers", Headers.render(Headers.script_hash(head_js), beacon: beacon_token != nil)},
+      {"_headers", Headers.render(Headers.script_hash(head_js))},
       {"_redirects", Redirects.render()},
       {"robots.txt", "User-agent: *\nAllow: /\n"}
     ]
@@ -121,24 +114,6 @@ defmodule Site.Build do
     end
 
     script
-  end
-
-  defp beacon_token(:env), do: beacon_token(System.get_env("CF_BEACON_TOKEN"))
-  defp beacon_token(nil), do: nil
-
-  defp beacon_token(token) when is_binary(token) do
-    token = String.trim(token)
-
-    cond do
-      token == "" ->
-        nil
-
-      Regex.match?(@beacon_token, token) ->
-        token
-
-      true ->
-        raise Site.Error, message: "CF_BEACON_TOKEN may only contain letters, digits, - and _"
-    end
   end
 
   defp write!(out, file, data) do

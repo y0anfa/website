@@ -26,7 +26,7 @@ It shows who he is, what he thinks, and what he makes.
 | Motion | Only the field moves. Everything else is static. `prefers-reduced-motion` gets a static field frame. |
 | Build | Hand-rolled static generator in Elixir: EEx templates, MDEx for Markdown, YamlElixir for frontmatter. |
 | Hosting | Cloudflare Workers, assets-only, deployed by GitHub Actions with wrangler. |
-| Analytics | Cloudflare Web Analytics beacon, the single third-party exception in the CSP, included only when `CF_BEACON_TOKEN` is set at build time. |
+| Analytics | Cloudflare Web Analytics with automatic setup: Cloudflare injects the beacon into the HTML at the edge, so the pages carry no beacon tag and no repo variable or token is needed. The CSP allows its two hosts, the single third-party exception. |
 | Security | Strict CSP, no third-party assets, security headers via `_headers`, signed commits, deterministic build checked in CI. |
 | Contact | `hi@yoanfaure.com` (Cloudflare Email Routing) and LinkedIn `https://linkedin.com/in/yoan-faure`. |
 | Repo | `y0anfa/website` (formerly `y0anfa/yoanfau.re`), fresh orphan history on `main`. The old Hugo site is on `archive/hugo`. |
@@ -239,7 +239,7 @@ A quiet, fixed, full-viewport layer behind every page: a watermark you notice af
 
 ```
 /*
-  Content-Security-Policy: default-src 'none'; script-src 'self' '<head.js sha256>'[ https://static.cloudflareinsights.com]; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'[ https://cloudflareinsights.com]; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'none'; script-src 'self' '<head.js sha256>' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
   Strict-Transport-Security: max-age=63072000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
@@ -251,7 +251,7 @@ A quiet, fixed, full-viewport layer behind every page: a watermark you notice af
   Cache-Control: public, max-age=31536000, immutable
 ```
 
-The bracketed Cloudflare hosts appear only when `CF_BEACON_TOKEN` is set. In that case every page also gets `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"…"}'></script>`.
+The two Cloudflare hosts are always in the CSP, because Web Analytics runs on automatic setup: Cloudflare injects `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"…"}'></script>` into the HTML at the edge. The build never writes that tag, so no built page contains `beacon.min.js` or `data-cf-beacon`.
 The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `dist/_redirects` (§4) sits next to `_headers`; Cloudflare reads both from the assets directory, and the build writes both.
 **Never** use inline `style=""` attributes, inline `<style>`, inline event handlers, or any inline script other than head.js.
 
@@ -260,9 +260,9 @@ The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `di
 - **`wrangler.jsonc`:** an assets-only Worker named `yoanfaure` with `assets.directory: ./dist`, `not_found_handling: "404-page"` and `html_handling: "auto-trailing-slash"`. `yoanfaure.com` is its custom domain (`routes`), so Cloudflare owns the apex record and certificate.
 - **`redirect/`:** a script Worker named `yoanfau-re` (the old site Worker's name, so `yoanfau.re` stays attached) with custom domains `yoanfau.re` and `www.yoanfaure.com`. It answers every request with a 301 to the same path and query on `https://yoanfaure.com`, plus HSTS. Old Hugo paths then resolve through the site's `_redirects`. `www.yoanfau.re` reaches it through a Redirect Rule to the `yoanfau.re` apex.
 - **`.github/workflows/deploy.yml`** runs on push to `main` and on `workflow_dispatch`, with least-privilege permissions. **Every third-party action is pinned to a full commit SHA** with a `# vX.Y.Z` comment.
-  - The **build** job: checkout with `fetch-depth: 0` (needed for per-file hashes), then `erlef/setup-beam` with `version-file: .tool-versions` and `version-type: strict`, a deps cache, `mix format --check-formatted`, `mix test`, `MIX_ENV=prod mix site.verify`, and `MIX_ENV=prod mix site.build` with `CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}`. It uploads `dist`.
+  - The **build** job: checkout with `fetch-depth: 0` (needed for per-file hashes), then `erlef/setup-beam` with `version-file: .tool-versions` and `version-type: strict`, a deps cache, `mix format --check-formatted`, `mix test`, `MIX_ENV=prod mix site.verify`, and `MIX_ENV=prod mix site.build`. It uploads `dist`.
   - The **deploy** job (only on `main`) runs `cloudflare/wrangler-action` with secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`: the site first, then `deploy --config redirect/wrangler.jsonc`, so the old domain only redirects once the new one serves. The token must cover both zones.
-- **Owner steps still open** (README, Domains): Always Use HTTPS and no Email Address Obfuscation on `yoanfaure.com`, Email Routing for `hi@`, the `CF_BEACON_TOKEN` variable, and DNSSEC on both zones. Mail for `@yoanfau.re` stays on OVH.
+- **Owner steps still open** (README, Domains): Always Use HTTPS and no Email Address Obfuscation on `yoanfaure.com`, Email Routing for `hi@`, and DNSSEC on both zones. Mail for `@yoanfau.re` stays on OVH.
 
 ## 13. Launch content
 
