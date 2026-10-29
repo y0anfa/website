@@ -2,6 +2,7 @@
 title: Security pays in more than one currency
 date: 2026-10-28
 description: Risk reduced is one return. Business enabled and human time saved are others.
+draft: true
 ---
 
 Security teams usually report in one currency: risk reduced. It is real and it is hard to measure. The number moves slowly, and nobody can prove which incident didn't happen.

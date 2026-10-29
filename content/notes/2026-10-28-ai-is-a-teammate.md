@@ -2,6 +2,7 @@
 title: AI is a teammate
 date: 2026-10-28
 description: Give an agent the legwork of alert triage and treat it like a junior colleague.
+draft: true
 ---
 
 Many security teams treat AI as a threat to contain. The usual response is a block and a policy. People use the tools anyway, on their phones, and security hears about it last.

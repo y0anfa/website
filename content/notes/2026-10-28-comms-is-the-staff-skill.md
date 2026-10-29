@@ -2,6 +2,7 @@
 title: Comms is the staff skill
 date: 2026-10-28
 description: Writing the one-page memo that gets a control funded is security work.
+draft: true
 ---
 
 Security engineers often prefer a stack trace to a memo. Comms and politics feel like overhead on top of the real work.

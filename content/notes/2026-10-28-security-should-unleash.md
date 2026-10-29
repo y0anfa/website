@@ -2,6 +2,7 @@
 title: Security should unleash
 date: 2026-10-28
 description: A security review that ships the feature is worth more than one that blocks it.
+draft: true
 ---
 
 A team asks for a security review of a feature that stores customer files. The review comes back three weeks later with a list of concerns and no recommendation. The launch slips. Next time, the team asks for review later, or not at all.
