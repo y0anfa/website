@@ -90,7 +90,7 @@ defmodule Site.TemplatesTest do
   test "the layout loads field.js as a module, with no preset switch" do
     layout = File.read!("templates/layout.html.eex")
 
-    assert layout =~ ~S(<html lang="en">)
+    assert layout =~ ~S(<html lang="en" data-vt="morph">)
     assert layout =~ ~S(<script type="module" src="/assets/js/field.js"></script>)
     refute layout =~ "data-field="
   end

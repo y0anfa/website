@@ -4,7 +4,8 @@ defmodule Site.Log do
 
   Sorted by date descending, then type (essay, project, note), then title
   ascending. Each row carries the short hash of the last commit that touched the
-  entry's file, linked to GitHub, or seven middle dots when there is none.
+  entry's file, linked to GitHub, or seven middle dots when there is none, and the
+  `vt-<slug>` class of its title (`Site.Transitions`).
   """
 
   alias Site.Entry
@@ -17,7 +18,8 @@ defmodule Site.Log do
           date: String.t(),
           type: String.t(),
           title: String.t(),
-          href: String.t()
+          href: String.t(),
+          vt: String.t()
         }
 
   @doc "The placeholder shown for an entry that is not committed yet."
@@ -45,7 +47,8 @@ defmodule Site.Log do
       date: Date.to_iso8601(entry.date),
       type: Atom.to_string(entry.type),
       title: entry.title,
-      href: Entry.path(entry)
+      href: Entry.path(entry),
+      vt: Site.Transitions.class(entry.slug)
     }
   end
 

@@ -59,9 +59,11 @@ defmodule Site.BuildTest do
 
     test "every entry is one flat page, whatever its type", %{tree: tree} do
       # an essay, a note and a project all live at /<slug>/
-      assert page(tree, "first-essay/index.html") =~ "<h1>First essay</h1>"
-      assert page(tree, "small-note/index.html") =~ "<h1>Small note</h1>"
-      assert page(tree, "widget/index.html") =~ "<h1>widget</h1>"
+      assert page(tree, "first-essay/index.html") =~
+               ~s(<h1 class="vt-first-essay">First essay</h1>)
+
+      assert page(tree, "small-note/index.html") =~ ~s(<h1 class="vt-small-note">Small note</h1>)
+      assert page(tree, "widget/index.html") =~ ~s(<h1 class="vt-widget">widget</h1>)
 
       # and the folders of the content tree are not URL segments
       for dir <- ~w(essays notes projects uses cv) do
@@ -126,7 +128,9 @@ defmodule Site.BuildTest do
       out = Path.join(tmp_dir(), "dist")
       Build.run(content: fixture_copy(), out: out, assets: assets)
 
-      assert Build.files(Path.join(out, "assets")) == ["js/head.js", "js/ok.js"]
+      # the stylesheet of the page transitions is generated, not copied
+      assert Build.files(Path.join(out, "assets")) ==
+               ["css/transitions.css", "js/head.js", "js/ok.js"]
     end
   end
 
@@ -173,21 +177,25 @@ defmodule Site.BuildTest do
       refute page(tree, "404.html") =~ "og:url"
     end
 
-    test "the page sets the lang, with no field preset attribute", %{tree: tree} do
+    test "the page sets the lang and the default transition, with no field preset attribute",
+         %{tree: tree} do
       for path <- @pages do
-        assert page(tree, path) =~ ~s(<html lang="en">), path
+        assert page(tree, path) =~ ~s(<html lang="en" data-vt="morph">), path
+        refute page(tree, path) =~ "data-field=", path
       end
     end
 
-    test "head.js only restores the theme" do
+    test "head.js restores the theme and the transition prototype, and nothing else" do
       assert @head_js =~ "localStorage.getItem('theme')"
-      refute @head_js =~ "sessionStorage"
+      assert @head_js =~ "sessionStorage"
+      assert @head_js =~ "vt"
       refute @head_js =~ "field"
     end
 
-    test "the stylesheet is linked and no script is deferred wrongly", %{tree: tree} do
+    test "the stylesheets are linked and no script is deferred wrongly", %{tree: tree} do
       html = page(tree, "index.html")
       assert html =~ ~s(<link rel="stylesheet" href="/assets/css/site.css">)
+      assert html =~ ~s(<link rel="stylesheet" href="/assets/css/transitions.css">)
       assert html =~ ~s(<script defer src="/assets/js/theme.js"></script>)
     end
   end
@@ -324,7 +332,8 @@ defmodule Site.BuildTest do
       html = page(tree, "index.html")
 
       titles =
-        Regex.scan(~r{<a class="log-title" href="([^"]+)">}, html) |> Enum.map(&List.last/1)
+        Regex.scan(~r{<a class="log-title vt-[a-z0-9-]+" href="([^"]+)">}, html)
+        |> Enum.map(&List.last/1)
 
       assert titles == [
                "/second-essay/",
@@ -380,7 +389,7 @@ defmodule Site.BuildTest do
       assert html =~
                ~s(<p class="meta"><span>essay</span> · <time datetime="2026-03-28">2026-03-28</time> · <span>·······</span></p>)
 
-      assert html =~ "<h1>First essay</h1>"
+      assert html =~ ~s(<h1 class="vt-first-essay">First essay</h1>)
       assert html =~ ~s(<h2 id="a-heading">)
       assert html =~ ~s(<p class="back"><a href="/">← log</a></p>)
       assert html =~ "<table>"
@@ -406,7 +415,9 @@ defmodule Site.BuildTest do
       html = page(tree, "widget/index.html")
 
       assert html =~ ~s(<article class="prose project">)
-      assert html =~ ~r{<h1>widget</h1>\s*<p class="tagline">A small widget for the fixtures.</p>}
+
+      assert html =~
+               ~r{<h1 class="vt-widget">widget</h1>\s*<p class="tagline">A small widget for the fixtures.</p>}
 
       assert html =~
                ~s(<p class="meta"><span>active</span> · <span>Elixir, YAML</span> · <a href="https://example.com/widget">example.com/widget</a></p>)
@@ -442,7 +453,7 @@ defmodule Site.BuildTest do
       assert html =~
                ~s(<meta name="description" content="A &quot;quoted&quot; &lt;description&gt; &amp; more">)
 
-      assert html =~ "<h1>#{title}</h1>"
+      assert html =~ ~s(<h1 class="vt-escape-me">#{title}</h1>)
     end
 
     test "no page contains an unexpected inline script", %{tree: tree} do

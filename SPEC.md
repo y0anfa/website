@@ -23,7 +23,8 @@ It shows who he is, what he thinks, and what he makes.
 | Signature | A quiet backdrop of topographic contour lines in ASCII, fixed behind every page: on the home it shows behind everything, on inner pages only in the side margins. (Water and wind presets were tried and dropped at review.) |
 | Type | Inter (variable, self-hosted) for all text and UI. JetBrains Mono 400, self-hosted, only for code, the log's hash and date, and the backdrop field. |
 | Color | Monochrome only. Light and dark follow the system, with a manual toggle. |
-| Motion | Only the field moves. Everything else is static. `prefers-reduced-motion` gets a static field frame. |
+| Motion | The field moves, and pages change with a short cross-document view transition (§7, Transitions). Nothing else moves, and no JavaScript runs on navigation. `prefers-reduced-motion` gets a static field frame and no transitions. |
+| Page transitions | **Three prototypes, under review:** `morph` (the clicked log title glides into the entry's h1; the default), `fade` (the header and footer stay still, the main content cross-fades) and `rise` (the old page fades out, the new one fades in 12px lower). `?vt=morph\|fade\|rise` switches between them for the review (§7, Transitions). **After review the losers get deleted**: their CSS, the `?vt=` code in `head.js` and the `data-vt` default in the layout go, and if `morph` is not the winner so do `Site.Transitions`, the generated `transitions.css` and the `vt-<slug>` classes, with their tests. |
 | Build | Hand-rolled static generator in Elixir: EEx templates, MDEx for Markdown, YamlElixir for frontmatter. |
 | Hosting | Cloudflare Workers, assets-only, deployed by GitHub Actions with wrangler. |
 | Analytics | Cloudflare Web Analytics with automatic setup: Cloudflare injects the beacon into the HTML at the edge, so the pages carry no beacon tag and no repo variable or token is needed. The CSP allows its two hosts, the single third-party exception. |
@@ -50,8 +51,8 @@ It shows who he is, what he thinks, and what he makes.
 ├── content/                   all words live here: home.md and essays/, notes/, projects/ (see §5)
 ├── assets/                    copied verbatim to dist/assets/
 │   ├── css/site.css
-│   ├── js/head.js             inlined into <head>; its sha256 goes in the CSP
-│   ├── js/theme.js            theme toggle
+│   ├── js/head.js             inlined into <head>; its sha256 goes in the CSP; applies the saved theme and the ?vt= prototype
+│   ├── js/theme.js            theme toggle (a cross-fade when view transitions are supported)
 │   ├── js/field.js            the ASCII field (ES module)
 │   ├── js/404.js              fills the missing path on the 404 page
 │   ├── js/favicon.js          swaps the favicon to the sleeping one while the tab is hidden
@@ -175,7 +176,7 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 
 - **hash:** the first 7 characters of `git log -1 --format=%H -- <file>`. It links to `https://github.com/y0anfa/website/commit/<full sha>`. An untracked or uncommitted file, or no git at all, shows `·······` (7 middle dots) with no link.
 - **date:** `YYYY-MM-DD`. **type:** `essay` / `note` / `project`, the label for the folder the entry lives in. **title:** links to the entry at `/<slug>/`.
-- **Markup:** `<ol class="log">` > `<li class="log-row">` > `<a class="log-hash">`, `<time class="log-date">`, `<span class="log-type">`, `<a class="log-title">`.
+- **Markup:** `<ol class="log">` > `<li class="log-row">` > `<a class="log-hash">`, `<time class="log-date">`, `<span class="log-type">`, `<a class="log-title vt-<slug>">` (the `vt-<slug>` class names the title for the `morph` transition, §7).
 - **Fonts:** the hash and the date are JetBrains Mono (`.log-hash`, `.log-date`, at 0.8em, muted). The type and the title are Inter: the type is muted and regular, the title is 600 weight.
 - **Layout:** a CSS grid: `max-content max-content 3.75em 1fr`. The mono cells are `7ch` and `10ch` wide, in their own font, so the two mono columns line up in every row whatever the row's font; the sans type gets a fixed track in `em`. Under ~600px it becomes two lines: hash and date, then type and title (a `4em` first track, so the title stays aligned with the date).
 - There are no list pages: the log appears on the home only.
@@ -194,7 +195,7 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 - `main#main`.
 - `footer.site-footer`: `hi@yoanfaure.com · linkedin` on the left; `built from <a>a3f9c21</a>` on the right, linking to the HEAD commit (`-dirty` suffix if the tree is dirty, `unversioned` with no git).
 - `<title>`: `<Page> — Yoan Faure` (home: `Yoan Faure — security engineer who builds`). Also meta description, canonical, `og:title/description/url/type`, `og:image` with its width, height and alt, and `twitter:card` (`summary_large_image`; the 404 has no image and keeps `summary`; share images, §4), favicon, and a preload for the Inter variable font (`/assets/fonts/InterVariable.woff2`, with `crossorigin`). An entry page also has `<link rel="alternate" type="text/markdown" href="/<slug>.md">` (§4).
-- `<html lang="en">`. The inline head script (`assets/js/head.js`) only applies `localStorage.theme` (`light` / `dark`) to `data-theme`, before first paint.
+- `<html lang="en" data-vt="morph">`. The inline head script (`assets/js/head.js`) applies `localStorage.theme` (`light` / `dark`) to `data-theme`, and the page-transition prototype from `?vt=` or `sessionStorage` to `data-vt` (Transitions below), before first paint. Two stylesheets are linked, `/assets/css/site.css` and then the generated `/assets/css/transitions.css`.
 - A second inline script, `<script type="speculationrules">`, is in every page's `<head>`. Its text is the constant in `Site.Speculation`: prerender same-origin page links (`href_matches: "/*"`) with `eagerness: "moderate"` (a hover or focus hint), except `/*.md`, `/llms.txt`, `/assets/*` and any link with `rel~=nofollow`. The CSP allows it by its sha256 (§11). Browsers without Speculation Rules ignore it.
 - `<script type="module" src="/assets/js/field.js">` is loaded on every page, from the shared layout. `theme.js` and `favicon.js` (and `404.js` on the 404) are plain `defer` scripts.
 - **Favicon.** `assets/favicon.svg` is the mark: a 32×32 rounded square with a `>_` prompt, light and dark by media query. `assets/favicon-sleep.svg` is the same square with a sleeping prompt: the `>` and a small z z, drawn with paths only. `favicon.js` swaps the `link[rel=icon]` href to the sleeping one when the tab becomes hidden (`visibilitychange`) and back when it is visible. It touches no markup.
@@ -218,14 +219,23 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
   - The log is the dominant element, at 1.125rem with about 0.95rem of padding above and below each row. Its grid is the one in §6, so under ~600px each row is still two lines. This is the only list on the site.
 
 **Entries** are a centred reading column. The page column is 38rem of text (about 68 characters of Inter). The opaque "paper" column stays, so the field shows only in the side margins; the header and footer align to the same column.
-- **Article (essay, note):** `article.prose`. A small, muted meta line `essay · 2026-03-28 · <hash link>` (0.875rem) above the h1, then h1, then the body, then a `← log` back link to `/`. The body is 1.125rem with line-height 1.7, paragraphs 1.35em apart, h2 at 1.5rem with 2.75rem above it. Lists use plain markers, tables are ruled, and code is mono (`pre` 0.875rem).
-- **Project:** `article.prose.project`. h1, tagline, a meta line `status · stack · link`, then the body and the same `← log` back link.
+- **Article (essay, note):** `article.prose`. A small, muted meta line `essay · 2026-03-28 · <hash link>` (0.875rem) above the h1 (class `vt-<slug>`, like the entry's log title), then h1, then the body, then a `← log` back link to `/`. The body is 1.125rem with line-height 1.7, paragraphs 1.35em apart, h2 at 1.5rem with 2.75rem above it. Lists use plain markers, tables are ruled, and code is mono (`pre` 0.875rem).
+- **Project:** `article.prose.project`. h1 (class `vt-<slug>`), tagline, a meta line `status · stack · link`, then the body and the same `← log` back link.
 - **Entry links (article and project).** Under the body, one quiet row (`div.entry-end`, on the back link's hairline): the `← log` back link on the left, and on the right, in 0.875rem muted lowercase, `markdown` and `ask claude ↗` (`p.entry-links`, separated by ` · `).
   - `markdown` links to `/<slug>.md`, the entry's twin (§4).
   - `ask claude ↗` links to `https://claude.ai/new?q=<prompt>`, with `rel="noopener"`, no `target` (same tab). The prompt is `Read https://yoanfaure.com/<slug>/ by Yoan Faure, a security engineer. Using only what is on that page, summarize the main argument in a few sentences, then tell me where you would push back.` For a project, the end is `summarize what the project does and why, then suggest one improvement.`
   - The prompt is URI-encoded (everything but unreserved characters, so a space is `%20`) in `Site.View.ask_url/1`, then HTML-escaped as an attribute by the template.
 
 **404:** two `<pre>` lines (so they are mono): `zsh: no such file or directory: <span data-path></span>`, then `% cd ~` with `cd ~` linking home. `404.js` fills `data-path` via `textContent`.
+
+**Transitions (three prototypes, under review).** Pages change with cross-document view transitions, in CSS only: `@view-transition { navigation: auto; types: page; }` in `site.css`, inside `prefers-reduced-motion: no-preference`, and `@view-transition { navigation: none; }` inside `reduce` (the two queries never match together, so which rule wins does not matter). No JavaScript runs on navigation, and a browser without support (Firefox) navigates instantly. Every `::view-transition-group(*)` gets `animation-duration: var(--vt-duration)` (`--vt-duration: 200ms`) and `animation-timing-function: var(--vt-ease)` (`ease-out`); the old and new images inherit both. `html[data-vt]` picks the prototype, and every rule that styles the transition sits under `:root[data-vt="…"]:active-view-transition-type(page)`, so the theme toggle (type `theme`) never gets it.
+
+- **`morph`** (the layout's default). The clicked log title glides and grows into the entry's h1; everything else cross-fades, which is the browser's default. Both elements share a `view-transition-name`, which must be unique on a page and cannot be an inline style, so the build generates `dist/assets/css/transitions.css` (`Site.Transitions`, linked after `site.css`): one rule per entry, in slug order, `:root[data-vt="morph"] .vt-<slug> { view-transition-name: entry-<slug>; }`. The templates add the class `vt-<slug>` to the log title link (`_log`) and to the h1 of the article and project pages. A slug is kebab-case (§5), and both prefixes keep the identifier valid CSS even for a slug that starts with a digit (`vt-2026-recap`); anything else raises. The title and the h1 are as wide as their text (`justify-self: start`, `width: fit-content`), so the old image scales by about the factor the type does. The pointer is still on the clicked title when the old page is captured, which would show an inverted bar, so under `:active-view-transition-type(page)` (already active in the old page) the title is captured as plain text.
+- **`fade`.** Only the main content cross-fades. `.site-header` and `.site-footer` get their own names (`site-header`, `site-footer`), so they leave the page's image, and their groups have `animation-name: none`: no glide between the old and new box (a short page puts the footer elsewhere). Where they differ, the home is unpainted and entries have paper, the difference still fades.
+- **`rise`.** `::view-transition-old(root)` fades out (`vt-fade-out`) and `::view-transition-new(root)` fades in from `translateY(12px)` to 0 (`vt-rise-in`). `::view-transition` is painted with `--bg`, so the strip the rising page uncovers is not the browser's canvas colour.
+- **The switch.** `?vt=morph|fade|rise` on any URL sets `html[data-vt]` and is remembered in `sessionStorage`, so it holds for the tab while the links stay plain. Anything else is ignored. It is a few lines in `head.js`, each storage access in `try`/`catch`. The layout sets `data-vt="morph"`, so the CSS works with no storage at all.
+- **Theme toggle.** `theme.js` calls `document.startViewTransition({ update, types: ['theme'] })` when it exists and `prefers-reduced-motion` is not `reduce`, and otherwise switches at once (an engine that only knows the callback form throws on the options object and falls back to the same). The result is one soft cross-fade of the whole page, `--vt-duration`, `--vt-ease`. A second click before the first update still toggles back, and a skipped transition is not an error.
+- **The field.** It stays out of all this: no `view-transition-name`, so it is part of the page's image and cross-fades with it. It does not flash blank or jump on arrival, so there was nothing to fix: until `field.js` paints, the canvas has no size and draws nothing, and with the fonts cached a re-mounted field paints in the first frame after the mount (checked in the browser), which is inside the fade-in, while the new image is still nearly transparent. Each page seeds its own map, so the old contours dissolve into new ones, which is calmer than a cut. Naming it was rejected: every named group is painted above the page's image, so the field would be drawn over the opaque column and the text for 200ms and then drop behind them. `field.js` is unchanged.
 
 ## 8. Visual system
 
@@ -236,7 +246,7 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 --bg: #1e1d1b;  --fg: #ece6d9;  --muted: #9a958b;  --rule: #34322f;
 ```
 
-- **Theming:** no `data-theme` means follow `prefers-color-scheme`; `[data-theme=light|dark]` forces it. `theme.js` toggles the effective theme and stores it in `localStorage`.
+- **Theming:** no `data-theme` means follow `prefers-color-scheme`; `[data-theme=light|dark]` forces it. `theme.js` toggles the effective theme and stores it in `localStorage`, inside a 200ms whole-page cross-fade when view transitions are supported (§7, Transitions).
 - **Fonts:** Inter as a variable font (`InterVariable.woff2` and `InterVariable-Italic.woff2`, `font-weight: 100 900`) and JetBrains Mono 400 only (`JetBrainsMono-Regular.woff2`), all `font-display: swap`, all self-hosted with their OFL licences in `assets/fonts/`. The tokens:
 
   ```css
@@ -262,6 +272,7 @@ A quiet, fixed, full-viewport layer behind every page: a watermark you notice af
 - **Budget:** under 4 ms per frame on large screens (measured about 1 ms at 2560×1440, DPR 2). Pauses when the document is hidden.
 - **Accessibility:** the root is `aria-hidden`. Under `prefers-reduced-motion: reduce`, it renders one static frame (a still map) with no loop and no pointer effects, re-rendered on resize and theme change.
 - **CSP-safe:** sizing only via CSSOM (`canvas.style.width = …`), never `setAttribute('style')` and never inline `<style>`.
+- **Page transitions:** the root has no `view-transition-name`; it cross-fades inside the page's image (§7, Transitions).
 - **Playground:** `lab/field.html` shows the backdrop behind a fake log and an "inner page" column, with theme and reduced-motion switches.
 
 ## 10. Build (Elixir)
@@ -277,11 +288,11 @@ A quiet, fixed, full-viewport layer behind every page: a watermark you notice af
   4. Render the EEx templates. **EEx does not escape:** every interpolated string goes through `Site.HTML.escape/1`, and only rendered Markdown is inserted raw.
   5. Copy `assets/` to `dist/assets/` as is (no fingerprinting).
   6. Inline `assets/js/head.js` (trimmed) into `<head>` and compute its `sha256-…` for the CSP. Compute the `sha256-…` of the speculation rules (`Site.Speculation.rules/0`) too.
-  7. Write `_headers` (§11), `_redirects` (§4), `robots.txt`, `404.html`, the Markdown twin of every entry, `llms.txt` and the share images in `og/` (§4).
+  7. Write `_headers` (§11), `_redirects` (§4), `robots.txt`, `404.html`, the Markdown twin of every entry, `llms.txt`, the share images in `og/` (§4) and the generated `assets/css/transitions.css` (§7, Transitions). A source file at `assets/css/transitions.css` is an error.
 - **Deterministic:** no build timestamps; sorted iteration everywhere; identical output for identical commit and env.
 - **`mix site.verify`:** builds twice into temporary dirs, compares a SHA-256 over every file path and content, fails on mismatch, and prints the tree hash.
 - **`mix site.serve [--port 4000]`:** builds, serves `dist/` with Bandit and Plug, and applies the headers parsed from `dist/_headers`, so CSP violations show up locally exactly as in production. It polls `content/`, `templates/`, `assets/` and `lib/` mtimes every second and rebuilds on change (no file_system dep). Missing paths serve `404.html` with status 404, and `/x/` serves `/x/index.html`.
-- **Tests:** frontmatter parsing and validation, flat URLs, slugs (global uniqueness and reserved slugs), `_redirects`, escaping, log ordering, no nav and no list pages, the font and mono-only CSS rules, CSP hashes (head.js and the speculation rules), the Markdown twins and `llms.txt`, the entry links and their escaping, the favicon pair and its script, the share images (size, no metadata chunks, determinism, text wrapping, contours, meta tags), the `stats` callouts (rendering, escaping, CSS), and a determinism smoke test, all using `test/fixtures/content`.
+- **Tests:** frontmatter parsing and validation, flat URLs, slugs (global uniqueness and reserved slugs), `_redirects`, escaping, log ordering, no nav and no list pages, the font and mono-only CSS rules, CSP hashes (head.js and the speculation rules), the Markdown twins and `llms.txt`, the entry links and their escaping, the favicon pair and its script, the share images (size, no metadata chunks, determinism, text wrapping, contours, meta tags), the `stats` callouts (rendering, escaping, CSS), the page transitions (the generated stylesheet and its idents, the classes on the log titles and h1s, the `data-vt` default, the CSS opt-in and its reduced-motion opt-out, and `head.js` and `theme.js` run under node with stubs when `node` is installed), and a determinism smoke test, all using `test/fixtures/content`.
 
 ## 11. Security headers (`dist/_headers`)
 
@@ -309,6 +320,7 @@ A quiet, fixed, full-viewport layer behind every page: a watermark you notice af
 
 The two Cloudflare hosts are always in the CSP, because Web Analytics runs on automatic setup: Cloudflare injects `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"…"}'></script>` into the HTML at the edge. The build never writes that tag, so no built page contains `beacon.min.js` or `data-cf-beacon`.
 The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `dist/_redirects` (§4) sits next to `_headers`; Cloudflare reads both from the assets directory, and the build writes both.
+The page transitions need no CSP change: the shared names come from a generated same-origin stylesheet, and `style-src` stays `'self'`.
 **Never** use inline `style=""` attributes, inline `<style>`, inline event handlers, or any inline script other than head.js and the speculation rules.
 
 ## 12. Hosting and deploy

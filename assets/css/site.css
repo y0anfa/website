@@ -42,6 +42,10 @@
   --gutter: clamp(1rem, 4vw, 2.5rem);
   --header-h: 3.5rem;
 
+  /* page transitions (see the end of this file) */
+  --vt-duration: 200ms;
+  --vt-ease: ease-out;
+
   /* The page column: header, main and footer share one width, centred, on
      every page, so the brand never moves. 38rem of text is about 68 characters
      of Inter at the entry body size. In rem, not ch, because the footer has a
@@ -725,5 +729,109 @@ main a[href]:is(:hover, :focus-visible),
 @media (max-width: 27.5rem) {
   .stats > div:last-child:nth-child(odd) {
     grid-column: 1 / -1;
+  }
+}
+
+/* ---------- page transitions ----------
+   Cross-document view transitions (SPEC section 7, Transitions): the browser
+   keeps the old page on screen, loads the new one and animates between the two.
+   No JavaScript runs on navigation, and a browser without support (Firefox)
+   simply navigates. Three prototypes are under review, picked by html[data-vt]:
+   the layout sets morph, and head.js sets it from ?vt= and keeps it for the tab.
+   Every page rule waits for the "page" type, so the theme toggle (type "theme",
+   set by theme.js) never gets them. The shared names of the morph live in the
+   generated assets/css/transitions.css. The field is not part of any of this: it
+   stays in the page's image and cross-fades with it (SPEC section 7). */
+
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+    types: page;
+  }
+}
+
+/* reduced motion: no transitions at all. The two media queries never match
+   together, so this does not depend on which @view-transition rule wins. */
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}
+
+/* One timing for every group: old and new inherit it from their group. */
+:root:active-view-transition-type(page)::view-transition-group(*),
+:root:active-view-transition-type(theme)::view-transition-group(*) {
+  animation-duration: var(--vt-duration);
+  animation-timing-function: var(--vt-ease);
+}
+
+/* morph: the clicked log title glides and grows into the entry's h1, and
+   everything else cross-fades, which is what the browser does by default. The
+   shared name per entry is generated (assets/css/transitions.css). Two things
+   keep the glide clean:
+   - both ends are as wide as their text, so the image of the title is scaled by
+     about the same factor as the type is (a full-width box would not be);
+   - the pointer is still on the clicked title when the old page is captured, and
+     a hovered link is an inverted bar. The page type is already active in the old
+     page at that moment, so the title is captured as plain text instead. */
+:root[data-vt="morph"] .log-title {
+  justify-self: start;
+}
+
+:root[data-vt="morph"] .prose > h1[class] {
+  width: fit-content;
+  max-width: 100%;
+}
+
+:root[data-vt="morph"]:active-view-transition-type(page)
+  .log-title:is(:hover, :focus-visible, :active) {
+  background: none;
+  color: inherit;
+  text-shadow: var(--halo);
+}
+
+/* fade: only the main content cross-fades. The header and the footer get names of
+   their own, so they are not part of the page's image, and no glide between their
+   old and new boxes (a short page puts the footer in a different place). Where the
+   header and footer differ (the home is unpainted, the entry pages have paper), the
+   difference still fades. */
+:root[data-vt="fade"] .site-header {
+  view-transition-name: site-header;
+}
+
+:root[data-vt="fade"] .site-footer {
+  view-transition-name: site-footer;
+}
+
+:root[data-vt="fade"]:active-view-transition-type(page)::view-transition-group(site-header),
+:root[data-vt="fade"]:active-view-transition-type(page)::view-transition-group(site-footer) {
+  animation-name: none;
+}
+
+/* rise: the old page fades out, the new page fades in while it rises 12px. The
+   image behind the pages is the page background, so the strip the rising page
+   uncovers is not the browser's canvas colour. */
+:root[data-vt="rise"]:active-view-transition-type(page)::view-transition {
+  background: var(--bg);
+}
+
+:root[data-vt="rise"]:active-view-transition-type(page)::view-transition-old(root) {
+  animation-name: vt-fade-out;
+}
+
+:root[data-vt="rise"]:active-view-transition-type(page)::view-transition-new(root) {
+  animation-name: vt-rise-in;
+}
+
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes vt-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
 }

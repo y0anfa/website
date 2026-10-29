@@ -313,9 +313,20 @@ defmodule Site.CSSTest do
     refute @css =~ "@import"
   end
 
-  test "only the field moves: no animations or transitions" do
-    refute @css =~ "@keyframes"
-    refute @css =~ ~r/\banimation\s*:/
-    refute @css =~ ~r/\btransition\s*:/
+  test "only the field moves, and pages change by view transition: no CSS transitions, and every animation sits in a view-transition rule" do
+    css = Regex.replace(~r{/\*.*?\*/}s, @css, "")
+
+    refute css =~ ~r/\btransition\s*:/
+    refute css =~ ~r/\btransition-(property|duration|delay)\s*:/
+
+    # the keyframes are the page transitions' own ...
+    names = Regex.scan(~r/@keyframes\s+([\w-]+)/, css) |> Enum.map(&List.last/1)
+    assert Enum.sort(names) == ["vt-fade-out", "vt-rise-in"]
+
+    # ... and an `animation` property is only ever set on a ::view-transition-* pseudo-element
+    for [_, selector, body] <- Regex.scan(~r/([^{}]+)\{([^{}]*)\}/, css),
+        body =~ ~r/(?<![-\w])animation(-[a-z-]+)?\s*:/ do
+      assert selector =~ "::view-transition-", "animation outside a view transition: #{selector}"
+    end
   end
 end
