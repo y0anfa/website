@@ -12,7 +12,7 @@ defmodule Site.GitTest do
   end
 
   test "commit_url/1 points at the GitHub repository" do
-    assert Git.commit_url(@sha) == "https://github.com/y0anfa/yoanfau.re/commit/" <> @sha
+    assert Git.commit_url(@sha) == "https://github.com/y0anfa/website/commit/" <> @sha
   end
 
   test "a file outside any repository has no commit" do

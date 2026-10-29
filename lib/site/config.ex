@@ -4,7 +4,7 @@ defmodule Site.Config do
   slugs that entries may not use.
   """
 
-  @url "https://yoanfau.re"
+  @url "https://yoanfaure.com"
 
   @types [
     # type, content directory under content/, log sort rank
@@ -26,8 +26,8 @@ defmodule Site.Config do
 
   def name, do: "Yoan Faure"
   def home_title, do: "Yoan Faure — security engineer who builds"
-  def repo_url, do: "https://github.com/y0anfa/yoanfau.re"
-  def email, do: "hello@yoanfau.re"
+  def repo_url, do: "https://github.com/y0anfa/website"
+  def email, do: "hi@yoanfaure.com"
   def linkedin, do: "https://linkedin.com/in/yoan-faure"
 
   @doc "Entry types that appear in the log."

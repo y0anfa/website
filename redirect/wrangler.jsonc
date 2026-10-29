@@ -1,0 +1,13 @@
+{
+  // Redirect-only Worker: every request to an old or www hostname moves to the
+  // same path on yoanfaure.com. It keeps the name of the Worker that served
+  // yoanfau.re, so that custom domain stays attached through the move.
+  "name": "yoanfau-re",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-01",
+
+  "routes": [
+    { "pattern": "yoanfau.re", "custom_domain": true },
+    { "pattern": "www.yoanfaure.com", "custom_domain": true }
+  ]
+}

@@ -61,7 +61,7 @@ defmodule Site.LogTest do
     row = Log.row(entry(:note, "x", "2026-10-28", commit: sha))
 
     assert row.hash == "a3f9c21"
-    assert row.commit_url == "https://github.com/y0anfa/yoanfau.re/commit/" <> sha
+    assert row.commit_url == "https://github.com/y0anfa/website/commit/" <> sha
     assert row.href == "/x/"
   end
 

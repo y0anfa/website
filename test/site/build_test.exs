@@ -130,14 +130,14 @@ defmodule Site.BuildTest do
       assert html =~
                ~s(<meta name="description" content="A second essay, with its own description.">)
 
-      assert html =~ ~s(<link rel="canonical" href="https://yoanfau.re/second-essay/">)
+      assert html =~ ~s(<link rel="canonical" href="https://yoanfaure.com/second-essay/">)
       assert html =~ ~s(<meta property="og:title" content="Second essay — Yoan Faure">)
 
       assert html =~
                ~s(<meta property="og:description" content="A second essay, with its own description.">)
 
       assert html =~
-               ~s(<meta property="og:url" content="https://yoanfau.re/second-essay/">)
+               ~s(<meta property="og:url" content="https://yoanfaure.com/second-essay/">)
 
       assert html =~ ~s(<meta property="og:type" content="article">)
       assert html =~ ~s(<meta name="twitter:card" content="summary">)
@@ -146,7 +146,7 @@ defmodule Site.BuildTest do
       assert html =~
                ~s(<link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>)
 
-      assert page(tree, "index.html") =~ ~s(<link rel="canonical" href="https://yoanfau.re/">)
+      assert page(tree, "index.html") =~ ~s(<link rel="canonical" href="https://yoanfaure.com/">)
       assert page(tree, "index.html") =~ ~s(<meta property="og:type" content="website">)
     end
 
@@ -187,7 +187,7 @@ defmodule Site.BuildTest do
 
         assert html =~ ~s(<main id="main">), path
         assert html =~ ~s(<footer class="site-footer">), path
-        assert html =~ ~s(<a href="mailto:hello@yoanfau.re">hello@yoanfau.re</a>), path
+        assert html =~ ~s(<a href="mailto:hi@yoanfaure.com">hi@yoanfaure.com</a>), path
 
         assert html =~
                  ~s(<a href="https://linkedin.com/in/yoan-faure" rel="noopener">linkedin</a>),
@@ -217,7 +217,7 @@ defmodule Site.BuildTest do
 
       assert html =~ ~s(<p class="footer-build">built from <span>unversioned</span></p>) or
                html =~
-                 ~r|built from <a href="https://github.com/y0anfa/yoanfau.re/commit/[0-9a-f]{40}">[0-9a-f]{7}(-dirty)?</a>|
+                 ~r|built from <a href="https://github.com/y0anfa/website/commit/[0-9a-f]{40}">[0-9a-f]{7}(-dirty)?</a>|
     end
   end
 
@@ -299,7 +299,7 @@ defmodule Site.BuildTest do
                ~r{\A\s*<h1>Test Person</h1>\s*<p class="tagline">Fixture tagline for the home page.</p>}
 
       assert intro_html =~ ~s(<p>This is the intro paragraph.)
-      assert intro_html =~ ~s(<p class="contact"><a href="mailto:hello@yoanfau.re">)
+      assert intro_html =~ ~s(<p class="contact"><a href="mailto:hi@yoanfaure.com">)
     end
 
     test "the log lists every entry in order, hashes as dots", %{tree: tree} do

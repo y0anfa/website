@@ -1,6 +1,6 @@
 defmodule Site do
   @moduledoc """
-  Hand-rolled static site generator for yoanfau.re.
+  Hand-rolled static site generator for yoanfaure.com.
 
   The pipeline lives in `Site.Build`: load and validate `content/` (`Site.Content`),
   render the EEx templates (`Site.Render`, `Site.Templates`), copy `assets/`, and

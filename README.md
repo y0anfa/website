@@ -1,4 +1,4 @@
-# yoanfau.re
+# yoanfaure.com
 
 Personal site of Yoan Faure. A static site built by a small Elixir generator and served from Cloudflare Workers.
 
@@ -59,33 +59,29 @@ Text is Inter (variable, `assets/fonts/InterVariable.woff2` and `InterVariable-I
 A push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml). It can also be started by hand with `workflow_dispatch`.
 
 1. **build** checks out the full history, which the commit hashes need. It sets up Erlang and Elixir from `.tool-versions`, restores the dependency and `_build` cache, then runs the format check, the tests, `site.verify` and `site.build` in `prod` mode. The `dist/` directory is uploaded as an artifact. The Web Analytics beacon is included only when the repo variable `CF_BEACON_TOKEN` is set.
-2. **deploy** runs only for `main`, in the `production` environment. It downloads `dist/` and runs `wrangler deploy` with a pinned wrangler version. The Cloudflare secrets are used only in this job.
+2. **deploy** runs only for `main`, in the `production` environment. It downloads `dist/`, runs `wrangler deploy` for the site, then for the redirect Worker, with a pinned wrangler version. The Cloudflare secrets are used only in this job.
 
-`wrangler.jsonc` defines an assets-only Worker with `yoanfau.re` as its custom domain.
+`wrangler.jsonc` defines an assets-only Worker with `yoanfaure.com` as its custom domain. A second step deploys the redirect Worker in `redirect/`, after the site.
 
-## Cutover checklist
+## Domains
 
-These are one-time steps for the owner, in order.
+- `yoanfaure.com` is the site: a Workers custom domain on the `yoanfaure` Worker.
+- `yoanfau.re` and `www.yoanfaure.com` redirect (301, path and query kept) to `yoanfaure.com`. The redirect Worker in `redirect/` keeps the old Worker name `yoanfau-re`, so the old domain never detached. `www.yoanfau.re` goes to the `yoanfau.re` apex by a Redirect Rule, then on to `yoanfaure.com`.
+- Both zones are on Cloudflare. Mail for `@yoanfau.re` stays on OVH (keep its MX and SPF records). `hi@yoanfaure.com` uses Cloudflare Email Routing.
+- The API token in `CLOUDFLARE_API_TOKEN` must cover both zones.
 
-1. In Cloudflare, add the zone `yoanfau.re` (Free plan) and check the imported DNS records.
-2. At OVH, switch the nameservers to the two Cloudflare nameservers.
-3. Create an API token from the "Edit Cloudflare Workers" template, scoped to the account and the `yoanfau.re` zone. Add it as the GitHub repo secret `CLOUDFLARE_API_TOKEN`, and add the account ID as the repo secret `CLOUDFLARE_ACCOUNT_ID`.
-4. In Cloudflare Web Analytics, add the site. Put its token in the GitHub repo *variable* `CF_BEACON_TOKEN`. It is a variable, not a secret, because the beacon sends it to the browser.
-5. Mail stays on OVH (MX Plan): keep the OVH MX and SPF records in Cloudflare, and don't enable Cloudflare Email Routing, which would replace them. Create `hello@yoanfau.re` as an OVH redirection (Web Cloud → Emails → yoanfau.re → Redirections) to your inbox.
-6. Turn off Email Address Obfuscation for the zone (it rewrites `mailto:` links and injects a script). Delete the old GitHub Pages A records (`185.199.108.153` to `185.199.111.153`) first, since a custom domain can't attach while they exist, then push with the `routes` line in `wrangler.jsonc`. Make `www` a proxied CNAME to `yoanfau.re` with the "Redirect from WWW to root" rule, and unpublish GitHub Pages.
-7. Add the SSH key to GitHub as a signing key, so commits show as verified:
+Owner steps still open:
 
-   ```sh
-   gh auth refresh -s admin:ssh_signing_key
-   gh ssh-key add ~/.ssh/id_ed25519.pub --type signing --title "yoanfa signing"
-   ```
-
-8. Optional, later: submit the domain to the HSTS preload list. The list requires the `preload` directive, which the `Strict-Transport-Security` header in `_headers` does not have yet.
+1. In Cloudflare, turn on **Always Use HTTPS** and turn off **Email Address Obfuscation** for `yoanfaure.com`.
+2. Set up Email Routing for `hi@yoanfaure.com`.
+3. In Cloudflare Web Analytics, add `yoanfaure.com` and put its token in the GitHub repo *variable* `CF_BEACON_TOKEN`. It is a variable, not a secret, because the beacon sends it to the browser.
+4. Re-enable DNSSEC for both zones in Cloudflare, and add each DS record at its registrar.
+5. Optional, later: submit `yoanfaure.com` to the HSTS preload list. The list requires the `preload` directive, which the `Strict-Transport-Security` header in `_headers` does not have yet.
 
 ## Security
 
 - The Content Security Policy is strict. Scripts come only from `'self'` and one hashed inline script (`assets/js/head.js`), plus the beacon when it is enabled. There are no inline styles or event handlers.
 - There are no third-party assets. The one exception is the optional Cloudflare Web Analytics beacon, included only when `CF_BEACON_TOKEN` is set.
-- Commits are signed (see cutover step 7). Security headers are generated into `dist/_headers` at build time.
+- Commits are signed with an SSH key registered on GitHub as a signing key. Security headers are generated into `dist/_headers` at build time.
 - Every third-party action is pinned to a full commit SHA, with the release version in a comment.
 - The build is deterministic. `mix site.verify` checks it, and CI runs it before every deploy.

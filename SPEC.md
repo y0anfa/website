@@ -1,4 +1,4 @@
-# yoanfau.re — v2 spec
+# yoanfaure.com — v2 spec
 
 The contract every contributor (human or agent) builds against. If code and spec disagree, fix one of them on purpose.
 
@@ -28,8 +28,9 @@ It shows who he is, what he thinks, and what he makes.
 | Hosting | Cloudflare Workers, assets-only, deployed by GitHub Actions with wrangler. |
 | Analytics | Cloudflare Web Analytics beacon, the single third-party exception in the CSP, included only when `CF_BEACON_TOKEN` is set at build time. |
 | Security | Strict CSP, no third-party assets, security headers via `_headers`, signed commits, deterministic build checked in CI. |
-| Contact | `hello@yoanfau.re` (an OVH redirection; mail stays on OVH) and LinkedIn `https://linkedin.com/in/yoan-faure`. |
-| Repo | `y0anfa/yoanfau.re`, fresh orphan history on `main`. The old Hugo site is on `archive/hugo`. |
+| Contact | `hi@yoanfaure.com` (Cloudflare Email Routing) and LinkedIn `https://linkedin.com/in/yoan-faure`. |
+| Repo | `y0anfa/website` (formerly `y0anfa/yoanfau.re`), fresh orphan history on `main`. The old Hugo site is on `archive/hugo`. |
+| Domains | `yoanfaure.com` serves the site. `yoanfau.re` and `www.yoanfaure.com` redirect to it (301, path kept). |
 
 ## 3. Repository layout
 
@@ -56,7 +57,8 @@ It shows who he is, what he thinks, and what he makes.
 │   ├── fonts/JetBrainsMono-Regular.woff2 + JetBrainsMono-OFL.txt
 │   └── favicon.svg
 ├── lab/field.html             standalone playground for field.js (never built/deployed)
-├── wrangler.jsonc
+├── wrangler.jsonc             the site Worker (yoanfaure.com)
+├── redirect/                  worker.js + wrangler.jsonc: 301s yoanfau.re and www to yoanfaure.com
 ├── .github/workflows/deploy.yml
 └── dist/                      build output (gitignored)
 ```
@@ -129,7 +131,7 @@ Entries are essays, notes, and projects, and the log on the home is the only lis
 a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 ```
 
-- **hash:** the first 7 characters of `git log -1 --format=%H -- <file>`. It links to `https://github.com/y0anfa/yoanfau.re/commit/<full sha>`. An untracked or uncommitted file, or no git at all, shows `·······` (7 middle dots) with no link.
+- **hash:** the first 7 characters of `git log -1 --format=%H -- <file>`. It links to `https://github.com/y0anfa/website/commit/<full sha>`. An untracked or uncommitted file, or no git at all, shows `·······` (7 middle dots) with no link.
 - **date:** `YYYY-MM-DD`. **type:** `essay` / `note` / `project`, the label for the folder the entry lives in. **title:** links to the entry at `/<slug>/`.
 - **Markup:** `<ol class="log">` > `<li class="log-row">` > `<a class="log-hash">`, `<time class="log-date">`, `<span class="log-type">`, `<a class="log-title">`.
 - **Fonts:** the hash and the date are JetBrains Mono (`.log-hash`, `.log-date`, at 0.8em, muted). The type and the title are Inter: the type is muted and regular, the title is 600 weight.
@@ -148,7 +150,7 @@ a3f9c21  2026-03-28  essay    Threat modeling with Claude Code
 
 - `header.site-header`: `a.brand` "yoan faure", linking home, on the left; `button.theme-toggle` (aria-label "Toggle theme") on the right. There is no nav: no `nav` element, no links to sections, no `aria-current`.
 - `main#main`.
-- `footer.site-footer`: `hello@yoanfau.re · linkedin` on the left; `built from <a>a3f9c21</a>` on the right, linking to the HEAD commit (`-dirty` suffix if the tree is dirty, `unversioned` with no git).
+- `footer.site-footer`: `hi@yoanfaure.com · linkedin` on the left; `built from <a>a3f9c21</a>` on the right, linking to the HEAD commit (`-dirty` suffix if the tree is dirty, `unversioned` with no git).
 - `<title>`: `<Page> — Yoan Faure` (home: `Yoan Faure — security engineer who builds`). Also meta description, canonical, `og:title/description/url/type`, `twitter:card=summary`, favicon, and a preload for the Inter variable font (`/assets/fonts/InterVariable.woff2`, with `crossorigin`).
 - `<html lang="en">`. The inline head script (`assets/js/head.js`) only applies `localStorage.theme` (`light` / `dark`) to `data-theme`, before first paint.
 - `<script type="module" src="/assets/js/field.js">` is loaded on every page, from the shared layout. `theme.js` (and `404.js` on the 404) are plain `defer` scripts.
@@ -255,18 +257,12 @@ The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `di
 
 ## 12. Hosting and deploy
 
-- **`wrangler.jsonc`:** an assets-only Worker named `yoanfau-re` with `assets.directory: ./dist`, `not_found_handling: "404-page"` and `html_handling: "auto-trailing-slash"`. `yoanfau.re` is its custom domain (`routes`), so Cloudflare owns the apex record and certificate. `www` is a proxied CNAME redirected to the apex by a Redirect Rule.
+- **`wrangler.jsonc`:** an assets-only Worker named `yoanfaure` with `assets.directory: ./dist`, `not_found_handling: "404-page"` and `html_handling: "auto-trailing-slash"`. `yoanfaure.com` is its custom domain (`routes`), so Cloudflare owns the apex record and certificate.
+- **`redirect/`:** a script Worker named `yoanfau-re` (the old site Worker's name, so `yoanfau.re` stays attached) with custom domains `yoanfau.re` and `www.yoanfaure.com`. It answers every request with a 301 to the same path and query on `https://yoanfaure.com`, plus HSTS. Old Hugo paths then resolve through the site's `_redirects`. `www.yoanfau.re` reaches it through a Redirect Rule to the `yoanfau.re` apex.
 - **`.github/workflows/deploy.yml`** runs on push to `main` and on `workflow_dispatch`, with least-privilege permissions. **Every third-party action is pinned to a full commit SHA** with a `# vX.Y.Z` comment.
   - The **build** job: checkout with `fetch-depth: 0` (needed for per-file hashes), then `erlef/setup-beam` with `version-file: .tool-versions` and `version-type: strict`, a deps cache, `mix format --check-formatted`, `mix test`, `MIX_ENV=prod mix site.verify`, and `MIX_ENV=prod mix site.build` with `CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}`. It uploads `dist`.
-  - The **deploy** job (only on `main`) runs `cloudflare/wrangler-action` with secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
-- **Cutover:** these are the owner's steps, documented in README:
-  1. Add the zone to Cloudflare and switch the OVH nameservers.
-  2. Create an API token and add the repo secrets.
-  3. Create the Web Analytics site and add the repo variable `CF_BEACON_TOKEN`.
-  4. Create `hello@` as an OVH redirection. Mail stays on OVH, so no Cloudflare Email Routing.
-  5. Turn off Email Address Obfuscation, delete the GitHub Pages A records, then deploy with the route; point `www` at the apex with a redirect rule.
-  6. Disable GitHub Pages.
-  7. Add the SSH key on GitHub as a *signing* key.
+  - The **deploy** job (only on `main`) runs `cloudflare/wrangler-action` with secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`: the site first, then `deploy --config redirect/wrangler.jsonc`, so the old domain only redirects once the new one serves. The token must cover both zones.
+- **Owner steps still open** (README, Domains): Always Use HTTPS and no Email Address Obfuscation on `yoanfaure.com`, Email Routing for `hi@`, the `CF_BEACON_TOKEN` variable, and DNSSEC on both zones. Mail for `@yoanfau.re` stays on OVH.
 
 ## 13. Launch content
 

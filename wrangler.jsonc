@@ -1,12 +1,12 @@
 {
   // Assets-only Worker: serves the static site built into ./dist.
   // There is no `main` entry point; Cloudflare serves the assets directly.
-  "name": "yoanfau-re",
+  "name": "yoanfaure",
   "compatibility_date": "2026-10-01",
 
   // The apex is a Workers custom domain: Cloudflare owns its DNS record and
-  // certificate. www is a proxied CNAME redirected to the apex by a rule.
-  "routes": [{ "pattern": "yoanfau.re", "custom_domain": true }],
+  // certificate. www and the old domain redirect here (see redirect/).
+  "routes": [{ "pattern": "yoanfaure.com", "custom_domain": true }],
 
   "assets": {
     "directory": "./dist",
