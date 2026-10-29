@@ -71,7 +71,7 @@ These are one-time steps for the owner, in order.
 2. At OVH, switch the nameservers to the two Cloudflare nameservers.
 3. Create an API token from the "Edit Cloudflare Workers" template, scoped to the account and the `yoanfau.re` zone. Add it as the GitHub repo secret `CLOUDFLARE_API_TOKEN`, and add the account ID as the repo secret `CLOUDFLARE_ACCOUNT_ID`.
 4. In Cloudflare Web Analytics, add the site. Put its token in the GitHub repo *variable* `CF_BEACON_TOKEN`. It is a variable, not a secret, because the beacon sends it to the browser.
-5. Set up Email Routing so `hello@yoanfau.re` forwards to a personal inbox.
+5. Mail stays on OVH (MX Plan): keep the OVH MX and SPF records in Cloudflare, and don't enable Cloudflare Email Routing, which would replace them. Create `hello@yoanfau.re` as an OVH redirection (Web Cloud → Emails → yoanfau.re → Redirections) to your inbox.
 6. Uncomment the `routes` line in `wrangler.jsonc` and push. Once the Worker serves `yoanfau.re`, delete the old GitHub Pages A records (`185.199.108.153` to `185.199.111.153`) and disable GitHub Pages in the repo settings.
 7. Add the SSH key to GitHub as a signing key, so commits show as verified:
 

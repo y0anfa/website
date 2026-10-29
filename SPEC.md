@@ -28,7 +28,7 @@ It shows who he is, what he thinks, and what he makes.
 | Hosting | Cloudflare Workers, assets-only, deployed by GitHub Actions with wrangler. |
 | Analytics | Cloudflare Web Analytics beacon, the single third-party exception in the CSP, included only when `CF_BEACON_TOKEN` is set at build time. |
 | Security | Strict CSP, no third-party assets, security headers via `_headers`, signed commits, deterministic build checked in CI. |
-| Contact | `hello@yoanfau.re` (Cloudflare Email Routing) and LinkedIn `https://linkedin.com/in/yoan-faure`. |
+| Contact | `hello@yoanfau.re` (an OVH redirection; mail stays on OVH) and LinkedIn `https://linkedin.com/in/yoan-faure`. |
 | Repo | `y0anfa/yoanfau.re`, fresh orphan history on `main`. The old Hugo site is on `archive/hugo`. |
 
 ## 3. Repository layout
@@ -263,7 +263,7 @@ The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `di
   1. Add the zone to Cloudflare and switch the OVH nameservers.
   2. Create an API token and add the repo secrets.
   3. Create the Web Analytics site and add the repo variable `CF_BEACON_TOKEN`.
-  4. Set up Email Routing for `hello@`.
+  4. Create `hello@` as an OVH redirection. Mail stays on OVH, so no Cloudflare Email Routing.
   5. Uncomment the route and deploy.
   6. Disable GitHub Pages.
   7. Add the SSH key on GitHub as a *signing* key.
