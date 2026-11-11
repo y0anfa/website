@@ -263,7 +263,7 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 
 - *Where.* The margin is the `body` (or `html`) itself: the bar and the column are its children. The press (`pointerdown`, primary button) and the click must both be on the margin, so the end of a text selection that began on the text does not count. Links, buttons, a text selection, a click with a modifier key or a non-primary button, and a coarse pointer are all left alone. The back links take a plain primary click only.
 - *Which way.* If the page before this one in the session history, past any `#hash` hops on this page, is the home (`navigation.entries()`), it steps back to it with `history.go(-n)`, so the home keeps its scroll position and the back transition plays. Otherwise it opens `/`. Without the Navigation API it uses `document.referrer` and `history.length`, and a `#hash` on the page sends it to `/`.
-- *Escape.* The same, unless it has a modifier, comes from a form field or `contenteditable`, was prevented, or is part of an input method.
+- *Escape.* The same, unless it has a modifier, comes from a form field or `contenteditable`, was prevented, or is part of an input method. A handled Escape is prevented: otherwise the same press reaches Chrome's own Escape (stop loading), which aborts the trip home just started.
 - *Affordance.* Inside `@media (pointer: fine)`, entry pages have `cursor: zoom-out` on the body and `cursor: auto` on the skip link, the bar and `main`. The home and the 404 are not touched.
 
 **Transitions.** Cross-document view transitions. The motion is CSS (`site.css`); `site.js` says which way a navigation goes and which element is the shared title.

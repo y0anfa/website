@@ -454,12 +454,15 @@ defmodule Site.TransitionsTest do
 
       test "Escape goes back unless a modifier, a form field or another handler has it", %{r: r} do
         assert r["escape"]["go"] == [-1]
+        # handled, so Chrome's own Escape (stop loading) can't abort the trip home
+        assert r["escape"]["prevented"] == true
 
         for name <-
               ~w(escape-ctrl escape-shift escape-alt escape-meta escape-field escape-prevented
                  escape-composing other-key) do
           assert r[name]["go"] == [], name
           assert r[name]["assign"] == [], name
+          assert r[name]["prevented"] == false, name
         end
       end
 
@@ -843,7 +846,7 @@ defmodule Site.TransitionsTest do
       const E = (o) => ({ page: 'essay', path: '/rhino/', from: '/', ...o });
       function goHome(name, o) {
         const p = page(E(o));
-        p.fireDoc('keydown', { key: 'Escape', target: { closest: () => null } });
+        p.fireDoc('keydown', { key: 'Escape', target: { closest: () => null }, preventDefault() {} });
         out[name] = { go: p.log.go, assign: p.log.assign, back: p.log.back };
       }
       goHome('go-prev-home', { entries: ['/', '/rhino/'], index: 1 });
@@ -880,7 +883,11 @@ defmodule Site.TransitionsTest do
       click('click-twice', {}, (p) => { press(p, p.body); clk(p, p.body); clk(p, p.body); });
 
       // ---- Escape
-      const key = (name, ev, o = {}) => click(name, o, (p) => p.fireDoc('keydown', { target: { closest: () => null }, ...ev }));
+      const key = (name, ev, o = {}) => {
+        let prevented = false;
+        click(name, o, (p) => p.fireDoc('keydown', { target: { closest: () => null }, preventDefault() { prevented = true; }, ...ev }));
+        out[name].prevented = prevented;
+      };
       key('escape', { key: 'Escape' });
       key('escape-ctrl', { key: 'Escape', ctrlKey: true });
       key('escape-shift', { key: 'Escape', shiftKey: true });

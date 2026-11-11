@@ -681,6 +681,9 @@
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     var t = event.target;
     if (t && t.closest && t.closest('input, textarea, select, [contenteditable]')) return;
+    // Handled here: left unhandled, the same press reaches Chrome's own Escape
+    // (stop loading), which aborts the navigation goHome has just started.
+    event.preventDefault();
     goHome();
   });
 })();
