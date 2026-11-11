@@ -1,6 +1,7 @@
 ---
 title: rhino
 date: 2026-09-02
+summary: Workflows as code. A mini Airflow in Go.
 tagline: Workflows as code. A mini Airflow in Go.
 link: https://github.com/y0anfa/rhino
 stack: [Go, YAML]

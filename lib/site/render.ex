@@ -7,13 +7,10 @@ defmodule Site.Render do
 
   alias Site.{Content, Entry, Log, Templates, View}
 
-  @type context :: %{
-          required(:head_js) => String.t(),
-          required(:build) => %{label: String.t(), href: String.t() | nil}
-        }
+  @type context :: %{required(:head_js) => String.t()}
 
-  # Plain deferred scripts loaded on every page, in this order.
-  @scripts ["/assets/js/theme.js", "/assets/js/favicon.js"]
+  # Plain deferred scripts loaded on every page, after the render-blocking site.js.
+  @scripts ["/assets/js/favicon.js"]
 
   @doc "Renders every page of the site."
   @spec pages(Content.t(), context()) :: [{Path.t(), String.t()}]
@@ -33,18 +30,24 @@ defmodule Site.Render do
   # -- pages ----------------------------------------------------------------
 
   defp home(content, rows, context) do
-    inner = Templates.home(%{doc: content.home, rows: rows})
+    inner =
+      Templates.home(%{
+        name_lines: View.name_lines(content.home.title),
+        role: Site.Config.role(),
+        years: Log.years(rows)
+      })
 
     page(context, "/", inner,
       title: Site.Config.home_title(),
       description: content.home.description,
       og_image: Site.OG.url(Site.OG.home_key()),
-      page_key: "home"
+      page_key: "home",
+      skip: %{href: "#feed", label: "Skip to the entries"}
     )
   end
 
   defp not_found(context) do
-    inner = Templates.not_found(%{fallback: "unknown"})
+    inner = Templates.not_found(%{fallback: "this address"})
 
     html =
       layout(context, inner,
@@ -61,14 +64,20 @@ defmodule Site.Render do
   defp entry_pages(content, context) do
     for %Entry{} = entry <- Content.entries(content) do
       links = View.entry_links(entry)
+      meta = View.article_meta(entry)
 
       inner =
         case entry.type do
           :project ->
-            Templates.project(%{entry: entry, meta: View.project_meta(entry), links: links})
+            Templates.project(%{
+              entry: entry,
+              meta: meta,
+              facts: View.project_facts(entry),
+              links: links
+            })
 
           _ ->
-            Templates.article(%{entry: entry, meta: View.article_meta(entry), links: links})
+            Templates.article(%{entry: entry, meta: meta, links: links})
         end
 
       page(context, Entry.path(entry), inner,
@@ -97,11 +106,11 @@ defmodule Site.Render do
       og_image: Keyword.get(opts, :og_image),
       og_type: Keyword.get(opts, :og_type, "website"),
       page_key: Keyword.fetch!(opts, :page_key),
+      skip: Keyword.get(opts, :skip, %{href: "#main", label: "Skip to the content"}),
       scripts: Keyword.get(opts, :scripts, @scripts),
       markdown: Keyword.get(opts, :markdown),
       head_js: context.head_js,
       speculation: Site.Speculation.rules(),
-      build: context.build,
       content: inner
     })
   end

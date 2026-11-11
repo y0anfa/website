@@ -14,63 +14,56 @@ defmodule Site.FaviconTest do
   defp tags(svg),
     do: Regex.scan(~r/<([a-z]+)[\s>\/]/, svg) |> Enum.map(&List.last/1) |> Enum.uniq()
 
-  describe "assets/favicon-sleep.svg" do
-    test "has balanced tags and is under 1 KB" do
-      assert byte_size(@asleep) < 1024
+  # every tag is closed, in order: a cheap well-formedness check
+  defp balanced?(svg) do
+    Regex.scan(~r{<(/?)([a-z]+)[^>]*?(/?)>}, svg)
+    |> Enum.reduce([], fn
+      [_, "", _name, "/"], stack -> stack
+      [_, "", name, ""], stack -> [name | stack]
+      [_, "/", name, ""], [name | stack] -> stack
+    end) == []
+  end
 
-      # every tag is closed, in order: a cheap well-formedness check
-      open =
-        Regex.scan(~r{<(/?)([a-z]+)[^>]*?(/?)>}, @asleep)
-        |> Enum.reduce([], fn
-          [_, "", _name, "/"], stack -> stack
-          [_, "", name, ""], stack -> [name | stack]
-          [_, "/", name, ""], [name | stack] -> stack
-        end)
-
-      assert open == []
-      assert @asleep =~ ~r/\A<svg [^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/
-    end
-
-    test "is the same 32x32 rounded square as the awake mark" do
-      mark = ~S|<rect class="bg" x="0" y="0" width="32" height="32" rx="6"/>|
-
-      assert @awake =~ mark
-      assert @asleep =~ mark
-      assert @asleep =~ ~S|viewBox="0 0 32 32"|
-      assert @asleep =~ ~S|width="32" height="32"|
-    end
-
-    test "has the same light and dark palette, switched by the same media query" do
-      for rule <- [
-            ".bg { fill: #262523; }",
-            ".stroke { stroke: #f4efe4; }",
-            "@media (prefers-color-scheme: dark) {",
-            ".bg { fill: #f4efe4; }",
-            ".stroke { stroke: #262523; }"
-          ] do
-        assert @awake =~ rule, "awake lacks #{rule}"
-        assert @asleep =~ rule, "asleep lacks #{rule}"
+  describe "the marks" do
+    test "are small, well-formed SVGs made of shapes only" do
+      for svg <- [@awake, @asleep] do
+        assert byte_size(svg) < 1024
+        assert balanced?(svg)
+        assert svg =~ ~r/\A<svg [^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/
+        assert Enum.sort(tags(svg)) -- ~w(circle path rect style svg) == []
+        refute svg =~ ~r/<(text|script|image|use|foreignObject)/i
+        refute svg =~ ~r/\son[a-z]+\s*=/i
       end
     end
 
-    test "is made of paths and rects, with a z z next to the prompt" do
-      assert Enum.sort(tags(@asleep)) == ~w(g path rect style svg)
-      refute @asleep =~ "<text"
-      refute @asleep =~ ~r/<(script|image|use|foreignObject)/i
-      refute @asleep =~ ~r/\son[a-z]+\s*=/i
+    test "are the same graphite square with the timeline's axis" do
+      square = ~S|<rect class="bg" x="0" y="0" width="32" height="32" rx="6"/>|
+      axis = ~S|d="M16 5 V27"|
 
-      # the prompt chevron, then two z paths (a bigger and a smaller one)
-      paths = Regex.scan(~r/<path [^>]*\sd="([^"]+)"/, @asleep) |> Enum.map(&List.last/1)
-      assert length(paths) == 3
-      assert Enum.at(paths, 0) =~ ~r/\AM[\d. ]+L[\d. ]+L[\d. ]+\z/
-      assert Enum.drop(paths, 1) |> Enum.all?(&(&1 =~ ~r/\AM[\d. ]+H[\d. ]+L[\d. ]+H[\d. ]+\z/))
+      for svg <- [@awake, @asleep] do
+        assert svg =~ square
+        assert svg =~ axis
+        assert svg =~ ~S|viewBox="0 0 32 32"|
+        assert svg =~ ".bg { fill: #0d0f14; }"
+      end
     end
 
-    test "differs from the awake mark" do
-      refute @asleep == @awake
+    test "awake, the entry's mark is lit; asleep, the lamp is out" do
+      assert @awake =~ ".lamp { fill: #f2c47c; }"
+      assert @awake =~ ~S|<circle class="lamp"|
+      assert @awake =~ ~S|<circle class="halo"|
+
+      refute @asleep =~ "#f2c47c"
+      assert @asleep =~ ".mark { fill: #0d0f14; stroke: #80848d; }"
     end
 
-    test "is copied to the site", %{tree: tree} do
+    test "the old palette is gone" do
+      for svg <- [@awake, @asleep], old <- ~w(#262523 #f4efe4) do
+        refute svg =~ old
+      end
+    end
+
+    test "are copied to the site", %{tree: tree} do
       assert tree["assets/favicon-sleep.svg"] == @asleep
       assert tree["assets/favicon.svg"] == @awake
     end
@@ -82,9 +75,6 @@ defmodule Site.FaviconTest do
       assert @script =~ "document.addEventListener('visibilitychange'"
       assert @script =~ "document.visibilityState === 'hidden'"
       assert @script =~ "'/assets/favicon-sleep.svg'"
-      assert @script =~ "setAttribute('href'"
-
-      # it puts the original href back, whatever it was
       assert @script =~ "var awake = link.getAttribute('href');"
     end
 
@@ -97,20 +87,16 @@ defmodule Site.FaviconTest do
       refute @script =~ "<"
     end
 
-    test "names a file that exists" do
-      assert File.exists?("assets/favicon-sleep.svg")
-    end
-
     test "is copied to the site verbatim", %{tree: tree} do
       assert tree["assets/js/favicon.js"] == @script
     end
   end
 
   describe "the pages" do
-    test "every page, the 404 too, loads favicon.js deferred, right after theme.js", %{tree: tree} do
+    test "every page, the 404 too, loads favicon.js deferred, right after site.js", %{tree: tree} do
       for {path, html} <- tree, String.ends_with?(path, ".html") do
         assert html =~
-                 ~s(<script defer src="/assets/js/theme.js"></script>\n) <>
+                 ~s(<script defer blocking="render" src="/assets/js/site.js"></script>\n) <>
                    ~s(<script defer src="/assets/js/favicon.js"></script>\n),
                path
 

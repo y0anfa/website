@@ -1,9 +1,14 @@
-<article class="prose">
-<%= meta(%{parts: @meta}) %>
-  <h1><%= escape(@entry.title) %></h1>
+<%= bar(%{esc: true}) %>
+
+<main id="main" class="article">
+  <article>
+<%= meta(%{class: "meta", parts: @meta}) %>
+    <h1><%= escape(@entry.title) %></h1>
+
+    <div class="prose">
 <%= raw(@entry.html) %>
-  <div class="entry-end">
-    <p class="back"><a href="/">← log</a></p>
-<%= entry_links(%{links: @links}) %>
-  </div>
-</article>
+    </div>
+
+<%= article_end(%{links: @links}) %>
+  </article>
+</main>

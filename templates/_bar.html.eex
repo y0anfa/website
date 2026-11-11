@@ -1,0 +1,7 @@
+<header class="bar">
+  <a class="back" href="/" data-home>
+<%= back_icon() %>
+    <%= escape(Site.Config.name()) %><%= if @esc do %><kbd aria-hidden="true">Esc</kbd><% end %>
+  </a>
+<%= toggle() %>
+</header>

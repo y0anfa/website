@@ -2,16 +2,17 @@ defmodule Site.TemplatesTest do
   use ExUnit.Case, async: true
 
   # Every `<%= expr %>` in a template must be one of:
-  #   * escape(...)                       interpolating a value
-  #   * raw(@content | @head_js | @speculation | @doc.html | @entry.html)   already-safe HTML
-  #   * header() | footer(...) | log(...) | meta(...) | entry_links(...)    partials (linted themselves)
+  #   * escape(...)                                    interpolating a value
+  #   * raw(@content | @head_js | @speculation | @entry.html)   already-safe HTML
+  #   * toggle() | back_icon()                         static partials
+  #   * bar(...) | feed(...) | meta(...) | article_end(...)     partials (linted themselves)
   #   * a block opener: for / if / cond / case / unless
   # Anything else would put an unescaped value into a page.
   @allowed [
     ~r/\Aescape\(.+\)\z/s,
-    ~r/\Araw\(@(content|head_js|speculation|doc\.html|entry\.html)\)\z/,
-    ~r/\Aheader\(\)\z/,
-    ~r/\A(footer|log|meta|entry_links)\(%\{[^}]*\}\)\z/,
+    ~r/\Araw\(@(content|head_js|speculation|entry\.html)\)\z/,
+    ~r/\A(toggle|back_icon)\(\)\z/,
+    ~r/\A(bar|feed|meta|article_end)\(%\{[^}]*\}\)\z/,
     ~r/\A(for|if|cond|case|unless)\s/
   ]
 
@@ -51,6 +52,14 @@ defmodule Site.TemplatesTest do
           do: assert(scripts != []),
           else: assert(scripts == [])
       end
+
+      test "loads nothing from elsewhere" do
+        source = File.read!(@template)
+
+        refute source =~ "fonts.googleapis"
+        refute source =~ ~r/\ssrc="https?:/
+        refute source =~ ~r/<link [^>]*href="https?:/
+      end
     end
   end
 
@@ -74,87 +83,76 @@ defmodule Site.TemplatesTest do
     end
   end
 
-  test "the layout has the field backdrop between the skip link and the header, on every page" do
+  test "the layout loads site.js render-blocking, and no field, theme or transitions script" do
     layout = File.read!("templates/layout.html.eex")
 
-    backdrop =
-      ~S(<div class="field" data-field-root aria-hidden="true">) <>
-        ~S(<canvas class="field-canvas"></canvas></div>)
+    assert layout =~ ~S(<script defer blocking="render" src="/assets/js/site.js"></script>)
 
-    assert layout =~
-             ~r/<a class="skip-link" href="#main">[^<]*<\/a>\n#{Regex.escape(backdrop)}\n<%= header\(/
-
-    assert length(Regex.scan(~r/data-field-root/, layout)) == 1
-  end
-
-  test "the layout loads field.js as a module, with no preset switch" do
-    layout = File.read!("templates/layout.html.eex")
-
-    assert layout =~ ~S(<html lang="en">)
-    refute layout =~ "data-vt"
-    assert layout =~ ~S(<script type="module" src="/assets/js/field.js"></script>)
-    refute layout =~ "data-field="
-  end
-
-  test "no page template but the layout knows about the field" do
-    for file <- @template_files, Path.basename(file) != "layout.html.eex" do
-      source = File.read!(file)
-      refute source =~ "data-field", file
-      refute source =~ "canvas", file
-      refute source =~ "field.js", file
+    for gone <- ~w(field.js theme.js transitions.js data-field-root canvas type="module") do
+      refute layout =~ gone, gone
     end
   end
 
-  test "the home template is an intro and the log, with no hero or field section" do
-    home = File.read!("templates/home.html.eex")
-
-    refute home =~ "hero"
-    refute home =~ "field"
-    assert home =~ ~S(<div class="intro">)
-    assert home =~ ~S(<section class="log-section" aria-labelledby="log-h">)
-  end
-
-  test "the home template only puts rendered Markdown through raw" do
-    assert File.read!("templates/home.html.eex") =~ "raw(@doc.html)"
-    refute File.read!("templates/home.html.eex") =~ "raw(@doc.title)"
-  end
-
-  test "there are no list or page templates, and no nav in the shell" do
-    refute File.exists?("templates/list.html.eex")
-    refute File.exists?("templates/page.html.eex")
-    refute Map.has_key?(Map.new(Site.Templates.files()), :list)
-    refute Map.has_key?(Map.new(Site.Templates.files()), :page)
-
-    header = File.read!("templates/_header.html.eex")
-    refute header =~ "<nav"
-    refute header =~ "site-nav"
-    refute header =~ "aria-current"
-    assert header =~ ~S(<a class="brand" href="/">yoan faure</a>)
-    assert header =~ ~S(<button class="theme-toggle" type="button" aria-label="Toggle theme">)
-  end
-
-  test "entries link back to the log, not to a section" do
-    for file <- ["templates/article.html.eex", "templates/project.html.eex"] do
-      source = File.read!(file)
-      assert source =~ ~S(<p class="back"><a href="/">← log</a></p>), file
-      refute source =~ "@section", file
-    end
-  end
-
-  test "the 404 terminal is made of pre lines, so every line is mono" do
-    source = File.read!("templates/404.html.eex")
-    assert length(Regex.scan(~r/<pre class="terminal/, source)) == 2
-    refute source =~ ~r/<p[\s>]/
-  end
-
-  test "the layout preloads the Inter variable font and has no script flag for modules" do
+  test "the layout preloads the Inter variable font and nothing from Google" do
     layout = File.read!("templates/layout.html.eex")
 
     assert layout =~
              ~S(<link rel="preload" href="/assets/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin>)
 
     refute layout =~ "JetBrainsMono"
-    refute layout =~ ".module"
+    refute layout =~ "preconnect"
+  end
+
+  test "the layout is a skip link and the page: no header, no footer of its own" do
+    layout = File.read!("templates/layout.html.eex")
+
+    assert layout =~ ~S|<a class="skip-link" href="<%= escape(@skip.href) %>">|
+    refute layout =~ "<header"
+    refute layout =~ "<footer"
+    refute layout =~ "<main"
+  end
+
+  test "the home is the name, the position and the feed, and the light after main" do
+    home = File.read!("templates/home.html.eex")
+
+    assert home =~ ~S(<main id="main" class="stage">)
+    assert home =~ ~S(<h1 class="name" id="name">)
+    assert home =~ ~S(<div class="name-lit" aria-hidden="true">)
+    assert home =~ ~S(<p class="role">)
+    assert home =~ "<%= feed(%{years: @years}) %>"
+    refute home =~ "<footer"
+    refute home =~ "raw("
+
+    [_, after_main] = String.split(home, "</main>")
+    assert after_main =~ ~S(<div class="spot" aria-hidden="true"></div>)
+    assert after_main =~ ~S(<div class="beam" aria-hidden="true"></div>)
+    assert after_main =~ ~S(<div class="bead" aria-hidden="true">)
+  end
+
+  test "there are no list templates, and no nav anywhere" do
+    refute File.exists?("templates/list.html.eex")
+    refute File.exists?("templates/page.html.eex")
+
+    for gone <- ~w(_log _footer _header _entry_links) do
+      refute File.exists?("templates/#{gone}.html.eex"), gone
+    end
+
+    for file <- @template_files do
+      refute File.read!(file) =~ "<nav", file
+      refute File.read!(file) =~ "aria-current", file
+    end
+  end
+
+  test "entries and the 404 open with the bar and end with the back link" do
+    for file <- ~w(article project 404) do
+      source = File.read!("templates/#{file}.html.eex")
+      assert source =~ ~r/\A<%= bar\(%\{esc: (true|false)\}\) %>/, file
+      assert source =~ "<%= article_end(%{links: ", file
+    end
+
+    end_ = File.read!("templates/_article_end.html.eex")
+    assert end_ =~ ~S(<a class="back" href="/" data-home>)
+    assert end_ =~ "All entries"
   end
 
   test "a hostile title cannot break out of a template" do
@@ -163,13 +161,16 @@ defmodule Site.TemplatesTest do
       slug: "x",
       title: ~S|"><script>alert(1)</script>|,
       date: ~D[2026-10-28],
+      summary: ~S|<img src=x>|,
       html: "<p>ok</p>"
     }
 
-    row = Site.Log.row(entry)
-    html = Site.Templates.log(%{rows: [row]})
+    row = entry |> Site.Log.row() |> Map.put(:n, 1)
+    html = Site.Templates.feed(%{years: [{2026, [row]}]})
     assert html =~ "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"
+    assert html =~ "&lt;img src=x&gt;"
     refute html =~ "<script>"
+    refute html =~ "<img"
 
     article =
       Site.Templates.article(%{

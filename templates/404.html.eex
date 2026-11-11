@@ -1,5 +1,12 @@
-<section class="not-found">
-  <h1 class="visually-hidden">page not found</h1>
-<pre class="terminal">zsh: no such file or directory: <span data-path><%= escape(@fallback) %></span></pre>
-  <pre class="terminal prompt"><a href="/">cd ~</a></pre>
-</section>
+<%= bar(%{esc: false}) %>
+
+<main id="main" class="article not-found">
+  <p class="meta">404</p>
+  <h1>Not found</h1>
+
+  <div class="prose">
+    <p>There is no page at <span class="path" data-path><%= escape(@fallback) %></span>.</p>
+  </div>
+
+<%= article_end(%{links: nil}) %>
+</main>

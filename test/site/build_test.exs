@@ -96,7 +96,7 @@ defmodule Site.BuildTest do
     end
 
     test "copies assets verbatim, skipping dotfiles", %{tree: tree} do
-      for rel <- ["css/site.css", "js/head.js", "js/theme.js", "js/404.js", "favicon.svg"] do
+      for rel <- ["css/site.css", "js/head.js", "js/site.js", "js/404.js", "favicon.svg"] do
         assert page(tree, "assets/" <> rel) == File.read!("assets/" <> rel)
       end
 
@@ -173,11 +173,10 @@ defmodule Site.BuildTest do
       refute page(tree, "404.html") =~ "og:url"
     end
 
-    test "the page sets the lang, with no field preset attribute and no transition switch",
-         %{tree: tree} do
+    test "the page sets the lang and a dark-first colour scheme", %{tree: tree} do
       for path <- @pages do
         assert page(tree, path) =~ ~s(<html lang="en">), path
-        refute page(tree, path) =~ "data-field=", path
+        assert page(tree, path) =~ ~s(<meta name="color-scheme" content="dark light">), path
         refute page(tree, path) =~ "data-vt", path
       end
     end
@@ -188,212 +187,325 @@ defmodule Site.BuildTest do
       refute @head_js =~ "field"
     end
 
-    test "the stylesheet is linked and no script is deferred wrongly", %{tree: tree} do
-      html = page(tree, "index.html")
-      assert html =~ ~s(<link rel="stylesheet" href="/assets/css/site.css">)
-      refute html =~ "transitions.css"
-      assert html =~ ~s(<script defer src="/assets/js/theme.js"></script>)
+    test "one stylesheet, site.js render-blocking, favicon.js deferred, nothing else", %{
+      tree: tree
+    } do
+      for path <- @pages do
+        html = page(tree, path)
+        assert html =~ ~s(<link rel="stylesheet" href="/assets/css/site.css">), path
+
+        assert html =~ ~s(<script defer blocking="render" src="/assets/js/site.js"></script>),
+               path
+
+        assert html =~ ~s(<script defer src="/assets/js/favicon.js"></script>), path
+
+        srcs = Regex.scan(~r/<script[^>]*\ssrc="([^"]+)"/, html) |> Enum.map(&List.last/1)
+        expected = ["/assets/js/site.js", "/assets/js/favicon.js"]
+        expected = if path == "404.html", do: expected ++ ["/assets/js/404.js"], else: expected
+        assert srcs == expected, path
+      end
+    end
+
+    test "fonts are self-hosted: no Google Fonts, no third-party stylesheet", %{tree: tree} do
+      for path <- @pages do
+        html = page(tree, path)
+        refute html =~ "fonts.googleapis", path
+        refute html =~ "fonts.gstatic", path
+        refute html =~ ~s(rel="preconnect"), path
+        assert length(Regex.scan(~r/<link rel="stylesheet"/, html)) == 1, path
+      end
     end
   end
 
   describe "shell" do
-    test "every page has the skip link, header, main, footer", %{tree: tree} do
-      for path <- @pages do
+    test "every page has one skip link, to the entries on the home and the content elsewhere",
+         %{tree: tree} do
+      assert page(tree, "index.html") =~
+               ~s(<body data-page="home">\n<a class="skip-link" href="#feed">Skip to the entries</a>)
+
+      for path <- @pages, path != "index.html" do
         html = page(tree, path)
-        assert html =~ ~s(<a class="skip-link" href="#main">), path
-        assert html =~ ~s(<header class="site-header">), path
-        assert html =~ ~s(<a class="brand" href="/">yoan faure</a>), path
 
-        assert html =~ ~s(<button class="theme-toggle" type="button" aria-label="Toggle theme">),
-               path
-
-        assert html =~ ~s(<main id="main">), path
-        assert html =~ ~s(<footer class="site-footer">), path
-        assert html =~ ~s(<a href="mailto:hi@yoanfaure.com">hi@yoanfaure.com</a>), path
-
-        assert html =~
-                 ~s(<a href="https://linkedin.com/in/yoan-faure" rel="noopener">linkedin</a>),
-               path
+        assert html =~ ~s(<a class="skip-link" href="#main">Skip to the content</a>), path
+        assert length(Regex.scan(~r/class="skip-link"/, html)) == 1, path
+        assert html =~ ~s(<main id="main" class="article), path
       end
     end
 
-    test "the header is the name and the theme toggle, and nothing else", %{tree: tree} do
-      for path <- @pages do
-        html = page(tree, path)
-        [header] = Regex.run(~r{<header class="site-header">.*?</header>}s, html)
-
-        assert header =~ ~s(<a class="brand" href="/">yoan faure</a>), path
-        assert header =~ ~s(<button class="theme-toggle"), path
-        assert length(Regex.scan(~r/<a[\s>]/, header)) == 1, path
-        assert length(Regex.scan(~r/<button[\s>]/, header)) == 1, path
-
-        # no navigation anywhere on the page
-        refute html =~ "<nav", path
-        refute html =~ "site-nav", path
-        refute html =~ "aria-current", path
-      end
-    end
-
-    test "the footer says unversioned or links the HEAD commit", %{tree: tree} do
+    test "the home has the theme toggle in a corner and no bar", %{tree: tree} do
       html = page(tree, "index.html")
 
-      assert html =~ ~s(<p class="footer-build">built from <span>unversioned</span></p>) or
-               html =~
-                 ~r|built from <a href="https://github.com/y0anfa/website/commit/[0-9a-f]{40}">[0-9a-f]{7}(-dirty)?</a>|
+      assert html =~ ~s(<div class="corner">\n<button class="theme-toggle" type="button")
+      refute html =~ ~s(class="bar")
+      assert length(Regex.scan(~r/class="theme-toggle"/, html)) == 1
     end
-  end
 
-  describe "the field backdrop (SPEC section 7)" do
-    @backdrop ~s(<div class="field" data-field-root aria-hidden="true">) <>
-                ~s(<canvas class="field-canvas"></canvas></div>)
-
-    test "every page has one backdrop root, right after the skip link and before the header",
+    test "entry pages and the 404 have the bar: back to the name on the left, the toggle on the right",
          %{tree: tree} do
-      for path <- @pages do
+      for path <- @pages, path != "index.html" do
         html = page(tree, path)
-        assert length(Regex.scan(~r/data-field-root/, html)) == 1, path
-        assert length(Regex.scan(~r/<canvas/, html)) == 1, path
+        [bar] = Regex.run(~r{<header class="bar">.*?</header>}s, html)
 
-        {skip, _} = :binary.match(html, ~s(<a class="skip-link"))
-        {field, _} = :binary.match(html, @backdrop)
-        {header, _} = :binary.match(html, ~s(<header class="site-header">))
-        {main, _} = :binary.match(html, ~s(<main id="main">))
-        assert skip < field and field < header and header < main, path
+        assert bar =~ ~s(<a class="back" href="/" data-home>), path
+        assert bar =~ "Yoan Faure", path
 
-        # the backdrop belongs to the page, not to its content
-        refute html |> String.split(~s(<main id="main">)) |> List.last() =~ "data-field-root",
+        assert bar =~ ~s(<button class="theme-toggle" type="button" aria-label="Switch theme">),
                path
+
+        assert length(Regex.scan(~r/<a[\s>]/, bar)) == 1, path
+        assert length(Regex.scan(~r/<button[\s>]/, bar)) == 1, path
+
+        # the Escape hint only where Escape goes back: entry pages, not the 404
+        if path == "404.html",
+          do: refute(bar =~ "<kbd"),
+          else: assert(bar =~ ~s(<kbd aria-hidden="true">Esc</kbd>), path)
       end
     end
 
-    test "every page loads field.js as a module, and only field.js", %{tree: tree} do
+    test "the toggle's icons are decorative and its label is set by site.js", %{tree: tree} do
+      html = page(tree, "index.html")
+      [toggle] = Regex.run(~r{<button class="theme-toggle".*?</button>}s, html)
+
+      assert length(Regex.scan(~r/<svg [^>]*aria-hidden="true"/, toggle)) == 2
+      assert toggle =~ ~s(class="icon-sun")
+      assert toggle =~ ~s(class="icon-moon")
+    end
+
+    test "no page has a nav, a site header or a site footer", %{tree: tree} do
       for path <- @pages do
         html = page(tree, path)
-
-        assert length(
-                 Regex.scan(~r{<script type="module" src="/assets/js/field\.js"></script>}, html)
-               ) ==
-                 1,
-               path
-
-        assert length(Regex.scan(~r/field\.js/, html)) == 1, path
-        assert length(Regex.scan(~r/type="module"/, html)) == 1, path
+        refute html =~ "<nav", path
+        refute html =~ "aria-current", path
+        refute html =~ "site-header", path
+        refute html =~ "site-footer", path
+        refute html =~ "built from", path
+        refute html =~ "mailto:", path
+        refute html =~ "linkedin", path
       end
     end
 
-    test "no page has a hero or a second field", %{tree: tree} do
+    test "the old design is gone: no field backdrop, no canvas, no log", %{tree: tree} do
       for path <- @pages do
         html = page(tree, path)
-        refute html =~ ~s(class="hero"), path
-        refute html =~ "data-hotspot", path
+        refute html =~ "data-field", path
+        refute html =~ "<canvas", path
+        refute html =~ "field.js", path
+        refute html =~ "theme.js", path
+        refute html =~ "transitions.js", path
+        refute html =~ ~s(type="module"), path
+        refute html =~ ~r/class="log/, path
+      end
+
+      for asset <- ~w(assets/js/field.js assets/js/theme.js assets/js/transitions.js) do
+        refute Map.has_key?(tree, asset), asset
       end
     end
   end
 
   describe "home (SPEC section 7)" do
-    test "is an intro and the log, with no hero or field section", %{tree: tree} do
+    defp main(html) do
+      [_, main] = Regex.run(~r{<main id="main" class="stage">(.*)</main>}s, html)
+      main
+    end
+
+    test "is the name, the position and the timeline, and nothing else", %{tree: tree} do
       html = page(tree, "index.html")
+      main = main(html)
 
-      assert html =~ ~s(<div class="intro">)
-      assert html =~ ~s(<section class="log-section" aria-labelledby="log-h">)
-      assert html =~ ~s(<h2 id="log-h">log</h2>)
-      assert html =~ ~s(<ol class="log">)
-
-      [_, main] = String.split(html, ~s(<main id="main">))
-      refute main =~ "hero"
-      refute main =~ "field"
-      refute main =~ "canvas"
-      assert length(Regex.scan(~r/<section/, main)) == 1
+      assert main =~ ~s(<section class="identity" aria-labelledby="name">)
+      assert main =~ ~s(<section class="timeline" id="feed" aria-labelledby="feed-label">)
+      assert length(Regex.scan(~r/<section/, main)) == 2
       assert length(Regex.scan(~r/<h1/, html)) == 1
+
+      # no intro text, no contact line, no footer, no build hash
+      refute html =~ "This is the intro paragraph."
+      refute html =~ "Fixture tagline for the home page."
+      refute html =~ "<footer"
+      refute html =~ "unversioned"
+      refute html =~ ~r/[0-9a-f]{7}-dirty|·······/
     end
 
-    test "the intro comes before the log and holds h1, tagline, the Markdown and the contact line",
-         %{tree: tree} do
-      html = page(tree, "index.html")
-      {main, _} = :binary.match(html, ~s(<main id="main">))
-      {intro, _} = :binary.match(html, ~s(<div class="intro">))
-      {log, _} = :binary.match(html, ~s(<section class="log-section"))
-      assert main < intro and intro < log
+    test "the name is the h1, one line per word, with an aria-hidden lit copy", %{tree: tree} do
+      main = main(page(tree, "index.html"))
 
-      [_, intro_html] = Regex.run(~r{<div class="intro">(.*?)<section class="log-section"}s, html)
+      assert main =~
+               ~r{<h1 class="name" id="name">\s*<span class="name-line"><span>Test</span></span>\s*<span class="name-line"><span>Person</span></span>\s*</h1>}
 
-      assert intro_html =~
-               ~r{\A\s*<h1>Test Person</h1>\s*<p class="tagline">Fixture tagline for the home page.</p>}
-
-      assert intro_html =~ ~s(<p>This is the intro paragraph.)
-      assert intro_html =~ ~s(<p class="contact"><a href="mailto:hi@yoanfaure.com">)
+      assert main =~
+               ~r{<div class="name-lit" aria-hidden="true">\s*<div class="name-lit-inner">\s*<p class="name">\s*<span class="name-line"><span>Test</span></span>}
     end
 
-    test "the log lists every entry in order, hashes as dots", %{tree: tree} do
-      html = page(tree, "index.html")
+    test "the position links the company", %{tree: tree} do
+      assert main(page(tree, "index.html")) =~
+               ~s(<p class="role">Security engineer at <a class="text-link" href="https://tryriot.com" rel="noopener">Riot</a></p>)
+    end
 
-      titles =
-        Regex.scan(~r{<a class="log-title" href="([^"]+)">}, html)
-        |> Enum.map(&List.last/1)
+    test "the timeline is a hidden heading, a year label and one ordered list", %{tree: tree} do
+      main = main(page(tree, "index.html"))
 
-      assert titles == [
+      assert main =~
+               ~r{<h2 class="visually-hidden" id="feed-label">Entries, newest first</h2>\s*<p class="year" aria-hidden="true">2026</p>\s*<div class="tl">\s*<ol class="feed">}
+
+      assert length(Regex.scan(~r/<ol class="feed">/, main)) == 1
+      assert length(Regex.scan(~r/class="year"/, main)) == 1
+    end
+
+    test "lists every entry in order, numbered, with its month", %{tree: tree} do
+      main = main(page(tree, "index.html"))
+
+      rows =
+        Regex.scan(~r{<li class="entry-row" data-row="(\d+)" data-month="([\d-]+)">}, main)
+        |> Enum.map(fn [_, n, month] -> {n, month} end)
+
+      assert rows == [
+               {"1", "2026-10"},
+               {"2", "2026-10"},
+               {"3", "2026-10"},
+               {"4", "2026-10"},
+               {"5", "2026-03"}
+             ]
+
+      hrefs = Regex.scan(~r{<a class="entry" href="([^"]+)"}, main) |> Enum.map(&List.last/1)
+
+      assert hrefs == [
                "/second-essay/",
-               "/widget/",
+               "https://example.com/widget",
                "/small-note/",
                "/escape-me/",
                "/first-essay/"
              ]
-
-      assert length(Regex.scan(~s(<a class="log-hash">·······</a>) |> Regex.compile!(), html)) ==
-               5
-
-      assert html =~ ~s(<time class="log-date" datetime="2026-10-28">2026-10-28</time>)
     end
 
-    test "the log is the only list: no list pages, and no link to one", %{tree: tree} do
+    test "an entry is its title and short description in the link, and its date beside it",
+         %{tree: tree} do
+      main = main(page(tree, "index.html"))
+
+      assert main =~
+               ~r{<a class="entry" href="/small-note/">\s*<span class="entry-title">Small note</span>\s*<span class="entry-desc">One idea, briefly.</span>\s*</a>\s*<time class="entry-date" datetime="2026-10-28">28 Oct<span class="visually-hidden"> 2026</span></time>\s*</li>}
+
+      # the date is day and month; the year is there for a screen reader only
+      assert main =~
+               ~s(<time class="entry-date" datetime="2026-03-28">28 Mar<span class="visually-hidden"> 2026</span></time>)
+    end
+
+    test "the short description is the summary, else the description", %{tree: tree} do
+      main = main(page(tree, "index.html"))
+
+      # second-essay sets a summary: it wins over the description
+      assert main =~ ~s(<span class="entry-desc">The short line on the timeline.</span>)
+      refute main =~ "A second essay, with its own description."
+
+      # the others fall back to their description (first-essay: its first paragraph)
+      assert main =~ ~s(<span class="entry-desc">One idea, briefly.</span>)
+      assert main =~ ~s(<span class="entry-desc">An essay without a description)
+    end
+
+    test "a project with a link goes straight to it, and says so", %{tree: tree} do
+      main = main(page(tree, "index.html"))
+
+      assert main =~
+               ~s(<a class="entry" href="https://example.com/widget" rel="noopener">\n) <>
+                 ~s|          <span class="entry-title">widget<span class="entry-out" aria-hidden="true">↗</span><span class="visually-hidden"> (external)</span></span>|
+
+      # only the link that leaves the site has rel and the arrow
+      assert length(Regex.scan(~r/rel="noopener"/, main)) == 2
+      assert length(Regex.scan(~r/class="entry-out"/, main)) == 1
+      refute main =~ ~s(href="/widget/")
+
+      # its own page is still built, with its twin and its share image
+      assert page(tree, "widget/index.html") =~ "<h1>widget</h1>"
+      assert Map.has_key?(tree, "widget.md")
+      assert Map.has_key?(tree, "og/widget.png")
+    end
+
+    test "the light is three empty, aria-hidden layers after main, on the home only", %{
+      tree: tree
+    } do
+      html = page(tree, "index.html")
+      [_, after_main] = String.split(html, "</main>")
+
+      for layer <- [
+            ~s(<div class="spot" aria-hidden="true"></div>),
+            ~s(<div class="beam" aria-hidden="true"></div>),
+            ~s(<div class="bead" aria-hidden="true"><span class="bead-date"></span></div>)
+          ] do
+        assert after_main =~ layer
+      end
+
+      for path <- @pages, path != "index.html" do
+        refute page(tree, path) =~ ~r/class="(spot|beam|bead)"/, path
+      end
+    end
+
+    test "the type is not shown", %{tree: tree} do
+      html = page(tree, "index.html")
+      refute html =~ ~r{>(essay|note|project)</}
+      refute html =~ "log-type"
+    end
+
+    test "no list pages, and no link to one", %{tree: tree} do
       html = page(tree, "index.html")
 
-      assert length(Regex.scan(~r/class="log-row"/, html)) == 5
       refute html =~ ~r{href="/(essays|notes|projects|uses|cv)/}
 
       for {path, content} <- tree, String.ends_with?(path, ".html") do
         refute content =~ ~s(class="list-page"), path
-        refute content =~ ~s(class="lede"), path
       end
     end
 
-    test "no row says what kind of entry it is: the type is not shown", %{tree: tree} do
-      html = page(tree, "index.html")
-
-      refute html =~ "log-type"
-      refute html =~ ~r{>(essay|note|project)</}
-    end
-
-    test "an empty log says so" do
+    test "an empty timeline says so" do
       dir = minimal_content()
       out = Path.join(tmp_dir(), "dist")
       Build.run(content: dir, out: out)
+      html = out |> Path.join("index.html") |> File.read!()
 
-      assert out |> Path.join("index.html") |> File.read!() =~
-               ~s(<p class="empty">nothing here yet.</p>)
+      assert html =~ ~s(<p class="empty">Nothing here yet.</p>)
+      refute html =~ "<ol"
+      refute html =~ ~s(class="year")
+    end
+
+    test "a year label where the year changes, each year its own list" do
+      entry = fn title, date -> "---\ntitle: #{title}\ndate: #{date}\n---\nBody.\n" end
+
+      dir =
+        minimal_content(%{
+          "notes/a.md" => entry.("New", "2026-02-01"),
+          "notes/b.md" => entry.("Old", "2025-11-20"),
+          "notes/c.md" => entry.("Older", "2025-01-05")
+        })
+
+      out = Path.join(tmp_dir(), "dist")
+      Build.run(content: dir, out: out)
+      html = out |> Path.join("index.html") |> File.read!()
+
+      years = Regex.scan(~r{<p class="year" aria-hidden="true">(\d+)</p>}, html)
+      assert Enum.map(years, &List.last/1) == ["2026", "2025"]
+      assert length(Regex.scan(~r/<ol class="feed">/, html)) == 2
+
+      # the rows are numbered across the years, newest first
+      assert Regex.scan(~r/data-row="(\d)"/, html) |> Enum.map(&List.last/1) == ~w(1 2 3)
+      assert html =~ ~s(1 Feb<span class="visually-hidden"> 2026</span>)
+      assert html =~ ~s(5 Jan<span class="visually-hidden"> 2025</span>)
     end
   end
 
   describe "entries and the 404" do
-    test "an article has the meta line, the body and the back link", %{tree: tree} do
+    test "an article: the meta line is the full date only, then h1, the text and the end",
+         %{tree: tree} do
       html = page(tree, "first-essay/index.html")
 
-      assert html =~ ~s(<article class="prose">)
-
       assert html =~
-               ~s(<p class="meta"><time datetime="2026-03-28">2026-03-28</time> · <span>·······</span></p>)
+               ~r{<main id="main" class="article">\s*<article>\s*<p class="meta"><time datetime="2026-03-28">28 Mar 2026</time></p>\s*<h1>First essay</h1>\s*<div class="prose">}
 
-      assert html =~ ~s(<h1>First essay</h1>)
       assert html =~ ~s(<h2 id="a-heading">)
-      assert html =~ ~s(<p class="back"><a href="/">← log</a></p>)
       assert html =~ "<table>"
       assert html =~ ~s(<pre><code class="language-sh">)
+      assert html =~ ~r{<footer class="article-end">\s*<a class="back" href="/" data-home>}
+      assert html =~ ~r{</svg>\s*All entries\s*</a>}
 
       note = page(tree, "small-note/index.html")
-      assert note =~ ~s(<p class="back"><a href="/">← log</a></p>)
-
-      assert note =~
-               ~s(<p class="meta"><time datetime="2026-10-28">2026-10-28</time> · <span>·······</span></p>)
+      assert note =~ ~s(<p class="meta"><time datetime="2026-10-28">28 Oct 2026</time></p>)
+      refute note =~ "·······"
     end
 
     test "raw HTML in Markdown is never rendered", %{tree: tree} do
@@ -405,28 +517,33 @@ defmodule Site.BuildTest do
       assert html =~ "&lt;script&gt;alert(1)&lt;/script&gt;"
     end
 
-    test "a project has h1, tagline, meta line and body", %{tree: tree} do
+    test "a project: date, h1, tagline, facts, the text and the end", %{tree: tree} do
       html = page(tree, "widget/index.html")
 
-      assert html =~ ~s(<article class="prose project">)
+      assert html =~ ~s(<main id="main" class="article project">)
 
       assert html =~
-               ~r{<h1>widget</h1>\s*<p class="tagline">A small widget for the fixtures.</p>}
+               ~r{<p class="meta"><time datetime="2026-10-28">28 Oct 2026</time></p>\s*<h1>widget</h1>\s*<p class="lede">A small widget for the fixtures.</p>}
 
       assert html =~
-               ~s(<p class="meta"><span>active</span> · <span>Elixir, YAML</span> · <a href="https://example.com/widget">example.com/widget</a></p>)
+               ~s(<p class="facts"><span>active</span><span class="sep" aria-hidden="true"> · </span><span>Elixir, YAML</span><span class="sep" aria-hidden="true"> · </span><a href="https://example.com/widget">example.com/widget</a></p>)
 
       assert html =~ "<li>one</li>"
-      assert html =~ ~s(<p class="back"><a href="/">← log</a></p>)
+      assert html =~ ~s(<footer class="article-end">)
     end
 
-    test "the 404 page is a terminal", %{tree: tree} do
+    test "the 404 is a short page in the same language", %{tree: tree} do
       html = page(tree, "404.html")
 
       assert html =~
-               ~s(<pre class="terminal">zsh: no such file or directory: <span data-path>unknown</span></pre>)
+               ~r{<main id="main" class="article not-found">\s*<p class="meta">404</p>\s*<h1>Not found</h1>}
 
-      assert html =~ ~s(<pre class="terminal prompt"><a href="/">cd ~</a></pre>)
+      assert html =~
+               ~s(<p>There is no page at <span class="path" data-path>this address</span>.</p>)
+
+      assert html =~ ~r{<footer class="article-end">\s*<a class="back" href="/" data-home>}
+      refute html =~ "entry-links"
+      refute html =~ "<pre"
       assert html =~ ~s(<script defer src="/assets/js/404.js"></script>)
     end
   end

@@ -149,30 +149,31 @@ defmodule Site.StatsTest do
       grid = rule(".stats")
 
       assert grid =~ "display: grid;"
-      # 8.5rem minimum: four columns fit the 38rem reading column, two fit a phone
-      assert grid =~ "grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));"
+      # 136px minimum: four columns fit the 580px reading column, two fit a phone
+      assert grid =~ "grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));"
     end
 
-    test "sets the value in Inter 700, large and tight, and the label small and muted" do
+    test "sets the value in Inter, large and tight, and the label small and quiet" do
       value = rule(".stats dt")
       label = rule(".stats dd")
 
-      assert value =~ ~r/font-size: clamp\(2\.25rem, [^;]*, 2\.75rem\);/
-      assert value =~ "font-weight: 700;"
+      assert value =~ ~r/font-size: clamp\(36px, [^;]*, 44px\);/
+      assert value =~ "font-weight: 600;"
       assert value =~ "letter-spacing: -0.03em;"
       refute value =~ "font-family"
 
-      assert label =~ "color: var(--muted);"
-      assert label =~ "font-size: 0.875rem;"
+      assert label =~ "color: var(--text-2);"
+      assert label =~ "font-size: 14px;"
       refute label =~ "font-family"
     end
 
-    test "is ruled with the --rule hairline and uses no raw colour" do
+    test "is ruled with the --line hairline and uses no raw colour" do
       cell = rule(".stats > div")
 
-      assert cell =~ "border-top: 1px solid var(--rule);"
+      assert cell =~ "border-top: 1px solid var(--line);"
 
-      block = @css |> String.split("stat callouts") |> List.last()
+      [_, block] = String.split(@css, "stat callouts", parts: 2)
+      [block | _] = String.split(block, "/* ----------", parts: 2)
       refute block =~ ~r/#[0-9a-fA-F]{3,6}\b/
       refute block =~ "!important"
     end

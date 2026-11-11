@@ -72,6 +72,18 @@ defmodule Site.ContentTest do
       assert widget.description == "A small widget for the fixtures."
     end
 
+    test "the short summary comes from frontmatter, else the description", %{content: content} do
+      second = Enum.find(content.essays, &(&1.slug == "second-essay"))
+      assert second.summary == "The short line on the timeline."
+      assert second.description == "A second essay, with its own description."
+
+      note = Enum.find(content.notes, &(&1.slug == "small-note"))
+      assert note.summary == note.description
+
+      widget = hd(content.projects)
+      assert widget.summary == "A small widget for the fixtures."
+    end
+
     test "project fields", %{content: content} do
       widget = hd(content.projects)
       assert widget.tagline == "A small widget for the fixtures."
@@ -127,6 +139,13 @@ defmodule Site.ContentTest do
 
       error = load_error(%{"projects/p.md" => head <> "stack: Go\n---\nbody"})
       assert error.message =~ "`stack` must be a list"
+    end
+
+    test "summary must be a string" do
+      error =
+        load_error(%{"notes/n.md" => "---\ntitle: N\ndate: 2026-10-28\nsummary: [a, b]\n---\nb"})
+
+      assert error.message =~ "notes/n.md: `summary` must be a string"
     end
 
     test "draft must be a boolean" do

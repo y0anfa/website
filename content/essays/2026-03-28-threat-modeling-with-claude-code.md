@@ -1,6 +1,7 @@
 ---
 title: Threat modeling with Claude Code
 date: 2026-03-28
+summary: A Claude Code skill that runs STRIDE.
 description: Threat modeling gets skipped under pressure, so we built a Claude Code skill that runs STRIDE inside the developer workflow.
 ---
 

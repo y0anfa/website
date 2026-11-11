@@ -1,9 +1,23 @@
 /* yoanfaure.com
-   Monochrome. Inter for everything that is read; JetBrains Mono only for code,
-   the log's hash and date, and the backdrop field. Nothing decorative except
-   the field. Tokens first, then base, backdrop, shell, content, log, home. */
 
-/* ---------- fonts ---------- */
+   Graphite and one warm lamp, set in Inter. Dark first, with a light theme.
+
+   The home is one poster: the name, the position, and the entries on a vertical
+   axis, newest at the top. A warm light rides the axis: it follows the pointer,
+   rakes across the letters of the name, lights the entry it reaches. An entry
+   page is one centred reading column under the same lamp.
+
+   CSP: no inline style anywhere. Positions the script computes are written
+   through the CSSOM (element.style.setProperty), never as attributes.
+
+   Tokens, fonts, base, the theme toggle, the home (stage, name, timeline, light,
+   entrance), the entry pages (bar, article, prose, end), the 404, small screens,
+   page transitions, reduced motion. */
+
+/* ---------- fonts ----------
+   Self-hosted. Inter is the variable font with its optical-size axis, so the
+   name, the titles and the text each get the cut drawn for their size.
+   JetBrains Mono is only for code. */
 
 @font-face {
   font-family: "Inter";
@@ -29,63 +43,49 @@
   font-display: swap;
 }
 
-/* ---------- tokens ---------- */
+/* ---------- tokens ----------
+   Each colour is light-dark(light, dark). No data-theme: the system decides;
+   data-theme forces one (head.js restores it, site.js toggles it). */
 
 :root {
-  --bg: #f4efe4;
-  --fg: #262523;
-  --muted: #6b675f;
-  --rule: #ddd6c8;
+  color-scheme: dark light;
 
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --gutter: clamp(1rem, 4vw, 2.5rem);
-  --header-h: 3.5rem;
+  --bg: light-dark(#f7f7f6, #0d0f14);
+  --line: light-dark(rgb(20 22 28 / 0.09), rgb(255 255 255 / 0.07));
+  --line-strong: light-dark(rgb(20 22 28 / 0.18), rgb(255 255 255 / 0.15));
+  --hover: light-dark(rgb(20 22 28 / 0.04), rgb(255 255 255 / 0.04));
 
-  /* page transitions (see the end of this file). The theme toggle keeps its own
-     200ms cross-fade. A navigation enters in 400ms, decelerating, and leaves in 40%
-     of that, accelerating; the new content starts a beat after the title. */
-  --vt-duration: 200ms;
-  --vt-ease: ease-out;
-  --vt-enter: 400ms;
-  --vt-exit: 160ms;
-  --vt-stagger: 70ms;
-  --vt-ease-enter: cubic-bezier(0.2, 0, 0, 1);
-  --vt-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --text: light-dark(#15171c, #ecebe8);
+  --text-prose: light-dark(#2a2d34, #cfd0d3);
+  --text-2: light-dark(#4d515a, #a2a6ae);
+  --text-3: light-dark(#62666f, #80848d);
+  --name: light-dark(#15171c, #d6d5d2);
 
-  /* The page column: header, main and footer share one width, centred, on
-     every page, so the brand never moves. 38rem of text is about 68 characters
-     of Inter at the entry body size. In rem, not ch, because the footer has a
-     smaller font and its ch would be narrower. */
-  --column: calc(38rem + 2 * var(--gutter));
+  /* the lamp: the one colour */
+  --lamp: light-dark(#9a5a00, #f2c47c);
+  --focus: light-dark(#9a5a00, #f2c47c);
+  --lit: light-dark(#8a4f00, #fff3df);
+  --lit-glow: light-dark(rgb(255 176 84 / 0.35), rgb(242 180 104 / 0.45));
+  --glow-hot: light-dark(rgb(255 214 168 / 0.30), rgb(255 222 180 / 0.10));
+  --glow-core: light-dark(rgb(255 184 110 / 0.18), rgb(242 170 92 / 0.12));
+  --glow-wide: light-dark(rgb(150 170 220 / 0.12), rgb(110 130 190 / 0.07));
+  --spot: light-dark(rgb(255 178 92 / 0.24), rgb(242 180 104 / 0.11));
+  --card: light-dark(rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.03));
+  --beam-line: light-dark(rgb(154 90 0 / 0.30), rgb(242 196 124 / 0.30));
 
-  /* What the column is painted with. Inner pages: opaque paper with hairline
-     edges, so the field only shows in the side margins. Home: nothing. */
-  --paper: var(--bg);
-  --edge: var(--rule);
-  --halo: none;
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
+  --gutter: clamp(16px, 4vw, 48px);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --fast: 160ms;
+}
+
+:root[data-theme="light"] {
   color-scheme: light;
 }
 
-/* No data-theme: follow the system. data-theme forces a theme. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #1e1d1b;
-    --fg: #ece6d9;
-    --muted: #9a958b;
-    --rule: #34322f;
-
-    color-scheme: dark;
-  }
-}
-
 :root[data-theme="dark"] {
-  --bg: #1e1d1b;
-  --fg: #ece6d9;
-  --muted: #9a958b;
-  --rule: #34322f;
-
   color-scheme: dark;
 }
 
@@ -99,290 +99,986 @@
 
 html {
   /* the page colour on the root itself, not only on body: the root image of a view
-     transition and anything transparent in it then start from the page, never from
-     the browser's white canvas */
+     transition and anything transparent in it start from the page, never from the
+     browser's white canvas */
   background: var(--bg);
-  font-size: 16px;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  scroll-padding-top: 4.5rem;
-}
-
-@media (min-width: 960px) {
-  html {
-    font-size: 17px;
-  }
 }
 
 body {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   margin: 0;
   background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-sans);
-  font-size: 1rem;
-  font-weight: 400;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
   line-height: 1.6;
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Home: the field shows behind everything. Text keeps a soft halo of the
-   background colour, so a line of the field never cuts through a word. */
-body[data-page="home"] {
-  --paper: transparent;
-  --edge: transparent;
-  --halo: 0 0 0.25em var(--bg), 0 0 0.5em var(--bg), 0 0 0.5em var(--bg);
+/* The lamp over the page. Part of the root image, so it stays put while a page
+   transition runs. */
+body::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 0 0 auto;
+  height: min(860px, 120vh);
+  pointer-events: none;
+  background:
+    radial-gradient(30% 46% at 20% -6%, var(--glow-hot), transparent 70%),
+    radial-gradient(52% 64% at 24% -14%, var(--glow-core), transparent 72%),
+    radial-gradient(72% 70% at 70% -24%, var(--glow-wide), transparent 70%);
 }
 
-main {
-  flex: 1 0 auto;
-  padding-bottom: clamp(3rem, 8vw, 5rem);
+body:not([data-page="home"])::before {
+  height: min(560px, 80vh);
+  opacity: 0.7;
 }
 
-::selection {
-  background: var(--fg);
-  color: var(--bg);
+p,
+h1,
+h2,
+ol {
+  margin: 0;
 }
 
 a {
   color: inherit;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.2em;
 }
 
-a[href]:hover,
-a[href]:focus-visible,
-button:hover,
-button:focus-visible {
-  background: var(--fg);
-  color: var(--bg);
+svg {
+  display: block;
 }
 
-:focus-visible {
-  outline: 2px solid var(--fg);
-  outline-offset: 2px;
-}
-
-h1,
-h2,
-h3,
-h4 {
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
-}
-
-h1 {
-  margin: 0 0 1.25rem;
-  font-size: clamp(1.875rem, 1.3rem + 2.2vw, 2.5rem);
-  line-height: 1.12;
-  letter-spacing: -0.03em;
-}
-
-/* The only mono in the text. One weight ships, so nothing is faked. */
 code,
-pre,
-kbd {
-  font-family: var(--font-mono);
+pre {
+  font-family: var(--mono);
   font-weight: 400;
   font-style: normal;
   font-variant-ligatures: none;
-  font-feature-settings: "calt" 0;
 }
 
-.visually-hidden,
-.skip-link:not(:focus) {
+::selection {
+  background: color-mix(in srgb, var(--lamp) 30%, transparent);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
   margin: -1px;
   padding: 0;
   overflow: hidden;
-  clip-path: inset(50%);
+  clip: rect(0 0 0 0);
   white-space: nowrap;
+  border: 0;
 }
 
 .skip-link {
-  position: fixed;
-  top: 0.75rem;
-  left: var(--gutter);
-  z-index: 100;
-  padding: 0.35rem 0.75rem;
-  background: var(--fg);
-  color: var(--bg);
-}
-
-/* ---------- backdrop: the field ---------- */
-
-/* A fixed, full-viewport layer behind the page (field.js draws into it).
-   The shell sits above it; inner pages paint an opaque column over it.
-   field.js builds its character grid from this element's computed font, so the
-   field says "mono" itself instead of inheriting the sans from the body. */
-.field {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 1;
-  color: var(--fg);
-}
-
-.field-canvas {
   position: absolute;
-  inset: 0;
+  z-index: 100;
+  top: 12px;
+  left: var(--gutter);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transform: translateY(-180%);
+  transition: transform var(--fast) var(--ease);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+}
+
+.text-link,
+.prose a,
+.facts a {
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+  transition:
+    color var(--fast) var(--ease),
+    text-decoration-color var(--fast) var(--ease);
+}
+
+.text-link:hover,
+.prose a:hover,
+.facts a:hover {
+  color: var(--text);
+  text-decoration-color: var(--lamp);
+}
+
+/* ---------- theme toggle ---------- */
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+
+.theme-toggle:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* without script the toggle could not do anything: it is not shown */
+:root:not(.js) .theme-toggle {
+  display: none;
+}
+
+/* The icon shows the theme a click switches to. Dark first. */
+.theme-toggle .icon-moon {
+  display: none;
+}
+
+:root[data-theme="light"] .theme-toggle .icon-sun {
+  display: none;
+}
+
+:root[data-theme="light"] .theme-toggle .icon-moon {
   display: block;
 }
 
-/* ---------- shell: the column ---------- */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .theme-toggle .icon-sun {
+    display: none;
+  }
 
-.site-header,
-main,
-.site-footer {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: var(--column);
-  margin-inline: auto;
-  background: var(--paper);
-  box-shadow: 1px 0 0 var(--edge), -1px 0 0 var(--edge);
-  text-shadow: var(--halo);
+  :root:not([data-theme="dark"]) .theme-toggle .icon-moon {
+    display: block;
+  }
 }
 
-/* an inverted link or button is its own background: no halo on it */
-.site-header a[href]:is(:hover, :focus-visible),
-.site-header button:is(:hover, :focus-visible),
-main a[href]:is(:hover, :focus-visible),
-.site-footer a[href]:is(:hover, :focus-visible) {
-  text-shadow: none;
+.corner {
+  position: absolute;
+  z-index: 20;
+  top: 16px;
+  right: calc(var(--gutter) - 8px);
 }
 
-/* ---------- shell: header ---------- */
+/* ---------- home: the stage ----------
+   Two columns on a wide screen, centred together: the name on the left, the
+   timeline on the right, close enough to read as a pair. */
 
-/* The name on the left, the theme toggle on the right. Nothing else. */
-.site-header {
-  display: flex;
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  height: var(--header-h);
-  padding: 0 var(--gutter);
+  column-gap: clamp(40px, 5vw, 88px);
+  width: 100%;
+  max-width: calc(1040px + 2 * var(--gutter));
+  min-height: 100vh;
+  margin-inline: auto;
+  padding: clamp(72px, 11vh, 128px) var(--gutter) clamp(56px, 9vh, 104px);
 }
 
-.brand {
-  margin-left: -0.3em;
-  padding: 0 0.3em;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+.identity {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.name-wrap {
+  position: relative;
+}
+
+/* A display size, not a poster: 40px on a phone up to 68px on a wide screen. */
+.name {
+  color: var(--name);
+  font-size: clamp(2.5rem, 1.7rem + 2.6vw, 4.25rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.name-line {
+  display: block;
+  overflow: clip;
+  /* room for the glyphs inside the clip, given back to the layout */
+  padding-block: 0.06em;
+  margin-block: -0.06em;
+}
+
+.name-line > span {
+  display: block;
+}
+
+/* The decrypt (site.js, once a visit): the real name stays in place, in the
+   accessibility tree and in the layout, but transparent, while an aria-hidden
+   overlay cycles glyphs in one fixed slot per letter, then hands back. */
+.name-wrap.is-decrypting > .name {
+  color: transparent;
+}
+
+.name-scramble {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.scramble-slot {
+  position: absolute;
+  display: block;
+  color: color-mix(in srgb, var(--lamp) 80%, transparent);
+  letter-spacing: 0;
+  text-align: center;
+  white-space: pre;
+}
+
+.scramble-slot.is-locked {
+  color: var(--name);
+}
+
+/* The lit copy of the name: a window of light that rides the pointer's height.
+   The window moves one way and its content the other, by the same amount and on
+   the same curve, so the letters stay in register with the name below and only
+   the light travels. Transforms only, from two custom properties: --my (the
+   pointer) and --wy (the top of the name), both written by site.js. */
+.name-lit {
+  display: none;
+}
+
+.js .name-lit {
+  display: block;
+  position: absolute;
+  inset: 0 0 auto;
+  height: 220px;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 38%, #000 62%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 38%, #000 62%, transparent);
+  opacity: 0;
+  transform: translate3d(0, calc(var(--my, -9999px) - var(--wy, 0px) - 110px), 0);
+  transition:
+    opacity 600ms var(--ease),
+    transform 520ms var(--ease);
+  will-change: transform;
+}
+
+.name-lit-inner {
+  transform: translate3d(0, calc(var(--wy, 0px) + 110px - var(--my, -9999px)), 0);
+  transition: transform 520ms var(--ease);
+  will-change: transform;
+}
+
+.js.beam-on .name-lit {
+  opacity: 1;
+}
+
+.name-lit .name {
+  color: var(--lit);
+}
+
+.role {
+  margin-top: 0;
+  padding-top: 20px;
+  color: var(--text-2);
+  font-size: 17px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- home: the timeline ----------
+   The entries on a vertical axis, newest at the top, under the year. Each entry is
+   a mark on the axis, its date in the column to the left, its title to the right;
+   its short description shows only on the entry that is lit, hovered or focused.
+   A new year label where the year changes. */
+
+.timeline {
+  --axis: 96px;
+  min-width: 0;
+}
+
+.year {
+  /* sits on the axis, above the first entry */
+  width: var(--axis);
+  margin-bottom: 20px;
+  padding-right: 20px;
+  color: var(--text-3);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+  text-align: right;
+}
+
+.tl + .year {
+  margin-top: 8px;
+}
+
+.empty {
+  color: var(--text-3);
+}
+
+.tl {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--axis) minmax(0, 1fr);
+}
+
+/* the axis */
+.tl::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--axis) - 1px);
+  width: 1px;
+  background: linear-gradient(to bottom, var(--line-strong), var(--line-strong) 70%, transparent);
+  transform-origin: top;
+}
+
+/* a grid, so each entry is its own formatting context and the entry's negative
+   margin stays inside its row */
+.feed {
+  display: grid;
+  grid-column: 2;
+  padding: 0;
+  list-style: none;
+}
+
+/* --age: 0 for the newest entry, 1 for the oldest. Here by position, so it holds
+   without script; site.js sets it from the dates themselves. --i is the entry's
+   place in the entrance, set by site.js. --c is the centre line of the title's
+   first line, --pad the title's inset: the mark, the leader and the axis are all
+   placed from them, on whole pixels, so a 1px line never blurs and the three line
+   up at any size. */
+.entry-row {
+  --age: 1;
+  --i: 1;
+  --c: 15px;
+  --pad: 32px;
+  position: relative;
+  padding: 0 0 44px var(--pad);
+}
+
+.tl:first-of-type .entry-row:nth-child(1) {
+  --age: 0;
+}
+
+.tl:first-of-type .entry-row:nth-child(2) {
+  --age: 0.5;
+}
+
+/* the entry's mark on the axis */
+.entry-row::before {
+  content: "";
+  position: absolute;
+  top: calc(var(--c) - 5px);
+  left: -6px;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--bg);
+  transition:
+    transform 320ms var(--ease),
+    background-color 320ms var(--ease),
+    border-color 320ms var(--ease),
+    box-shadow 320ms var(--ease);
+}
+
+/* the leader: from just after the mark to just before the title */
+.entry-row::after {
+  content: "";
+  position: absolute;
+  top: var(--c);
+  left: 8px;
+  width: calc(var(--pad) - 16px);
+  height: 1px;
+  background: var(--line-strong);
+  transition:
+    background-color 320ms var(--ease),
+    box-shadow 320ms var(--ease);
+}
+
+/* Its date stands in the column left of the axis, tinted by age: the newest in the
+   lamp's colour, cooling to grey with time. Both ends pass AA on either theme, and
+   so does every mix between them. */
+.entry-date {
+  position: absolute;
+  top: 3px;
+  right: calc(100% + 20px);
+  color: color-mix(in oklab, var(--lamp) calc(100% - var(--age) * 100%), var(--text-3));
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 30px;
+  white-space: nowrap;
+  transition: color 320ms var(--ease);
+}
+
+/* The entry, with room around it for its glow; the negative margin keeps the
+   text on the column's line. A link and a 44px target at least. */
+.entry {
+  display: block;
+  max-width: calc(100% + 28px);
+  min-height: 44px;
+  margin: -10px -14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: inherit;
   text-decoration: none;
 }
 
-.theme-toggle {
-  margin: 0 -0.4rem 0 0;
-  padding: 0.45rem 0.4rem;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  line-height: 0;
-  cursor: pointer;
+.entry:focus-visible {
+  outline-offset: 2px;
 }
 
-.theme-toggle__icon {
+/* The shared title: as wide as its text, so its picture and the h1's are the
+   same shape when the transition morphs one into the other. */
+.entry-title {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  color: var(--text-prose);
+  font-size: 22px;
+  font-weight: 560;
+  line-height: 30px;
+  letter-spacing: -0.02em;
+  transition: color 320ms var(--ease);
+}
+
+/* An entry that leaves the site (a project's repository) says so with an arrow,
+   which leans toward where it goes on hover and focus. */
+.entry-out,
+.link-out {
   display: inline-block;
-  width: 1.05rem;
-  height: 1.05rem;
-  border: 2px solid currentColor;
+  margin-left: 0.3em;
+  color: var(--text-3);
+  font-size: 0.75em;
+  font-weight: 500;
+  vertical-align: 0.1em;
+  transition:
+    transform 320ms var(--ease),
+    color 320ms var(--ease);
+}
+
+.entry-row:is(:hover, :has(.entry:focus-visible)) .entry-out,
+a:is(:hover, :focus-visible) > .link-out {
+  color: var(--lamp);
+  transform: translate(2px, -2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-row:is(:hover, :has(.entry:focus-visible)) .entry-out,
+  a:is(:hover, :focus-visible) > .link-out {
+    transform: none;
+  }
+}
+
+/* Title and date only at rest. The short description shows under the entry the
+   light, the pointer or the keyboard is on: its space is kept, so nothing moves.
+   One line on a wide screen; it may wrap on a phone, never cut. */
+.entry-desc {
+  display: block;
+  max-width: 32em;
+  margin-top: 4px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.55;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition:
+    opacity 320ms var(--ease),
+    transform 320ms var(--ease),
+    color 320ms var(--ease);
+}
+
+.entry-row:is(.is-lit, :hover, :has(.entry:focus-visible)) .entry-desc {
+  opacity: 1;
+  transform: none;
+}
+
+/* The light has reached the entry's height (site.js): its mark, its leader and
+   its date take the lamp. */
+.entry-row.is-lit::before {
+  border-color: var(--lamp);
+  background: var(--lamp);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--lamp) 18%, transparent),
+    0 0 18px 2px var(--lit-glow);
+  transform: scale(1.2);
+}
+
+.entry-row.is-lit::after {
+  background: var(--lamp);
+}
+
+.entry-row.is-lit .entry-date {
+  color: var(--lamp);
+}
+
+/* Hover, and keyboard focus exactly the same: no card, only light. The entry's mark
+   and leader light up, its words brighten, and the others step back. Focus also
+   keeps its own outline, so it never depends on the light. */
+.entry-row:is(:hover, :has(.entry:focus-visible))::before {
+  border-color: var(--lamp);
+  background: var(--lamp);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--lamp) 18%, transparent),
+    0 0 18px 2px var(--lit-glow);
+  transform: scale(1.2);
+}
+
+.entry-row:is(:hover, :has(.entry:focus-visible))::after {
+  background: var(--lamp);
+  box-shadow: 0 0 8px var(--lit-glow);
+}
+
+.entry-row:is(:hover, :has(.entry:focus-visible)) .entry-title {
+  color: var(--text);
+}
+
+.entry-row:is(:hover, :has(.entry:focus-visible)) .entry-desc {
+  color: var(--text-prose);
+}
+
+.entry-row:is(:hover, :has(.entry:focus-visible)) .entry-date {
+  color: var(--lamp);
+}
+
+/* the others: still AA, a step down each */
+.timeline:has(.entry-row:hover, .entry:focus-visible) .entry-row:not(:hover, :has(.entry:focus-visible)) .entry-title {
+  color: var(--text-2);
+}
+
+.timeline:has(.entry-row:hover, .entry:focus-visible) .entry-row:not(:hover, :has(.entry:focus-visible)) :is(.entry-desc, .entry-date) {
+  color: var(--text-3);
+}
+
+/* ---------- home: the light ----------
+   Everything here moves from two custom properties, --mx and --my, the pointer's
+   position, written once a frame at most by one pointer handler (site.js), with
+   no layout read in it. The motion itself is CSS: transforms with a short
+   transition, so the light glides after the pointer on the compositor.
+   - the spot: a soft glow under the pointer, across the whole page;
+   - the scan line: a hairline across the axis at the pointer's height;
+   - the bead: a point of light on the axis, with the date it is passing;
+   - the lit name (above).
+   The scan line and the bead show only while the pointer is on the timeline. On a
+   touch screen the light holds a fixed height while the page scrolls past it,
+   and the spot is off. Under reduced motion none of it runs. */
+
+.spot,
+.beam,
+.bead {
+  display: none;
+}
+
+.js .spot {
+  display: block;
+  position: fixed;
+  z-index: -1;
+  top: -360px;
+  left: -360px;
+  width: 720px;
+  height: 720px;
   border-radius: 50%;
-  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+  background: radial-gradient(closest-side, var(--spot), transparent);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(var(--mx, -9999px), var(--my, -9999px), 0);
+  transition:
+    opacity 600ms var(--ease),
+    transform 700ms var(--ease);
+  will-change: transform;
 }
 
-/* ---------- shell: footer ---------- */
+.js .beam {
+  display: block;
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(0, var(--my, -9999px), 0);
+  transition:
+    opacity 600ms var(--ease),
+    transform 260ms var(--ease);
+  will-change: transform;
+}
 
-.site-footer {
+.js .beam::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--ax, 70%);
+  width: 520px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--beam-line), transparent);
+}
+
+.js .bead {
+  display: block;
+  position: fixed;
+  z-index: 10;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(var(--ax, -9999px), var(--my, -9999px), 0);
+  transition:
+    opacity 300ms var(--ease),
+    transform 260ms var(--ease);
+  will-change: transform;
+}
+
+.js.beam-on .spot {
+  opacity: 1;
+}
+
+/* the scan line and its bead: only while the pointer is on the timeline itself */
+.js.beam-on.on-timeline :is(.beam, .bead) {
+  opacity: 1;
+}
+
+/* off the axis, or on an entry (whose own mark takes the light) */
+.js.beam-on .bead:is(.is-off, .is-locked) {
+  opacity: 0;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .js .spot {
+    display: none;
+  }
+}
+
+.bead::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: -5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--lamp);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--lamp) 20%, transparent),
+    0 0 14px 2px var(--lit-glow);
+}
+
+.bead-date {
+  position: absolute;
+  top: -10px;
+  right: 20px;
+  color: var(--lamp);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+/* ---------- home: the entrance ----------
+   One choreography on a fresh load (site.js adds .intro): the name decrypts
+   (first visit) or rises into its lines (later ones), the axis draws down, each
+   entry appears as the axis reaches it, then the light comes on. Never when a page
+   transition brings the home back, never under reduced motion. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .intro body::before {
+    animation: light-on 1600ms var(--ease) both;
+  }
+
+  .intro .name-wrap:not(.no-rise) > .name .name-line > span {
+    animation: rise 1000ms var(--ease) both;
+  }
+
+  .intro .name-wrap:not(.no-rise) > .name .name-line + .name-line > span {
+    animation-delay: 90ms;
+  }
+
+  .intro .role {
+    animation: fade-up 800ms var(--ease) 360ms both;
+  }
+
+  .intro .year {
+    animation: fade 600ms var(--ease) 260ms both;
+  }
+
+  .intro .tl::before {
+    animation: draw 1100ms var(--ease) 300ms both;
+  }
+
+  .intro .entry-row {
+    animation: fade-in-x 700ms var(--ease) calc(300ms + var(--i) * 95ms) both;
+  }
+
+  .intro .entry-row::before {
+    animation: pop 500ms var(--ease) calc(300ms + var(--i) * 95ms) both;
+  }
+}
+
+@keyframes light-on {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(105%);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes draw {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes fade-in-x {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0);
+  }
+}
+
+/* ---------- entry pages: the bar ---------- */
+
+.bar {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.25rem 2rem;
-  padding: 1.75rem var(--gutter) 2.25rem;
-  border-top: 1px solid var(--rule);
-  color: var(--muted);
-  font-size: 0.875rem;
+  width: 100%;
+  max-width: calc(1200px + 2 * var(--gutter));
+  height: 68px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
 }
 
-.site-footer p {
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  margin-left: -8px;
+  padding: 0 10px 0 6px;
+  border-radius: 10px;
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition:
+    color var(--fast) var(--ease),
+    background-color var(--fast) var(--ease);
+}
+
+.back:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.back svg {
+  transition: transform 220ms var(--ease);
+}
+
+.back:hover svg {
+  transform: translateX(-2px);
+}
+
+.back kbd {
+  display: none;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  box-shadow: inset 0 -1px 0 var(--line);
+  color: var(--text-3);
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .back kbd {
+    display: inline-block;
+  }
+}
+
+.bar .theme-toggle {
+  margin-right: -8px;
+}
+
+/* ---------- entry pages: the article ----------
+   One measure for the title, its rule and the text, centred on the page. */
+
+.article {
+  width: 100%;
+  max-width: calc(580px + 2 * var(--gutter));
+  margin-inline: auto;
+  padding: clamp(40px, 9vh, 96px) var(--gutter) 120px;
+}
+
+/* the meta line: only the date, behind the entry's mark from the axis */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-2);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meta::before {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--lamp);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--lamp) 18%, transparent),
+    0 0 14px 2px var(--lit-glow);
+}
+
+/* The other end of the shared title. */
+.article h1 {
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 16px;
+  font-size: clamp(34px, 6.4vw, 54px);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+  overflow-wrap: break-word;
+}
+
+/* a project: its tagline, then a quiet line of facts (status, stack, link) */
+.lede {
+  margin-top: 16px;
+  color: var(--text-2);
+  font-size: 19px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+.facts {
+  margin-top: 12px;
+  color: var(--text-3);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.facts a {
+  color: var(--text-2);
+}
+
+/* ---------- entry pages: the text ---------- */
+
+.prose {
+  margin-top: 40px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+  color: var(--text-prose);
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.prose > * {
   margin: 0;
 }
 
-/* ---------- pages: entry, 404 ---------- */
-
-.prose,
-.not-found {
-  padding: clamp(2.5rem, 7vw, 5rem) var(--gutter) 0;
+.prose > * + * {
+  margin-top: 1.15em;
 }
 
-.meta {
-  margin: 0 0 1rem;
-  color: var(--muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
+.prose h2 {
+  margin: 2.3em 0 0.65em;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
 }
 
-.project .tagline {
-  margin: -0.25rem 0 0.75rem;
-  font-size: 1.25rem;
+.prose h3 {
+  margin: 2em 0 0.5em;
+  color: var(--text);
+  font-size: 18px;
   font-weight: 600;
   line-height: 1.4;
   letter-spacing: -0.015em;
 }
 
-.back {
-  margin: 3.5rem 0 0;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--rule);
-}
-
-.empty {
-  color: var(--muted);
-}
-
-/* markdown body: a reading column (the page column sets the measure, about 68
-   characters), with room between paragraphs and headings */
-
-.prose {
-  font-size: 1.125rem;
-  line-height: 1.7;
-}
-
-.prose :is(p, ul, ol, pre, table, blockquote, figure) {
-  margin: 0 0 1.35em;
-}
-
-.prose h2 {
-  margin: 2.75rem 0 0.8rem;
-  font-size: 1.5rem;
-  line-height: 1.25;
-}
-
-.prose h3 {
-  margin: 2.25rem 0 0.6rem;
-  font-size: 1.2rem;
-  line-height: 1.35;
-}
-
 .prose h4 {
-  margin: 1.75rem 0 0.5rem;
-  font-size: 1.125rem;
+  margin: 1.75em 0 0.4em;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
   line-height: 1.4;
 }
 
-.prose ul,
-.prose ol {
+/* a heading's own margin sets the gap under it */
+.prose > :is(h2, h3, h4) + * {
+  margin-top: 0;
+}
+
+.prose strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.prose a {
+  color: var(--text);
+}
+
+.prose :is(ul, ol) {
   padding-left: 1.4em;
 }
 
@@ -391,60 +1087,70 @@ main a[href]:is(:hover, :focus-visible),
 }
 
 .prose li > :is(ul, ol) {
-  margin: 0.4em 0 0;
+  margin-top: 0.4em;
+}
+
+.prose li::marker {
+  color: var(--text-3);
 }
 
 .prose :not(pre) > code {
   padding: 0.12em 0.35em;
-  background: var(--rule);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--hover);
+  color: var(--text);
   font-size: 0.85em;
 }
 
 .prose pre {
-  padding: 1rem 1.25rem;
+  padding: 16px 20px;
   overflow-x: auto;
-  border: 1px solid var(--rule);
-  font-size: 0.875rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
   line-height: 1.6;
   tab-size: 2;
 }
 
 .prose pre code {
-  padding: 0;
-  background: none;
   font-size: inherit;
 }
 
 .prose blockquote {
   padding-left: 1.25em;
-  border-left: 2px solid var(--fg);
-  font-style: italic;
+  border-left: 2px solid var(--line-strong);
+  color: var(--text-2);
 }
 
-.prose blockquote > :last-child {
-  margin-bottom: 0;
+.prose blockquote > * {
+  margin: 0;
+}
+
+.prose blockquote > * + * {
+  margin-top: 1.15em;
 }
 
 .prose hr {
-  margin: 2.75rem 0;
+  height: 1px;
+  margin-block: 2.3em;
   border: 0;
-  border-top: 1px solid var(--rule);
+  background: var(--line);
 }
 
 .prose img {
   max-width: 100%;
   height: auto;
-}
-
-.prose strong {
-  font-weight: 650;
+  border-radius: 12px;
 }
 
 /* heading permalinks (empty anchors added by the Markdown renderer) */
 
 .prose .anchor {
   margin-left: 0.4em;
-  color: var(--muted);
+  color: var(--text-3);
   font-weight: 400;
   text-decoration: none;
   visibility: hidden;
@@ -455,7 +1161,7 @@ main a[href]:is(:hover, :focus-visible),
 }
 
 .prose :is(h2, h3, h4):hover .anchor,
-.prose :is(h2, h3, h4):focus-within .anchor {
+.prose .anchor:focus-visible {
   visibility: visible;
 }
 
@@ -471,19 +1177,15 @@ main a[href]:is(:hover, :focus-visible),
 }
 
 .prose .footnotes {
-  margin-top: 3rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--rule);
-  color: var(--muted);
-  font-size: 0.875rem;
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 14px;
 }
 
-.prose .footnotes ol {
-  margin: 0;
-}
-
-.prose .footnotes p {
-  margin: 0 0 0.5rem;
+.prose .footnotes > * + * {
+  margin-top: 0.5em;
 }
 
 /* tables: ruled, no boxes */
@@ -491,12 +1193,12 @@ main a[href]:is(:hover, :focus-visible),
 .prose table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95em;
+  font-size: 15px;
 }
 
 .prose :is(th, td) {
-  padding: 0.7em 2ch 0.7em 0;
-  border-top: 1px solid var(--rule);
+  padding: 10px 16px 10px 0;
+  border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
   overflow-wrap: anywhere;
@@ -507,282 +1209,177 @@ main a[href]:is(:hover, :focus-visible),
 }
 
 .prose th {
-  border-top: 0;
-  border-bottom: 1px solid var(--fg);
-  color: var(--muted);
-  font-weight: 650;
-}
-
-.prose tbody tr:last-child td {
-  border-bottom: 1px solid var(--rule);
-}
-
-.prose td:first-child {
-  color: var(--muted);
-}
-
-/* 404: a terminal (its lines are <pre>, so they are mono) */
-
-.not-found {
-  padding-top: clamp(3rem, 14vw, 9rem);
-}
-
-.not-found pre {
-  margin: 0;
-  font-size: clamp(0.95rem, 0.8rem + 0.8vw, 1.25rem);
-  line-height: 1.6;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.not-found .prompt {
-  margin-top: 0.5rem;
-}
-
-.not-found .prompt::before {
-  content: "% ";
-  color: var(--muted);
-}
-
-/* ---------- the log ---------- */
-
-/* Hash and date are mono and sized by their own `ch`, so they line up whatever
-   the row's font is. The title is Inter and takes the rest. Under 600px the
-   title gets its own line, under the hash and the date. */
-.log {
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid var(--rule);
-  list-style: none;
-}
-
-.log-row {
-  display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr);
-  column-gap: 1.25em;
-  align-items: baseline;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--rule);
-}
-
-.log-hash,
-.log-date {
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.8em;
-  font-variant-ligatures: none;
-}
-
-.log-hash {
-  width: 7ch;
-}
-
-.log-date {
-  width: 10ch;
-}
-
-.log-hash:not([href]) {
-  text-decoration: none;
-}
-
-.log-title {
+  border-bottom-color: var(--line-strong);
+  color: var(--text-2);
   font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-@media (max-width: 599.98px) {
-  .log-row {
-    grid-template-columns: 4em minmax(0, 1fr);
-    column-gap: 1em;
-    padding: 0.7rem 0;
-  }
-
-  .log-hash {
-    grid-area: 1 / 1;
-  }
-
-  .log-date {
-    grid-area: 1 / 2;
-  }
-
-  .log-title {
-    grid-area: 2 / 1 / 3 / 3;
-  }
-}
-
-/* ---------- home ---------- */
-
-/* One centred column: a quiet intro, then the log, which carries the page. */
-.intro {
-  padding: clamp(2rem, 6vw, 3.5rem) var(--gutter) 0;
-}
-
-.intro h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-}
-
-.intro p {
-  max-width: 38rem;
-  margin: 0 0 0.7rem;
-  color: var(--muted);
-  font-size: 0.9375rem;
-}
-
-.intro .tagline {
-  margin: 0.1rem 0 1.25rem;
-  color: var(--fg);
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.intro .contact {
-  margin: 1.25rem 0 0;
-}
-
-.log-section {
-  padding: clamp(2.5rem, 7vw, 4rem) var(--gutter) 0;
-}
-
-.log-section h2 {
-  margin: 0 0 0.85rem;
-  color: var(--muted);
-  font-size: 0.875rem;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.log-section .log {
-  font-size: 1.125rem;
-}
-
-.log-section .log-row {
-  padding: 0.95rem 0;
-}
-
-/* ---------- entry end: back link, markdown twin, ask claude ----------
-   One quiet row under an entry: the back link on the left, two small muted links
-   on the right. The row keeps the hairline and the spacing the back link had on
-   its own. Added with the Markdown twins (SPEC section 7). */
-
-.entry-end {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.25rem 1.5rem;
-  margin: 0 0 1.35em;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--rule);
-}
-
-.entry-end .back {
-  margin: 0;
-  padding: 0;
-  border-top: 0;
-}
-
-.entry-end .entry-links {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
 }
 
 /* ---------- stat callouts (Markdown ```stats blocks) ----------
    A fenced block with the info string `stats` becomes <dl class="stats">: one
-   <div> per `value | label` line, a big number over a small muted label, ruled
-   like the tables. Up to four columns in the reading column, two on a phone.
-   Sizes are in rem so the block looks the same inside .prose and the home intro.
-   Added with the share images (SPEC section 5). */
+   <div> per `value | label` line, a big number over a small label, ruled like the
+   tables. Up to four columns in the reading column, two on a phone. */
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
-  margin: 2rem 0;
-  border-bottom: 1px solid var(--rule);
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  margin-block: 32px;
+  border-bottom: 1px solid var(--line);
 }
 
 .stats > div {
   min-width: 0;
-  padding: 1.1rem 1rem 1.2rem 0;
-  border-top: 1px solid var(--rule);
+  padding: 18px 16px 19px 0;
+  border-top: 1px solid var(--line);
 }
 
 .stats dt {
-  font-size: clamp(2.25rem, 1.8rem + 1.6vw, 2.75rem);
-  font-weight: 700;
+  color: var(--text);
+  font-size: clamp(36px, 28px + 1.6vw, 44px);
+  font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1;
   overflow-wrap: anywhere;
 }
 
 .stats dd {
-  margin: 0.55rem 0 0;
-  color: var(--muted);
-  font-size: 0.875rem;
+  margin: 9px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
 /* on a phone (two columns) an odd last stat takes the whole row, so its rule is as long as the others */
-@media (max-width: 27.5rem) {
+@media (max-width: 440px) {
   .stats > div:last-child:nth-child(odd) {
     grid-column: 1 / -1;
   }
 }
 
-/* ---------- entry pages: the margins go back ----------
-   On an entry page the side margins, where the field shows, are a way back to the
-   log: transitions.js goes back on a click there. The cursor says so, on devices
-   with a fine pointer only; the paper keeps the normal cursor. */
+/* ---------- entry pages: the end ----------
+   One quiet row under the text: back to all entries on the left; on the right,
+   small, the entry's Markdown twin and a chat about it with Claude. */
 
+.article-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  margin-top: 64px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+.entry-links {
+  color: var(--text-3);
+  font-size: 13px;
+  line-height: 34px;
+}
+
+.entry-links a {
+  color: var(--text-2);
+  text-decoration: none;
+  transition: color var(--fast) var(--ease);
+}
+
+.entry-links a:hover {
+  color: var(--text);
+}
+
+/* The margins of an entry page go back to the home (site.js). The cursor says so,
+   on devices with a fine pointer; the bar and the column keep theirs. */
 @media (pointer: fine) {
   body:is([data-page="essay"], [data-page="note"], [data-page="project"]) {
     cursor: zoom-out;
   }
 
-  body:is([data-page="essay"], [data-page="note"], [data-page="project"])
-    :is(.site-header, main, .site-footer) {
+  body:is([data-page="essay"], [data-page="note"], [data-page="project"]) :is(.skip-link, .bar, main) {
     cursor: auto;
   }
 }
 
+/* ---------- 404 ---------- */
+
+.not-found .path {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 880px) {
+  .stage {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    padding-top: 88px;
+  }
+
+  .role {
+    padding-top: 16px;
+  }
+
+  .timeline {
+    margin-top: 72px;
+  }
+}
+
+@media (max-width: 600px) {
+  .timeline {
+    --axis: 64px;
+  }
+
+  .year {
+    padding-right: 14px;
+  }
+
+  .entry-row {
+    --c: 14px;
+    --pad: 24px;
+  }
+
+  .entry {
+    max-width: calc(100% + 20px);
+    margin-inline: -10px;
+    padding-inline: 10px;
+  }
+
+  .entry-title {
+    font-size: 20px;
+    line-height: 28px;
+  }
+
+  .entry-date {
+    top: 2px;
+    right: calc(100% + 14px);
+    line-height: 28px;
+  }
+}
+
 /* ---------- page transitions ----------
-   Cross-document view transitions (SPEC section 7, Transitions): the browser
-   keeps the old page on screen, loads the new one and animates between the two. A
-   browser without support (Firefox) simply navigates. transitions.js adds the type
-   "forward" (home to an entry) or "back" (an entry to the home), and "leaving" to the
-   old page and "arriving" to the new one, and names the one shared title; every other
-   navigation has no type and gets the browser's own cross-fade. The theme toggle has
-   its own type, "theme".
+   Cross-document view transitions: the browser keeps the old page on screen, loads
+   the new one and animates between them. A browser without support simply
+   navigates.
 
-   The clicked log title travels to the entry's h1 and grows into it, and back; the
-   content around it rises 12px as it arrives. Going into an entry and coming back
-   mirror each other.
+   site.js types each navigation "forward" (the home to an entry) or "back" (an
+   entry to the home), adds "leaving" to the old page and "arriving" to the new
+   one, and names one shared title, "entry-title": the clicked title on the axis,
+   the h1 on the entry. The title lifts off the axis and grows into the heading,
+   and settles back on its row on the way home.
 
-   The fixed things never move: the field, the header, the footer and the column's
-   paper stay in the page's root image. The new root fades in over the old one (both
-   opaque, ordinary blending), so the two never add up, and that fade is also how the
-   old content leaves: the old page names nothing, its content stays in its root
-   image. What moves is named on the page that arrives. The home's and an entry's names
-   differ, so no group ever pairs a page with itself.
+   What stays (the lamp, the corner, the bar) is the page's root image. Only the
+   page that arrives names its content, so the old page is never cut into tall
+   pictures (an essay is thousands of pixels high, and a picture that size can come
+   out as a white frame). The new root covers the old one quickly; the new content
+   rises 12px. */
 
-   Three things keep a white frame out, whatever the first frame looks like.
-   - The old page is never cut into tall pictures. An essay is thousands of pixels
-     high and, named, its old image is one picture that size, which the browser can
-     fail to draw (the whole frame comes out white). Only the new page's content is
-     named (a live element, not a picture), and the old page stays in its root image,
-     which is as big as the viewport.
-   - The page colour is under every transition (html, and ::view-transition), so
-     anything transparent shows the page and not the browser's white.
-   - An image that arrives is hidden until its animation runs (opacity 0 in the rule,
-     the animation goes to 1); the frame before the animations start is the old page and
-     nothing else. And no plus-lighter anywhere: it adds two images up, and a frame
-     with both at full opacity is white. */
+:root {
+  --vt-enter: 480ms;
+  --vt-exit: 160ms;
+  --vt-stagger: 60ms;
+  --vt-ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --vt-ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+}
 
 @media (prefers-reduced-motion: no-preference) {
   @view-transition {
@@ -798,10 +1395,20 @@ main a[href]:is(:hover, :focus-visible),
   }
 }
 
-/* The theme toggle: one soft cross-fade of the whole page. */
+::view-transition {
+  background: var(--bg);
+}
+
+/* The page colour under the root images too, so a frame where the old picture
+   is not drawn yet shows the page and never white. */
+:root:active-view-transition-type(forward, back)::view-transition-group(root) {
+  background: var(--bg);
+}
+
+/* the theme toggle: one soft cross-fade */
 :root:active-view-transition-type(theme)::view-transition-group(*) {
-  animation-duration: var(--vt-duration);
-  animation-timing-function: var(--vt-ease);
+  animation-duration: 280ms;
+  animation-timing-function: ease-out;
 }
 
 @keyframes vt-fade-in {
@@ -824,10 +1431,6 @@ main a[href]:is(:hover, :focus-visible),
   }
 }
 
-/* What arrives rises 12px and settles. What leaves only fades: an old image is a still
-   picture of the old page, often a tall one (an essay), and a picture that large must
-   not be moved or scaled while it fades, or the compositor can draw it as a white
-   rectangle. */
 @keyframes vt-in {
   from {
     opacity: 0;
@@ -840,27 +1443,18 @@ main a[href]:is(:hover, :focus-visible),
   }
 }
 
-/* names: the content that moves. Only the page that arrives names its content
-   (transitions.js adds the type "arriving" to it, "leaving" to the old page): the old
-   page's content stays in its root image, which is as big as the viewport, instead of
-   becoming one very tall picture (an essay is thousands of pixels high), which the
-   browser may fail to draw: a white frame. */
-:root:active-view-transition-type(arriving) .intro {
-  view-transition-name: home-intro;
+:root:active-view-transition-type(arriving) .identity {
+  view-transition-name: home-name;
 }
 
-:root:active-view-transition-type(arriving) .log-section {
-  view-transition-name: home-log;
+:root:active-view-transition-type(arriving) .timeline {
+  view-transition-name: home-year;
 }
 
-:root:active-view-transition-type(arriving) .prose {
+:root:active-view-transition-type(arriving) .article {
   view-transition-name: entry-body;
 }
 
-/* One timing for everything that moves. The old image of a group leaves quickly and
-   accelerating, in place; the new one arrives after a beat, decelerating. The new
-   image is hidden in the rule itself and only the animation shows it, so it cannot
-   appear a frame early. Normal blending throughout. */
 :root:active-view-transition-type(forward, back)::view-transition-group(*) {
   animation-duration: var(--vt-enter);
   animation-timing-function: var(--vt-ease-enter);
@@ -877,45 +1471,27 @@ main a[href]:is(:hover, :focus-visible),
   mix-blend-mode: normal;
 }
 
-/* The root image holds what stays (the field, the header, the footer and the paper of
-   the column) and, on the old page, its content too. The old one stays as it is and
-   the new one fades in over it in the time of an exit, so the old content is covered
-   as fast as it would have left, and the header and the footer text never dip. Both
-   images are opaque, so the sum cannot go above one. */
+/* back home, the timeline comes a beat after the name */
+:root:active-view-transition-type(back)::view-transition-new(home-year) {
+  animation-delay: calc(var(--vt-stagger) * 2);
+}
+
 :root:active-view-transition-type(forward, back)::view-transition-old(root) {
   animation: none;
   mix-blend-mode: normal;
 }
 
+/* The new root covers the old page quickly and decelerating, so the old content
+   is gone in a few frames and nothing that stays ever dips. */
 :root:active-view-transition-type(forward, back)::view-transition-new(root) {
   opacity: 0;
-  animation: vt-fade-in var(--vt-exit) var(--vt-ease-exit) both;
+  animation: vt-fade-in var(--vt-exit) var(--vt-ease-enter) both;
   mix-blend-mode: normal;
 }
 
-/* Under every transition, the theme toggle's too: the page colour, not the white of
-   the canvas, for anything that is transparent. */
-::view-transition {
-  background: var(--bg);
-}
-
-/* The shared title. Both ends are as wide as their text (a short title is not a
-   full-width box), so the old and new images are about the same size. */
-.log-title {
-  justify-self: start;
-}
-
-.prose > h1 {
-  width: fit-content;
-  max-width: 100%;
-}
-
-/* The title's old and new images fill the group and scale as one piece from its
-   top left corner (object-fit), so the text is never stretched, only scaled, and the
-   last frame is the real h1 at its own size. A one-line row and a two-line heading
-   are not the same picture, so they dissolve into each other where the group is
-   already moving: going in, the row fades out in the first quarter and the heading
-   comes in as that ends; coming back, the mirror image. */
+/* The title's two pictures fill the group and scale from its top left corner, so
+   the text is scaled, never stretched. Where the row and the heading wrap
+   differently, they dissolve into each other while the group moves. */
 :root:active-view-transition-type(forward, back)::view-transition-old(entry-title),
 :root:active-view-transition-type(forward, back)::view-transition-new(entry-title) {
   width: 100%;
@@ -940,15 +1516,25 @@ main a[href]:is(:hover, :focus-visible),
   animation: vt-fade-in calc(var(--vt-enter) * 0.25) linear calc(var(--vt-enter) * 0.75) both;
 }
 
-/* On its way the title crosses the content that is fading in. It carries a halo of
-   the paper colour, so the lines under it do not show through; once it has landed
-   the halo is paper on paper and cannot be seen. */
-:root:active-view-transition-type(forward, back) .prose > h1 {
-  text-shadow: 0 0 0.25em var(--bg), 0 0 0.5em var(--bg), 0 0 0.5em var(--bg);
+/* On its way in, the heading crosses content that is fading in; a halo of the
+   page colour keeps the lines under it from showing through. Only on the entry
+   that arrives, where the heading is live. */
+:root:active-view-transition-type(forward) .article h1 {
+  text-shadow:
+    0 0 0.25em var(--bg),
+    0 0 0.5em var(--bg),
+    0 0 0.5em var(--bg);
 }
 
-/* A title with no partner on the other page (its row or heading was not on screen) is
-   ordinary content: it leaves, or arrives, with the rest. */
+/* The clicked entry is captured without its hover glow. */
+:root:active-view-transition-type(forward, back) .entry {
+  background: none;
+  box-shadow: none;
+  transition: none;
+}
+
+/* A title with no partner on the other page (it was off screen) is ordinary
+   content: it leaves, or arrives, with the rest. */
 :root:active-view-transition-type(forward, back)::view-transition-old(entry-title):only-child {
   width: 100%;
   height: auto;
@@ -963,12 +1549,17 @@ main a[href]:is(:hover, :focus-visible),
   animation: vt-in var(--vt-enter) var(--vt-ease-enter) var(--vt-stagger) both;
 }
 
-/* The pointer is still on the clicked title when the old page is captured (and on
-   whatever is under it when the new one is), and a hovered link is an inverted bar:
-   during a transition the log titles are captured as plain text. */
-:root:active-view-transition-type(forward, back) .log-title:is(:hover, :focus-visible, :active) {
-  background: none;
-  color: inherit;
-  text-shadow: var(--halo);
-  outline: none;
+/* ---------- reduced motion ----------
+   Every animation and transition stops; state changes still show, at once. The
+   script keeps the light off and skips the decrypt and the entrance. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

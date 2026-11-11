@@ -1,4 +1,0 @@
-<header class="site-header">
-  <a class="brand" href="/">yoan faure</a>
-  <button class="theme-toggle" type="button" aria-label="Toggle theme"><span class="theme-toggle__icon" aria-hidden="true"></span></button>
-</header>

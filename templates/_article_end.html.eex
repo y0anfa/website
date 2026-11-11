@@ -1,0 +1,7 @@
+<footer class="article-end">
+  <a class="back" href="/" data-home>
+<%= back_icon() %>
+    All entries
+  </a>
+<%= if @links do %>  <p class="entry-links"><a href="<%= escape(@links.markdown) %>">Markdown</a><span class="sep" aria-hidden="true"> · </span><a href="<%= escape(@links.ask) %>" rel="noopener">Ask Claude<span class="link-out" aria-hidden="true">↗</span></a></p>
+<% end %></footer>

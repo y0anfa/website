@@ -1,15 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <style>
-    .bg { fill: #262523; }
-    .ink { fill: #f4efe4; }
-    .stroke { stroke: #f4efe4; }
-    @media (prefers-color-scheme: dark) {
-      .bg { fill: #f4efe4; }
-      .ink { fill: #262523; }
-      .stroke { stroke: #262523; }
-    }
+    .bg { fill: #0d0f14; }
+    .axis { stroke: #f2c47c; stroke-opacity: 0.45; }
+    .halo { fill: #f2c47c; fill-opacity: 0.22; }
+    .lamp { fill: #f2c47c; }
   </style>
   <rect class="bg" x="0" y="0" width="32" height="32" rx="6"/>
-  <path class="stroke" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M8.5 10.5 L14.5 16 L8.5 21.5"/>
-  <rect class="ink" x="17" y="20.5" width="6.5" height="2.5" rx="0.5"/>
+  <path class="axis" fill="none" stroke-width="2" stroke-linecap="round" d="M16 5 V27"/>
+  <circle class="halo" cx="16" cy="16" r="8.5"/>
+  <circle class="lamp" cx="16" cy="16" r="5"/>
 </svg>

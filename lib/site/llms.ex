@@ -14,7 +14,7 @@ defmodule Site.Llms do
 
       - [Title](https://yoanfaure.com/slug.md): description
 
-  The section is left out when there are no entries. Entries are in log order.
+  The section is left out when there are no entries. Entries are in timeline order.
   """
 
   alias Site.{Content, Doc, Entry, Log}

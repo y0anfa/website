@@ -3,7 +3,7 @@ defmodule Site.OGLayoutTest do
 
   import Site.TestHelpers, only: [tmp_dir: 0]
 
-  alias Site.OG.{Contours, Text}
+  alias Site.OG.Text
 
   @sizes [96, 84, 72, 62, 54]
   @max_width 1056
@@ -122,51 +122,6 @@ defmodule Site.OGLayoutTest do
     test "the layout is the same every time", %{font: font} do
       title = "Security pays in more than one currency"
       assert fit(font, title) == fit(font, title)
-    end
-  end
-
-  describe "Contours" do
-    test "are the same for the same seed and different for another" do
-      a = Contours.paths("rhino", 1200, 630)
-      assert a == Contours.paths("rhino", 1200, 630)
-      refute a == Contours.paths("security-should-unleash", 1200, 630)
-    end
-
-    test "make minor and index lines, as SVG path data" do
-      %{minor: minor, major: major} = Contours.paths("rhino", 1200, 630)
-
-      for data <- [minor, major] do
-        assert data =~ ~r/\AM-?\d+\.\d /
-        assert data =~ ~r/\A[MLQZ0-9.\s-]+\z/
-      end
-
-      assert byte_size(minor) > byte_size(major)
-    end
-
-    test "keep their numbers finite and on or near the canvas" do
-      %{minor: minor, major: major} = Contours.paths("a-slug", 1200, 630)
-
-      numbers =
-        ~r/-?\d+\.\d/
-        |> Regex.scan(minor <> " " <> major)
-        |> List.flatten()
-        |> Enum.map(&String.to_float/1)
-
-      assert numbers != []
-      assert Enum.all?(numbers, &(&1 >= -12 and &1 <= 1212))
-    end
-
-    test "the cell size sets how fine the lines are" do
-      coarse = Contours.paths("rhino", 1200, 630, cell: 24)
-      fine = Contours.paths("rhino", 1200, 630, cell: 12)
-
-      assert byte_size(fine.minor) > byte_size(coarse.minor)
-    end
-
-    test "use no random state: ten different slugs give ten different maps" do
-      maps = for n <- 1..10, do: Contours.paths("slug-#{n}", 600, 300, cell: 20)
-      assert length(Enum.uniq(maps)) == 10
-      assert maps == for(n <- 1..10, do: Contours.paths("slug-#{n}", 600, 300, cell: 20))
     end
   end
 end

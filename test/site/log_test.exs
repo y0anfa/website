@@ -5,6 +5,8 @@ defmodule Site.LogTest do
 
   alias Site.{Content, Entry, Log}
 
+  doctest Site.Log
+
   defp entry(type, title, date, extra \\ []) do
     struct!(
       Entry,
@@ -33,7 +35,7 @@ defmodule Site.LogTest do
     assert titles |> Log.sort() |> Enum.map(& &1.title) == ["Apple", "banana"]
   end
 
-  test "the fixture log is in the documented order" do
+  test "the fixture timeline is in the documented order" do
     content = Content.load(fixtures())
 
     assert content |> Content.entries() |> Log.sort() |> Enum.map(& &1.title) == [
@@ -45,29 +47,67 @@ defmodule Site.LogTest do
            ]
   end
 
-  test "an uncommitted entry shows seven middle dots and no link" do
-    row = Log.row(entry(:essay, "x", "2026-03-28"))
+  test "a row is the title, the summary and the date, linked to the entry's page" do
+    row = Log.row(entry(:essay, "x", "2026-03-08", summary: "Short.", description: "Long."))
 
-    assert row.hash == "·······"
-    assert String.length(row.hash) == 7
-    assert row.commit_url == nil
-    assert row.date == "2026-03-28"
+    assert row == %{
+             title: "x",
+             href: "/x/",
+             external: nil,
+             summary: "Short.",
+             date: "2026-03-08",
+             day: "8 Mar",
+             month: "2026-03",
+             year: 2026
+           }
+
     refute Map.has_key?(row, :type)
-    assert row.href == "/x/"
+    refute Map.has_key?(row, :hash)
   end
 
-  test "a committed entry shows the first 7 characters, linked to GitHub" do
-    sha = "a3f9c21" <> String.duplicate("0", 33)
-    row = Log.row(entry(:note, "x", "2026-10-28", commit: sha))
-
-    assert row.hash == "a3f9c21"
-    assert row.commit_url == "https://github.com/y0anfa/website/commit/" <> sha
-    assert row.href == "/x/"
+  test "the summary falls back to the description, then to nothing" do
+    assert Log.row(entry(:note, "x", "2026-03-08", description: "Long.")).summary == "Long."
+    assert Log.row(entry(:note, "x", "2026-03-08")).summary == ""
   end
 
-  test "fixtures copied outside git have no commits" do
-    content = Content.load(fixture_copy())
-    assert Enum.all?(Content.entries(content), &(&1.commit == nil))
-    assert content |> Content.entries() |> Log.rows() |> Enum.all?(&(&1.hash == "·······"))
+  test "a project with a link goes there and says where; without one, to its page" do
+    github = entry(:project, "rhino", "2026-09-02", link: "https://github.com/y0anfa/rhino")
+    assert %{href: "https://github.com/y0anfa/rhino", external: "on GitHub"} = Log.row(github)
+
+    other = entry(:project, "w", "2026-09-02", link: "https://example.com/w")
+    assert %{href: "https://example.com/w", external: "external"} = Log.row(other)
+
+    assert %{href: "/p/", external: nil} = Log.row(entry(:project, "p", "2026-09-02"))
+
+    # only a project leaves the site: a link field elsewhere means nothing
+    assert %{href: "/n/", external: nil} =
+             Log.row(entry(:note, "n", "2026-09-02", link: "https://example.com/"))
+  end
+
+  test "rows are numbered from 1 in timeline order" do
+    rows =
+      Log.rows([
+        entry(:note, "old", "2025-12-31"),
+        entry(:note, "new", "2026-01-02")
+      ])
+
+    assert Enum.map(rows, &{&1.n, &1.title}) == [{1, "new"}, {2, "old"}]
+  end
+
+  test "years groups the rows where the year changes, newest first" do
+    rows =
+      Log.rows([
+        entry(:note, "a", "2026-02-01"),
+        entry(:note, "b", "2025-11-20"),
+        entry(:note, "c", "2025-01-05"),
+        entry(:note, "d", "2024-06-01")
+      ])
+
+    assert rows
+           |> Log.years()
+           |> Enum.map(fn {year, group} -> {year, Enum.map(group, & &1.title)} end) ==
+             [{2026, ["a"]}, {2025, ["b", "c"]}, {2024, ["d"]}]
+
+    assert Log.years([]) == []
   end
 end

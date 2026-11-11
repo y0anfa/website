@@ -4,7 +4,7 @@ defmodule Site.View do
   stay the one place where markup is written and escaped.
   """
 
-  alias Site.{Entry, Log}
+  alias Site.Entry
 
   @type part :: %{
           required(:text) => String.t(),
@@ -12,34 +12,33 @@ defmodule Site.View do
           optional(:datetime) => String.t() | nil
         }
 
-  @doc "The label and link of the footer's `built from` text."
-  @spec build_info(%{sha: String.t(), dirty?: boolean()} | nil) :: %{
-          label: String.t(),
-          href: String.t() | nil
-        }
-  def build_info(nil), do: %{label: "unversioned", href: nil}
+  @doc """
+  The date on the home timeline: day and short month, no year.
 
-  def build_info(%{sha: sha, dirty?: dirty?}) do
-    %{
-      label: Site.Git.short(sha) <> if(dirty?, do: "-dirty", else: ""),
-      href: Site.Git.commit_url(sha)
-    }
-  end
+      iex> Site.View.short_date(~D[2026-09-02])
+      "2 Sep"
+  """
+  @spec short_date(Date.t()) :: String.t()
+  def short_date(%Date{} = date), do: Calendar.strftime(date, "%-d %b")
 
-  @doc "Meta line of an essay or note: `2026-03-28 · a3f9c21`."
+  @doc """
+  The full date of an entry's meta line.
+
+      iex> Site.View.long_date(~D[2026-10-29])
+      "29 Oct 2026"
+  """
+  @spec long_date(Date.t()) :: String.t()
+  def long_date(%Date{} = date), do: Calendar.strftime(date, "%-d %b %Y")
+
+  @doc "Meta line of an entry: its full date, and nothing else."
   @spec article_meta(Entry.t()) :: [part()]
   def article_meta(%Entry{} = entry) do
-    date = Date.to_iso8601(entry.date)
-
-    [
-      %{text: date, datetime: date},
-      %{text: Log.hash(entry), href: entry.commit && Site.Git.commit_url(entry.commit)}
-    ]
+    [%{text: long_date(entry.date), datetime: Date.to_iso8601(entry.date)}]
   end
 
-  @doc "Meta line of a project: `active · Go, YAML · github.com/y0anfa/rhino`."
-  @spec project_meta(Entry.t()) :: [part()]
-  def project_meta(%Entry{} = entry) do
+  @doc "The facts under a project's tagline: `active · Go, YAML · github.com/y0anfa/rhino`."
+  @spec project_facts(Entry.t()) :: [part()]
+  def project_facts(%Entry{} = entry) do
     Enum.reject(
       [
         entry.status && %{text: entry.status},
@@ -52,7 +51,7 @@ defmodule Site.View do
 
   @doc """
   The two quiet links at the end of an entry page: its Markdown twin and a
-  prefilled "ask claude" chat. Both are plain values; the template escapes them.
+  prefilled "Ask Claude" chat. Both are plain values; the template escapes them.
   """
   @spec entry_links(Entry.t()) :: %{markdown: String.t(), ask: String.t()}
   def entry_links(%Entry{} = entry) do
@@ -85,6 +84,15 @@ defmodule Site.View do
     "Read #{Site.Config.absolute(Entry.path(entry))} by #{Site.Config.name()}, " <>
       "a security engineer. Using only what is on that page, #{task}"
   end
+
+  @doc """
+  The lines of the name on the home: one per word.
+
+      iex> Site.View.name_lines("Yoan Faure")
+      ["Yoan", "Faure"]
+  """
+  @spec name_lines(String.t()) :: [String.t()]
+  def name_lines(name), do: String.split(name)
 
   @doc """
   A URL without scheme or trailing slash, for display.

@@ -1,5 +1,11 @@
 defmodule Site.Entry do
-  @moduledoc "An essay, note or project: one row of the log and one page."
+  @moduledoc """
+  An essay, note or project: one entry of the home timeline and one page.
+
+  `description` is the meta description (frontmatter, else the tagline, else the
+  first paragraph). `summary` is the short line the home timeline shows under the
+  title (frontmatter, else the description).
+  """
 
   defstruct [
     :type,
@@ -7,10 +13,10 @@ defmodule Site.Entry do
     :title,
     :date,
     :description,
+    :summary,
     :html,
     :body,
     :file,
-    :commit,
     :tagline,
     :link,
     :status,
@@ -23,10 +29,10 @@ defmodule Site.Entry do
           title: String.t(),
           date: Date.t(),
           description: String.t(),
+          summary: String.t(),
           html: String.t(),
           body: String.t(),
           file: Path.t(),
-          commit: String.t() | nil,
           tagline: String.t() | nil,
           link: String.t() | nil,
           status: String.t() | nil,
@@ -120,7 +126,7 @@ defmodule Site.Content do
     }
   end
 
-  @doc "Every log entry (essays, notes, projects), unsorted."
+  @doc "Every entry (essays, notes, projects), unsorted."
   @spec entries(t()) :: [Entry.t()]
   def entries(%__MODULE__{} = content), do: content.essays ++ content.notes ++ content.projects
 
@@ -159,7 +165,7 @@ defmodule Site.Content do
     end
   end
 
-  # -- log entries ----------------------------------------------------------
+  # -- entries --------------------------------------------------------------
 
   defp load_entries(type, dir, drafts?) do
     dir
@@ -178,11 +184,13 @@ defmodule Site.Content do
          {:ok, date} <- required_date(meta, file),
          {:ok, draft?} <- optional_boolean(meta, "draft", file),
          {:ok, description} <- optional_string(meta, "description", file),
+         {:ok, summary} <- optional_string(meta, "summary", file),
          {:ok, extra} <- type_fields(type, meta, file) do
       if draft? and not drafts? do
         :draft
       else
-        %{html: html, summary: summary} = Site.Markdown.render(body)
+        %{html: html, summary: first_paragraph} = Site.Markdown.render(body)
+        description = description || extra[:tagline] || first_paragraph
 
         {:ok,
          struct!(
@@ -192,11 +200,11 @@ defmodule Site.Content do
              slug: slug,
              title: title,
              date: date,
-             description: description || extra[:tagline] || summary,
+             description: description,
+             summary: summary || description,
              html: html,
              body: body,
-             file: file,
-             commit: Site.Git.last_commit(file)
+             file: file
            })
          )}
       end

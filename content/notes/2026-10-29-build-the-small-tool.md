@@ -1,6 +1,7 @@
 ---
 title: Build the small tool
 date: 2026-10-29
+summary: A Slack agent in three days, not a vendor.
 description: A questionnaire agent on Slack, built with Claude Code in three days, and the rule I use to decide when to build instead of buy.
 ---
 

@@ -20,14 +20,14 @@ defmodule Site.Templates do
     article: "article.html.eex",
     project: "project.html.eex",
     not_found: "404.html.eex",
-    footer: "_footer.html.eex",
-    log: "_log.html.eex",
+    feed: "_feed.html.eex",
+    bar: "_bar.html.eex",
     meta: "_meta.html.eex",
-    entry_links: "_entry_links.html.eex"
+    article_end: "_article_end.html.eex"
   ]
 
   # Nothing to interpolate: these take no assigns.
-  @static [header: "_header.html.eex"]
+  @static [toggle: "_toggle.html.eex", back_icon: "_back_icon.html.eex"]
 
   @doc "The template files, as `{function name, absolute path}`."
   def files, do: for({name, file} <- @templates ++ @static, do: {name, Path.join(@dir, file)})

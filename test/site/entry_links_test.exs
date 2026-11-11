@@ -23,7 +23,7 @@ defmodule Site.EntryLinksTest do
 
   # The href of the "ask claude" link in a built page, HTML-unescaped.
   defp ask_href(html) do
-    [_, href] = Regex.run(~r{<a href="([^"]+)" rel="noopener">ask claude ↗</a>}, html)
+    [_, href] = Regex.run(~r{<a href="([^"]+)" rel="noopener">Ask Claude<span}, html)
 
     href
     |> String.replace("&amp;", "&")
@@ -87,7 +87,7 @@ defmodule Site.EntryLinksTest do
   describe "the partial" do
     test "escapes both hrefs for HTML after the URI encoding" do
       html =
-        Templates.entry_links(%{
+        Templates.article_end(%{
           links: %{markdown: ~S|/x".md|, ask: ~S|https://claude.ai/new?q=a&b"<c>'d|}
         })
 
@@ -98,19 +98,19 @@ defmodule Site.EntryLinksTest do
   end
 
   describe "the built pages" do
-    test "every entry page has both links after the body, next to the back link", %{tree: tree} do
+    test "every entry page ends with the back link, then both links", %{tree: tree} do
       for slug <- ~w(escape-me first-essay second-essay small-note widget) do
         html = Map.fetch!(tree, "#{slug}/index.html")
 
         assert html =~
-                 ~r{<div class="entry-end">\s*<p class="back"><a href="/">← log</a></p>\s*<p class="entry-links"><a href="/#{slug}.md">markdown</a> · <a href="https://claude.ai/new\?q=[^"]+" rel="noopener">ask claude ↗</a></p>\s*</div>\s*</article>}s,
+                 ~r{<footer class="article-end">\s*<a class="back" href="/" data-home>\s*<svg[^>]*aria-hidden="true">.*?</svg>\s*All entries\s*</a>\s*<p class="entry-links"><a href="/#{slug}.md">Markdown</a><span class="sep" aria-hidden="true"> · </span><a href="https://claude.ai/new\?q=[^"]+" rel="noopener">Ask Claude<span class="link-out" aria-hidden="true">↗</span></a></p>\s*</footer>\s*</article>}s,
                slug
       end
     end
 
     test "the Claude link opens in the same tab and does not leak the opener", %{tree: tree} do
       for {path, html} <- tree, String.ends_with?(path, "/index.html"), path != "index.html" do
-        [_, anchor] = Regex.run(~r{(<a [^>]*>ask claude ↗</a>)}, html)
+        [_, anchor] = Regex.run(~r{(<a [^>]*>Ask Claude<span)}, html)
 
         assert anchor =~ ~s(rel="noopener"), path
         refute anchor =~ "target", path
@@ -153,12 +153,16 @@ defmodule Site.EntryLinksTest do
       end
     end
 
-    test "the labels are lowercase", %{tree: tree} do
+    test "a screen reader hears the two labels, not the separator or the arrow", %{tree: tree} do
       [_, links] = Regex.run(~r{<p class="entry-links">(.*?)</p>}, tree["first-essay/index.html"])
-      text = links |> String.replace(~r/<[^>]+>/, "") |> String.replace("&amp;", "&")
 
-      assert text == "markdown · ask claude ↗"
-      assert text == String.downcase(text)
+      heard =
+        links
+        |> String.replace(~r{<span [^>]*aria-hidden="true">[^<]*</span>}, "")
+        |> String.replace(~r/<[^>]+>/, " ")
+        |> String.split()
+
+      assert heard == ["Markdown", "Ask", "Claude"]
     end
   end
 
@@ -168,20 +172,21 @@ defmodule Site.EntryLinksTest do
       body
     end
 
-    test "the links are small and muted, and the row sits on the back link's hairline" do
-      links = block(".entry-end .entry-links")
-      assert links =~ "color: var(--muted);"
-      assert links =~ "font-size: 0.875rem;"
+    test "the links are small and quiet, on the article end's hairline" do
+      links = block(".entry-links")
+      assert links =~ "color: var(--text-3);"
+      assert links =~ "font-size: 13px;"
+      assert block(".entry-links a") =~ "color: var(--text-2);"
 
-      row = block(".entry-end")
+      row = block(".article-end")
       assert row =~ "display: flex;"
       assert row =~ "justify-content: space-between;"
-      assert row =~ "border-top: 1px solid var(--rule);"
-      assert block(".entry-end .back") =~ "border-top: 0;"
+      assert row =~ "border-top: 1px solid var(--line);"
     end
 
-    test "the new CSS names no font and sets no inline style" do
-      [_, mine] = String.split(@css, "entry end: back link, markdown twin, ask claude", parts: 2)
+    test "the end names no font of its own" do
+      [_, mine] = String.split(@css, "entry pages: the end", parts: 2)
+      [mine | _] = String.split(mine, "/* ----------", parts: 2)
       refute mine =~ "font-family"
     end
   end

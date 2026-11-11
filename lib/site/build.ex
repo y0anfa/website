@@ -3,13 +3,12 @@ defmodule Site.Build do
   The build pipeline.
 
   1. Load and validate `content/` (nothing is written if this fails).
-  2. Read git info for the footer.
-  3. Render the pages.
-  4. Clean the output directory and write pages, assets, `_headers`, `_redirects`,
+  2. Render the pages.
+  3. Clean the output directory and write pages, assets, `_headers`, `_redirects`,
      `robots.txt`, the Markdown twin of every entry, `llms.txt` and the share images.
 
   The output is deterministic: no timestamps, sorted iteration, so the same
-  commit, content and environment always produce byte-identical trees.
+  content, assets and environment always produce byte-identical trees.
   """
 
   alias Site.{Content, Headers, Redirects, Render}
@@ -47,10 +46,7 @@ defmodule Site.Build do
     content = Content.load(content_dir, drafts: Keyword.fetch!(opts, :drafts))
     head_js = read_head_js!(assets)
 
-    context = %{
-      head_js: head_js,
-      build: Site.View.build_info(Site.Git.head("."))
-    }
+    context = %{head_js: head_js}
 
     pages = Render.pages(content, context)
 

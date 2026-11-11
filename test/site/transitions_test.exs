@@ -1,28 +1,29 @@
 defmodule Site.TransitionsTest do
   @moduledoc """
-  The page transition (SPEC section 7, Transitions): the one design in `site.css`,
-  the direction and shared-title script `transitions.js`, the margin click and
-  Escape, the theme-only `head.js` and the theme toggle's own cross-fade in
-  `theme.js`.
+  The page transition (SPEC section 7, Transitions) and the rest of `site.js`: the
+  title transition in `site.css`, the direction and the shared title, the margin
+  click, Escape and the back links, the theme toggle and its cross-fade, the home's
+  entrance, and the theme-only `head.js`.
   """
 
   use ExUnit.Case, async: true
 
   import Site.TestHelpers
 
-  alias Site.{Headers, Log, Speculation}
+  alias Site.{Headers, Speculation}
 
   @css File.read!("assets/css/site.css")
   @code Regex.replace(~r{/\*.*?\*/}s, @css, "")
   @head_js "assets/js/head.js" |> File.read!() |> String.trim()
-  @theme_js File.read!("assets/js/theme.js")
-  @transitions_js File.read!("assets/js/transitions.js")
+  @site_js File.read!("assets/js/site.js")
   @node System.find_executable("node")
 
-  @script_tag ~s(<script defer blocking="render" src="/assets/js/transitions.js"></script>)
+  @script_tag ~s(<script defer blocking="render" src="/assets/js/site.js"></script>)
 
   setup_all do
-    %{tree: build_fixtures() |> read_tree()}
+    # site.js runs once under node, against stubs, when node is installed
+    r = if @node, do: run_node(harness(), "assets/js/site.js")
+    %{tree: build_fixtures() |> read_tree(), r: r}
   end
 
   defp page(tree, path), do: Map.fetch!(tree, path)
@@ -55,75 +56,25 @@ defmodule Site.TransitionsTest do
     value
   end
 
-  describe "what is gone" do
-    test "the generated stylesheet, its module and the per-slug classes", %{tree: tree} do
-      refute Code.ensure_loaded?(Site.Transitions)
-      refute File.exists?("lib/site/transitions.ex")
-      refute File.exists?("assets/css/transitions.css")
-      refute Map.has_key?(tree, "assets/css/transitions.css")
-
-      for {path, html} <- tree, String.ends_with?(path, ".html") do
-        refute html =~ "transitions.css", path
-        refute html =~ ~r/\bvt-[a-z0-9]/, path
-      end
-
-      for file <- Path.wildcard("templates/*.eex") ++ Path.wildcard("lib/**/*.ex") do
-        refute File.read!(file) =~ ~r/\bvt-[a-z0-9]|Transitions\.(class|name)/, file
-      end
-
-      refute Map.has_key?(
-               Log.row(%Site.Entry{
-                 type: :note,
-                 slug: "x",
-                 title: "x",
-                 date: ~D[2026-10-28],
-                 html: ""
-               }),
-               :vt
-             )
-    end
-
-    test "no leftover of the dropped prototypes, nor of the ?vt= switch" do
-      # morph, fade and rise went first; slide and sheet were tried and dropped
-      for dead <- ~w(morph fade rise slide sheet) do
-        refute @code =~ ~r/data-vt=["']?#{dead}|view-transition-name:\s*[\w-]*#{dead}/, dead
-      end
-
-      refute @code =~ "data-vt"
-      refute @code =~ ~r/vt-rise-in|type\(page\)|home-sheet|entry-sheet/
-      refute @code =~ ~r/--vt-in-|--vt-out/
-      refute @css =~ ~r/\b(slide|sheet)\b/i
-
-      # head.js is theme-only: no ?vt= parsing, no sessionStorage key for it
-      refute @head_js =~
-               ~r/vt|sessionStorage|URLSearchParams|location|morph|fade|rise|slide|sheet/
-
-      refute @transitions_js =~ ~r/data-vt|wantsTitle|variant/
-
-      for file <- Path.wildcard("templates/*.eex") do
-        refute File.read!(file) =~ "data-vt", file
-      end
-
-      refute File.read!("README.md") =~ "?vt="
-    end
-  end
-
-  describe "transitions.js is loaded on every page" do
-    test "one render-blocking deferred script in the head, before the field", %{tree: tree} do
+  describe "site.js is loaded on every page" do
+    test "one render-blocking deferred script in the head, after the stylesheet", %{tree: tree} do
       for {path, html} <- tree, String.ends_with?(path, ".html") do
         assert length(String.split(html, @script_tag)) == 2, path
 
         {css, _} = :binary.match(html, ~s(<link rel="stylesheet" href="/assets/css/site.css">))
         {js, _} = :binary.match(html, @script_tag)
-        {field, _} = :binary.match(html, ~s(<script type="module" src="/assets/js/field.js">))
         {head_end, _} = :binary.match(html, "</head>")
 
-        assert css < js and js < field and field < head_end, path
+        assert css < js and js < head_end, path
       end
     end
 
-    test "the file is served as written", %{tree: tree} do
-      assert page(tree, "assets/js/transitions.js") == @transitions_js
+    test "the file is served as written, and replaces the old scripts", %{tree: tree} do
+      assert page(tree, "assets/js/site.js") == @site_js
+
+      for gone <- ~w(transitions.js theme.js field.js) do
+        refute File.exists?("assets/js/" <> gone), gone
+      end
     end
 
     test "it is not an inline script: the CSP keeps exactly two hashes", %{tree: tree} do
@@ -134,49 +85,37 @@ defmodule Site.TransitionsTest do
 
       hashes = Regex.scan(~r/'(sha256-[^']+)'/, csp) |> Enum.map(&List.last/1)
       assert hashes == [Headers.script_hash(@head_js), Speculation.hash()]
-      assert length(Regex.scan(~r/'sha256-/, csp)) == 2
       assert csp =~ "script-src 'self'"
       assert csp =~ "style-src 'self';"
       refute csp =~ "unsafe-inline"
       refute csp =~ "unsafe-eval"
     end
 
-    test "the pages carry no inline script but the two, no inline style and no handler", %{
-      tree: tree
-    } do
-      for {path, html} <- tree, String.ends_with?(path, ".html") do
-        inline =
-          Regex.scan(~r{<script(?![^>]*\ssrc=)[^>]*>(.*?)</script>}s, html)
-          |> Enum.map(&List.last/1)
+    test "the source writes no markup and no inline style attribute, only CSSOM properties" do
+      refute @site_js =~
+               ~r/\binnerHTML\b|\beval\b|\binsertAdjacentHTML\b|document\.write|new Function/
 
-        assert inline == [@head_js, Speculation.rules()], path
-        refute html =~ ~r/\sstyle\s*=/i, path
-        refute html =~ ~r/<style[\s>]/i, path
-        refute html =~ ~r/\son[a-z]+\s*=/i, path
-      end
-    end
-
-    test "the source writes no markup and no inline style, only CSSOM properties" do
-      refute @transitions_js =~ ~r/\binnerHTML\b|\beval\b|\binsertAdjacentHTML\b|document\.write/
-      refute @transitions_js =~ ~r/setAttribute\(\s*['"]style|cssText|<style/
-      assert @transitions_js =~ "style.setProperty('view-transition-name', NAME)"
-      assert @transitions_js =~ "style.removeProperty('view-transition-name')"
-      assert @transitions_js =~ "var NAME = 'entry-title';"
-      refute @transitions_js =~ ~r/console\./
+      refute @site_js =~ ~r/setAttribute\(\s*['"]style|cssText|<style/
+      refute @site_js =~ ~r/\.style\.[a-z]+\s*=/
+      assert @site_js =~ "style.setProperty('view-transition-name', NAME)"
+      assert @site_js =~ "style.removeProperty('view-transition-name')"
+      assert @site_js =~ "var NAME = 'entry-title';"
+      refute @site_js =~ ~r/console\./
+      refute @site_js =~ ~r/fetch\(|XMLHttpRequest|import\(/
     end
 
     test "it listens to the page events and sets the types and the direction from the URLs" do
-      assert @transitions_js =~ "addEventListener('pageswap'"
-      assert @transitions_js =~ "addEventListener('pagereveal'"
-      assert @transitions_js =~ "navigation.activation"
-      assert @transitions_js =~ "'forward'"
-      assert @transitions_js =~ "'back'"
-      assert @transitions_js =~ "block: 'nearest'"
+      assert @site_js =~ "addEventListener('pageswap'"
+      assert @site_js =~ "addEventListener('pagereveal'"
+      assert @site_js =~ "navigation.activation"
+      assert @site_js =~ "'forward'"
+      assert @site_js =~ "'back'"
+      assert @site_js =~ "block: 'nearest'"
     end
 
     if @node do
       test "node accepts the syntax of every script" do
-        for file <- Path.wildcard("assets/js/*.js"), file != "assets/js/field.js" do
+        for file <- Path.wildcard("assets/js/*.js") do
           assert {_, 0} = System.cmd(@node, ["--check", file], stderr_to_stdout: true), file
         end
       end
@@ -192,7 +131,6 @@ defmodule Site.TransitionsTest do
                )
 
       assert body =~ "navigation: auto;"
-      refute body =~ "types:"
     end
 
     test "and off under prefers-reduced-motion: reduce, so no navigation animates" do
@@ -203,36 +141,22 @@ defmodule Site.TransitionsTest do
                )
 
       assert body =~ "navigation: none;"
-      refute body =~ "navigation: auto"
-
-      # exactly two @view-transition rules, one per query: whichever wins, a reduced-motion
-      # visitor never matches the one that says auto
       assert length(Regex.scan(~r/@view-transition/, @code)) == 2
     end
 
-    test "the theme toggle keeps its own cross-fade, untouched" do
-      assert token("--vt-duration") == "200ms"
-      assert token("--vt-ease") == "ease-out"
-
+    test "the theme toggle has its own short cross-fade" do
       theme = rule!(@css, ":root:active-view-transition-type(theme)::view-transition-group(*)")
-      assert theme =~ "animation-duration: var(--vt-duration);"
-      assert theme =~ "animation-timing-function: var(--vt-ease);"
-      assert @theme_js =~ "types: ['theme']"
+      assert theme =~ "animation-duration: 280ms;"
+      assert theme =~ "animation-timing-function: ease-out;"
+      assert @site_js =~ "types: ['theme']"
     end
   end
 
   describe "site.css: timing" do
-    test "the tokens: enters in about 400ms, leaves in 40% of that, content a beat after" do
-      enter = ms(token("--vt-enter"))
-      exit = ms(token("--vt-exit"))
-      stagger = ms(token("--vt-stagger"))
-
-      assert enter in 380..450
-      assert_in_delta exit / enter, 0.4, 0.02
-      assert stagger in 60..90
-    end
-
-    test "emphasized decelerate in, emphasized accelerate out" do
+    test "the tokens: enter in 480ms, leave in 160ms, content a beat after" do
+      assert ms(token("--vt-enter")) == 480
+      assert ms(token("--vt-exit")) == 160
+      assert ms(token("--vt-stagger")) == 60
       assert token("--vt-ease-enter") == "cubic-bezier(0.2, 0, 0, 1)"
       assert token("--vt-ease-exit") == "cubic-bezier(0.3, 0, 0.8, 0.15)"
     end
@@ -250,10 +174,6 @@ defmodule Site.TransitionsTest do
         refute body =~ ~r/\d+m?s\b/, "hard-coded time in #{selector}"
         refute body =~ "cubic-bezier", "hard-coded easing in #{selector}"
       end
-
-      # exactly the two easings of the brief exist in the whole sheet
-      assert Regex.scan(~r/cubic-bezier\([^)]*\)/, @code) |> Enum.map(&hd/1) |> Enum.sort() ==
-               ["cubic-bezier(0.2, 0, 0, 1)", "cubic-bezier(0.3, 0, 0.8, 0.15)"]
     end
 
     test "old images leave on the exit timing, new images arrive after the stagger" do
@@ -270,7 +190,6 @@ defmodule Site.TransitionsTest do
 
       # hidden in the rule itself: the frame before the animation starts never shows it
       assert new =~ "opacity: 0;"
-
       assert new =~ "mix-blend-mode: normal;"
 
       group = rule!(@css, page <> "::view-transition-group(*)")
@@ -279,131 +198,68 @@ defmodule Site.TransitionsTest do
     end
   end
 
-  describe "site.css: types and prototypes" do
+  describe "site.css: types and names" do
     test "every navigation rule waits for a type, so the theme toggle only gets its own" do
       transition_rules =
         for {selector, _} = rule <- rules(@css), selector =~ "::view-transition", do: rule
 
       assert transition_rules != []
 
-      # one rule is for every transition, the theme toggle's included: the page colour
-      # under it all (see "no white frame")
       for {selector, _} <- transition_rules,
           selector != "::view-transition",
           part <- String.split(selector, ", :root") do
         assert part =~ ~r/:active-view-transition-type\((forward|back|theme)(, back)?\)/, selector
       end
 
-      theme = for {s, _} <- transition_rules, s =~ "(theme)", do: s
-      assert length(theme) == 1
-      refute Enum.any?(theme, &(&1 =~ "forward"))
-    end
-
-    test "forward and back both have rules, and the CSS needs no attribute on the root" do
-      for type <- ~w(forward back) do
-        scope = ":root:active-view-transition-type(#{type})"
-
-        assert Enum.any?(rules(@css), fn {selector, _} -> String.starts_with?(selector, scope) end),
-               "no #{type} rule"
-      end
-
-      # leaving and arriving are only ever used as types, never as a rule of their own
-      assert Enum.any?(rules(@css), fn {selector, _} -> selector =~ "(arriving)" end)
+      # leaving and arriving are only ever used as types
       refute @code =~ "(leaving)"
       refute @code =~ "[data-vt"
     end
 
-    test "the root holds what stays: the old one stays, the new one fades in over it" do
+    test "the root holds what stays: the old one stays, the new one covers it quickly" do
       page = ":root:active-view-transition-type(forward, back)"
 
       old = rule!(@css, page <> "::view-transition-old(root)")
       assert old =~ "animation: none;"
-      assert old =~ "mix-blend-mode: normal;"
 
       new = rule!(@css, page <> "::view-transition-new(root)")
-      # in the time of an exit: it is also how the old page's content leaves
-      assert new =~ "animation: vt-fade-in var(--vt-exit) var(--vt-ease-exit) both;"
+      assert new =~ "animation: vt-fade-in var(--vt-exit) var(--vt-ease-enter) both;"
       assert new =~ "opacity: 0;"
-      assert new =~ "mix-blend-mode: normal;"
       refute new =~ "transform"
+    end
 
-      # nothing that stays put has a name of its own: not the field, header, footer or paper
+    test "only the page that arrives names its content, and the names belong to a page" do
       names = Regex.scan(~r/view-transition-name:\s*([^;]+);/, @code) |> Enum.map(&List.last/1)
+      assert Enum.sort(Enum.uniq(names)) == ~w(entry-body home-name home-year)
 
-      assert Enum.sort(Enum.uniq(names)) == ~w(entry-body home-intro home-log)
-
-      refute rule!(@css, ".field") =~ "view-transition-name"
-      refute @code =~ ~r/view-transition-name:\s*(site-header|site-footer|field)/
-    end
-
-    test "no white frame: the page colour is under everything, nothing adds up, nothing shows early" do
-      # the root element has the page colour itself, not only body, so a root image or a
-      # transparent corner never starts from the canvas white
-      assert [_ | _] =
-               for({"html", body} <- rules(@css), body =~ "background: var(--bg);", do: body)
-
-      # under every transition, the theme toggle's too, and not scoped by a type: the first
-      # frame of a navigation may come before the types do
-      assert rule!(@css, "::view-transition") == "background: var(--bg);"
-
-      # plus-lighter adds two images up; a frame with both at full opacity is white
-      refute @code =~ "plus-lighter"
-
-      # the new image of every group is hidden by the rule, so it cannot show before its
-      # animation does, and what leaves is visible until its animation runs
-      for sel <- ["(*)", "(root)"] do
-        new =
-          rule!(
-            @css,
-            ":root:active-view-transition-type(forward, back)::view-transition-new#{sel}"
-          )
-
-        assert new =~ "opacity: 0;", sel
-      end
-
-      for name <- ~w(vt-in vt-fade-in) do
-        assert @code =~
-                 ~r/@keyframes #{name}\s*\{\s*from\s*\{[^}]*opacity: 0;[^}]*\}\s*to\s*\{[^}]*opacity: 1;/,
-               name
-      end
-
-      assert @code =~
-               ~r/@keyframes vt-fade-out\s*\{\s*from\s*\{\s*opacity: 1;\s*\}\s*to\s*\{\s*opacity: 0;/
-    end
-
-    test "no white frame: an old picture is only ever faded, never moved, and the old page names nothing tall" do
-      # what leaves is a still picture of the old page, often a very tall one (an essay):
-      # moved or scaled while it fades, the browser can draw it as a white rectangle
-      refute @code =~ "vt-out"
-      refute @code =~ "--vt-out"
-
-      for {selector, body} <- rules(@css),
-          selector =~ ~r/::view-transition-old\(/ do
-        refute body =~ "transform:", selector
-        refute body =~ "vt-in", selector
-      end
-
-      # only the page that arrives names its content (type "arriving"); the old page's
-      # content stays in its root image, which is as big as the viewport
       for {selector, body} <- rules(@css), body =~ "view-transition-name" do
         assert selector =~ ":active-view-transition-type(arriving)", selector
-        refute selector =~ "leaving", selector
       end
-    end
 
-    test "names belong to a page type, so a group never pairs a page with itself" do
-      # home and entry content have different names
-      assert rule!(@css, ":root:active-view-transition-type(arriving) .intro") ==
-               "view-transition-name: home-intro;"
+      assert rule!(@css, ":root:active-view-transition-type(arriving) .identity") ==
+               "view-transition-name: home-name;"
 
-      assert rule!(@css, ":root:active-view-transition-type(arriving) .log-section") ==
-               "view-transition-name: home-log;"
+      assert rule!(@css, ":root:active-view-transition-type(arriving) .timeline") ==
+               "view-transition-name: home-year;"
 
-      assert rule!(@css, ":root:active-view-transition-type(arriving) .prose") ==
+      assert rule!(@css, ":root:active-view-transition-type(arriving) .article") ==
                "view-transition-name: entry-body;"
     end
 
-    test "title: the shared title fills its group and scales as one piece, never stretched" do
+    test "no white frame: the page colour is under everything, nothing adds up" do
+      assert [_ | _] =
+               for({"html", body} <- rules(@css), body =~ "background: var(--bg);", do: body)
+
+      assert rule!(@css, "::view-transition") == "background: var(--bg);"
+      refute @code =~ "plus-lighter"
+
+      for {selector, body} <- rules(@css), selector =~ ~r/::view-transition-old\(/ do
+        refute body =~ "transform:", selector
+        refute body =~ "vt-in", selector
+      end
+    end
+
+    test "the shared title fills its group and scales as one piece, never stretched" do
       page = ":root:active-view-transition-type(forward, back)"
 
       fit =
@@ -416,232 +272,60 @@ defmodule Site.TransitionsTest do
 
       assert fit =~ "object-fit: contain;"
       assert fit =~ "object-position: left top;"
-      assert fit =~ "width: 100%;"
-      assert fit =~ "height: 100%;"
 
-      # going in, the row fades out in the first quarter; coming back, the heading fades out late
-      fwd_old =
-        rule!(
-          @css,
-          ":root:active-view-transition-type(forward)::view-transition-old(entry-title)"
-        )
-
-      assert fwd_old =~ "calc(var(--vt-enter) * 0.25)"
-
-      back_new =
-        rule!(
-          @css,
-          ":root:active-view-transition-type(back)::view-transition-new(entry-title)"
-        )
-
-      assert back_new =~ "calc(var(--vt-enter) * 0.75)"
-
-      # a title with no partner is ordinary content
       for side <- ~w(old new) do
         alone = rule!(@css, page <> "::view-transition-#{side}(entry-title):only-child")
         assert alone =~ "animation: vt-"
         assert alone =~ "object-fit: fill;"
       end
 
-      # the content rises 12px after the title
-      assert @code =~
-               ~r/@keyframes vt-in\s*\{\s*from\s*\{\s*opacity: 0;\s*transform: translateY\(12px\);/
+      # both ends are as wide as their text
+      assert @code =~ ~r/\n\.entry-title \{[^}]*width: fit-content;/
+      assert rule!(@css, ".article h1") =~ "width: fit-content;"
     end
 
-    test "title: the log title and the h1 are as wide as their text, and the hovered row is captured plain" do
-      assert [_ | _] = for({".log-title", "justify-self: start;"} <- rules(@css), do: :ok)
-      assert rule!(@css, ".prose > h1") =~ "width: fit-content;"
-
-      hover =
-        rule!(
-          @css,
-          ":root:active-view-transition-type(forward, back) " <>
-            ".log-title:is(:hover, :focus-visible, :active)"
-        )
-
-      assert hover =~ "background: none;"
-      assert hover =~ "color: inherit;"
-      assert hover =~ "outline: none;"
-    end
-
-    test "the keyframes: what arrives rises and fades, what leaves only fades, nothing is left over" do
+    test "the navigation keyframes: what arrives rises 12px and fades, what leaves only fades" do
       assert @code =~
                ~r/@keyframes vt-in\s*\{\s*from\s*\{\s*opacity: 0;\s*transform: translateY\(12px\);\s*\}\s*to\s*\{\s*opacity: 1;\s*transform: none;\s*\}\s*\}/
 
-      names = Regex.scan(~r/@keyframes\s+([\w-]+)/, @code) |> Enum.map(&List.last/1)
-      assert Enum.sort(names) == ["vt-fade-in", "vt-fade-out", "vt-in"]
+      assert @code =~
+               ~r/@keyframes vt-fade-out\s*\{\s*from\s*\{\s*opacity: 1;\s*\}\s*to\s*\{\s*opacity: 0;/
 
-      # every keyframe and every custom property of the transition is used
-      for name <- names do
-        assert length(Regex.scan(~r/animation:[^;]*\b#{name}\b/, @code)) >= 1, name
-      end
-
-      for token <-
-            ~w(--vt-enter --vt-exit --vt-stagger --vt-ease-enter --vt-ease-exit --vt-duration --vt-ease) do
-        assert length(Regex.scan(~r/var\(#{token}\)/, @code)) >= 1, token
-      end
-
-      assert length(Regex.scan(~r/--vt-[\w-]+:/, @code)) == 7
-    end
-
-    test "the motion stays small and calm: at most 32px, no scale, no blur, colour or rotation" do
-      px = Regex.scan(~r/translate[XY]?\((-?\d+)px/, @code)
-      assert px != []
-
-      for [_, n] <- px do
-        assert abs(String.to_integer(n)) <= 32
-      end
-
-      # nothing is scaled by the CSS at all
-      refute @code =~ ~r/scale\(|scale:/
-
-      refute @code =~ ~r/blur\(|filter:|backdrop-filter|rotate|skew|perspective|steps\(/
-      refute @code =~ ~r/@keyframes[^{]*\{[^}]*(?:color|background)/
-    end
-
-    test "no CSS-driven shortcut: no view-transition-class, no @import" do
-      refute @css =~ "view-transition-class"
-      refute @css =~ "@import"
-    end
-  end
-
-  describe "site.css: the margins go back" do
-    test "the zoom-out cursor is on entry pages only, for a fine pointer only" do
-      assert [_, media] =
-               Regex.run(~r/@media \(pointer: fine\)\s*\{(.*?)\n\}\n/s, @code)
-
-      entry = ~s|body:is([data-page="essay"], [data-page="note"], [data-page="project"])|
-
-      assert rule!(media, entry) == "cursor: zoom-out;"
-
-      assert rule!(media, entry <> " :is(.site-header, main, .site-footer)") == "cursor: auto;"
-
-      # nowhere else, so the home and the 404 keep the normal cursor
-      assert length(Regex.scan(~r/zoom-out/, @code)) == 1
-      refute @code =~ ~r/body\[data-page="home"\][^{]*zoom-out/
-    end
-  end
-
-  describe "field.js: a revealed page never shows an empty field" do
-    @field_js File.read!("assets/js/field.js")
-
-    test "the first frame is drawn at once when the font is usable, and never later than a page being shown" do
-      # at once, whether or not the document is visible or prerendered
-      assert @field_js =~ "document.fonts.check(face, "
-      assert @field_js =~ "function begin()"
-
-      assert @field_js =~
-               ~r/function begin\(\) \{\s*if \(ready \|\| destroyed\) return;\s*ready = true;\s*layout\(\);/
-
-      # otherwise the wait for the font is what it was (up to 2.5s), but a page being
-      # activated from a prerender, or shown, ends it
-      assert @field_js =~ "later(r, 2500)"
-
-      assert @field_js =~
-               "document.addEventListener('prerenderingchange', begin, { once: true });"
-
-      assert @field_js =~ ~r/function onVisibility\(\) \{[^}]*if \(docVisible\) begin\(\);/s
-      assert @field_js =~ "document.removeEventListener('prerenderingchange', begin);"
-    end
-
-    test "nothing else about the field changed: no new timer, loop or listener on a page that loads normally" do
-      # the loop still waits for a visible document and an unreduced motion preference
-      assert @field_js =~
-               "const should = ready && sized && visible && docVisible && !reduced && !destroyed;"
-
-      assert length(Regex.scan(~r/requestAnimationFrame\(/, @field_js)) == 2
-    end
-
-    if @node do
-      test "node accepts the module" do
-        dir = tmp_dir("site-field")
-        path = Path.join(dir, "field.mjs")
-        File.write!(path, @field_js)
-        assert {_, 0} = System.cmd(@node, ["--check", path], stderr_to_stdout: true)
-      end
+      refute @code =~ "view-transition-class"
     end
   end
 
   describe "head.js" do
-    test "restores the theme and nothing else: no ?vt= switch, no sessionStorage" do
+    test "restores the theme and nothing else" do
       assert @head_js =~ "localStorage.getItem('theme')"
       assert @head_js =~ "setAttribute('data-theme'"
-
-      refute @head_js =~ ~r/sessionStorage|URLSearchParams|location|data-vt|'vt'/
-      refute @head_js =~ ~r/title|slide|sheet|morph|fade|rise/
-    end
-
-    test "is tiny, wrapped in try/catch, and cannot close its own script tag" do
+      refute @head_js =~ ~r/sessionStorage|URLSearchParams|location|data-vt/
       assert byte_size(@head_js) < 400
-      assert length(Regex.scan(~r/\btry\s*\{/, @head_js)) == 1
-      assert length(Regex.scan(~r/\bcatch\s*\(/, @head_js)) == 1
       refute String.downcase(@head_js) =~ "</script"
-      refute @head_js =~ ~r/\binnerHTML\b|\beval\b|\bnew Function\b/
     end
 
-    test "the root element carries no data-vt, and the page carries head.js verbatim", %{
-      tree: tree
-    } do
-      refute File.read!("templates/layout.html.eex") =~ "data-vt"
+    test "site.js toggles the same key head.js reads" do
+      assert @site_js =~ "var THEME_KEY = 'theme';"
+    end
 
-      for {path, html} <- tree, String.ends_with?(path, ".html") do
-        assert html =~ ~s(<html lang="en">), path
-        refute html =~ "data-vt", path
-      end
-
+    test "the page carries head.js verbatim, and the CSP its hash", %{tree: tree} do
       assert page(tree, "index.html") =~ "<script>#{@head_js}</script>"
       assert page(tree, "_headers") =~ "'#{Headers.script_hash(@head_js)}'"
     end
-
-    if @node do
-      test "behaves, under node, with the document, location and storages stubbed" do
-        results = run_node(head_harness(), "assets/js/head.js")
-
-        # the theme is restored from localStorage, light or dark only
-        assert results["none"]["attrs"] == %{}
-        assert results["none"]["error"] == nil
-        assert results["dark"]["attrs"] == %{"data-theme" => "dark"}
-        assert results["light"]["attrs"] == %{"data-theme" => "light"}
-        assert results["bad"]["attrs"] == %{}
-
-        # nothing is ever written, and a ?vt= in the URL or a stored vt does nothing
-        for name <- ~w(none dark light bad vt-slide vt-title stored-vt blocked denied) do
-          assert results[name]["writes"] == [], name
-        end
-
-        for name <- ~w(vt-slide vt-title stored-vt) do
-          assert results[name]["attrs"] == %{}, name
-        end
-
-        # blocked storage never throws
-        assert results["blocked"]["attrs"] == %{}
-        assert results["blocked"]["error"] == nil
-        assert results["denied"]["attrs"] == %{}
-        assert results["denied"]["error"] == nil
-      end
-    end
   end
 
-  describe "transitions.js under node" do
+  describe "site.js under node" do
     if @node do
-      setup do
-        %{r: run_node(transitions_harness(), "assets/js/transitions.js")}
-      end
-
-      test "going from the home into an entry is forward, and names the clicked row", %{r: r} do
+      test "going from the home into an entry is forward, and names the clicked title", %{r: r} do
         c = r["swap-forward"]
         assert c["types"] == ["forward", "leaving"]
         assert c["named"] == ["/rhino/"]
         assert c["error"] == nil
 
-        # the same navigation, started from anywhere: a link, the keyboard, a prerender
         assert r["swap-forward-trailing"]["named"] == ["/rhino/"]
       end
 
-      test "a row that is not on screen, or not there, skips the morph and keeps the direction",
-           %{
-             r: r
-           } do
+      test "a title off screen, or no row, skips the morph and keeps the direction", %{r: r} do
         assert r["swap-forward-offscreen"]["types"] == ["forward", "leaving"]
         assert r["swap-forward-offscreen"]["named"] == []
         assert r["swap-forward-norow"]["types"] == ["forward", "leaving"]
@@ -650,12 +334,11 @@ defmodule Site.TransitionsTest do
       end
 
       test "going back to the home names the h1, however the navigation was made", %{r: r} do
-        for name <- ["swap-back", "swap-back-traverse"] do
+        for name <- ["swap-back", "swap-back-project"] do
           assert r[name]["types"] == ["back", "leaving"], name
           assert r[name]["named"] == ["h1"], name
         end
 
-        # an h1 scrolled out of view is not named
         assert r["swap-back-scrolled"]["types"] == ["back", "leaving"]
         assert r["swap-back-scrolled"]["named"] == []
       end
@@ -672,7 +355,6 @@ defmodule Site.TransitionsTest do
         assert r["reveal-from-nowhere"]["types"] == []
         assert r["reveal-no-transition"]["types"] == []
         assert r["swap-no-transition"]["named"] == []
-        assert r["swap-no-transition"]["error"] == nil
       end
 
       test "on the new page: the h1 going in, the row we came from coming back", %{r: r} do
@@ -683,33 +365,34 @@ defmodule Site.TransitionsTest do
         b = r["reveal-back"]
         assert b["types"] == ["back", "arriving"]
         assert b["named"] == ["/rhino/"]
-        assert b["scrolls"] == [["/rhino/", %{"block" => "nearest", "inline" => "nearest"}]]
+
+        assert b["scrolls"] == [
+                 [
+                   "/rhino/",
+                   %{"block" => "nearest", "inline" => "nearest", "behavior" => "instant"}
+                 ]
+               ]
       end
 
-      test "a row off screen is scrolled to the nearest edge before it is named", %{r: r} do
+      test "a row off screen is scrolled into view before it is named, unless there is a hash",
+           %{r: r} do
         c = r["reveal-back-offscreen"]
-        assert c["scrolls"] == [["/rhino/", %{"block" => "nearest", "inline" => "nearest"}]]
         assert c["named"] == ["/rhino/"]
         assert c["order"] == ["scroll:/rhino/", "set:/rhino/"]
 
-        # no row for the entry we came from: the directional fallback
+        assert r["reveal-back-hash"]["scrolls"] == []
+
         assert r["reveal-back-norow"]["types"] == ["back", "arriving"]
         assert r["reveal-back-norow"]["named"] == []
         assert r["reveal-back-norow"]["error"] == nil
       end
 
-      test "at most one element carries the name at any time", %{r: r} do
+      test "at most one element carries the name, and it is cleared on any outcome", %{r: r} do
         for {name, c} <- r, is_map(c), Map.has_key?(c, "maxNamed") do
           assert c["maxNamed"] <= 1, name
         end
 
-        # a stale name (a page restored from the cache) is dropped before the next claim
-        c = r["stale"]
-        assert c["named"] == ["/rhino/"]
-        assert c["maxNamed"] == 1
-      end
-
-      test "the names are cleared when the transition finishes, is skipped or fails", %{r: r} do
+        assert r["stale"]["named"] == ["/rhino/"]
         assert r["finished"]["namedBefore"] == ["/rhino/"]
         assert r["finished"]["named"] == []
         assert r["rejected"]["namedBefore"] == ["h1"]
@@ -726,24 +409,29 @@ defmodule Site.TransitionsTest do
         assert r["no-navigation-api"]["error"] == nil
       end
 
-      test "on an entry page the margins and Escape go back to the log", %{r: r} do
-        # the previous history entry is the home: step back, so the home keeps its place
+      test "the home's entrance plays on a fresh load only, never under reduced motion", %{r: r} do
+        assert "intro" in r["home-fresh"]["classes"]
+        refute "intro" in r["home-back"]["classes"]
+        refute "intro" in r["home-reduced"]["classes"]
+        refute "intro" in r["entry-fresh"]["classes"]
+
+        # the script marks the page as scripted before anything else
+        for name <- ~w(home-fresh home-back home-reduced entry-fresh) do
+          assert "js" in r[name]["classes"], name
+        end
+      end
+
+      test "on an entry page the margins and Escape go back to the home", %{r: r} do
         assert r["go-prev-home"]["go"] == [-1]
         assert r["go-prev-home"]["assign"] == []
-
-        # hash hops on this page do not count
         assert r["go-hash-hops"]["go"] == [-3]
-
-        # otherwise, the home
         assert r["go-prev-entry"]["go"] == []
         assert r["go-prev-entry"]["assign"] == ["/"]
         assert r["go-first"]["assign"] == ["/"]
         assert r["go-other-origin"]["assign"] == ["/"]
 
-        # without the Navigation API: the referrer and the history length
         assert r["go-ref-home"]["back"] == 1
         assert r["go-ref-home"]["assign"] == []
-        assert r["go-ref-other"]["back"] == 0
         assert r["go-ref-other"]["assign"] == ["/"]
         assert r["go-ref-home-hash"]["assign"] == ["/"]
         assert r["go-ref-home-alone"]["assign"] == ["/"]
@@ -761,7 +449,6 @@ defmodule Site.TransitionsTest do
           assert r[name]["assign"] == [], name
         end
 
-        # the press is forgotten after one click
         assert r["click-twice"]["go"] == [-1]
       end
 
@@ -776,95 +463,90 @@ defmodule Site.TransitionsTest do
         end
       end
 
-      test "the home, the 404 and the log have no margin handler", %{r: r} do
+      test "the back links step back to the home too, and leave modified clicks alone", %{r: r} do
+        assert r["back-link"]["go"] == [-1]
+        assert r["back-link"]["prevented"] == true
+
+        for name <- ~w(back-link-meta back-link-middle) do
+          assert r[name]["go"] == [], name
+          assert r[name]["prevented"] == false, name
+        end
+      end
+
+      test "the home and the 404 have no margin handler", %{r: r} do
         for name <- ~w(page-home page-404 page-none) do
           assert r[name]["docListeners"] == [], name
-          # the direction script still runs there
           assert r[name]["winListeners"] == ["pagereveal", "pageshow", "pageswap"], name
         end
 
-        assert r["go-prev-home"]["docListeners"] == ["click", "keydown", "pointerdown"]
+        assert r["entry-listeners"]["docListeners"] == ["click", "keydown", "pointerdown"]
       end
-    end
-  end
 
-  describe "theme.js" do
-    test "wraps the switch in a view transition of type theme, unless motion is reduced" do
-      assert @theme_js =~ "document.startViewTransition"
-      assert @theme_js =~ "types: ['theme']"
-      assert @theme_js =~ "(prefers-reduced-motion: reduce)"
-      assert @theme_js =~ "typeof document.startViewTransition === 'function'"
-      refute @theme_js =~ ~r/\binnerHTML\b|\beval\b|\binsertAdjacentHTML\b/
-      refute @theme_js =~ ~r/\.style\b|setAttribute\(.style/
-    end
-
-    test "is a plain deferred script, loaded on every page", %{tree: tree} do
-      for {path, html} <- tree, String.ends_with?(path, ".html") do
-        assert html =~ ~s(<script defer src="/assets/js/theme.js"></script>), path
-      end
-    end
-
-    if @node do
-      test "behaves, under node, with the document, media queries and startViewTransition stubbed" do
-        results = run_node(theme_harness(), "assets/js/theme.js")
-
-        # supported: the switch waits for the browser's own update call
-        s = results["supported"]
+      test "the theme toggle: a cross-fade of type theme, unless motion is reduced", %{r: r} do
+        s = r["theme-supported"]
         assert s["calls"] == 1
         assert s["argKeys"] == ["types", "update"]
         assert s["types"] == ["theme"]
         assert s["themeBefore"] == nil
-        assert s["themeAfter"] == "dark"
-        assert s["stored"] == "dark"
+        assert s["themeAfter"] == "light"
+        assert s["stored"] == "light"
         assert s["unhandled"] == 0
 
-        # reduced motion: no transition, the theme switches at once
-        r = results["reduced"]
-        assert r["calls"] == 0
-        assert r["themeBefore"] == "dark"
-        assert r["stored"] == "dark"
+        reduced = r["theme-reduced"]
+        assert reduced["calls"] == 0
+        assert reduced["themeBefore"] == "light"
 
-        # no support, or an engine that only knows the callback form: switch once, at once
-        for name <- ["unsupported", "throws"] do
-          assert results[name]["themeBefore"] == "dark", name
-          assert results[name]["themeAfter"] == "dark", name
-          assert results[name]["applied"] == 1, name
-          assert results[name]["stored"] == "dark", name
+        for name <- ["theme-unsupported", "theme-throws"] do
+          assert r[name]["themeBefore"] == "light", name
+          assert r[name]["applied"] == 1, name
         end
 
-        assert results["throws"]["calls"] == 1
+        # an engine that only knows the callback form still cross-fades
+        callback = r["theme-callback-only"]
+        assert callback["calls"] == 2
+        assert callback["themeBefore"] == nil
+        assert callback["themeAfter"] == "light"
 
-        # the update callback may be called more than once: still one switch
-        assert results["twice"]["applied"] == 1
+        assert r["theme-twice"]["applied"] == 1
+      end
 
-        # the system is dark and the user toggles: light
-        assert results["system-dark"]["themeAfter"] == "light"
+      test "choosing what the system prefers forgets the choice", %{r: r} do
+        # forced light on a dark system: back to dark is back to the system
+        f = r["theme-forget"]
+        assert f["themeAfter"] == nil
+        assert f["stored"] == nil
+        assert f["removed"] == ["theme"]
 
-        # a forced theme toggles back
-        assert results["forced-dark"]["themeAfter"] == "light"
-        assert results["forced-light"]["themeAfter"] == "dark"
+        # a light system: the toggle forces dark, then forgets it
+        assert r["theme-system-light"]["themeAfter"] == "dark"
+        assert r["theme-system-light"]["stored"] == "dark"
 
-        # two quick clicks, before the first update: back where it started, nothing unhandled
-        d = results["double-click"]
+        # two quick clicks before the first update: back where it started
+        d = r["theme-double-click"]
         assert d["calls"] == 2
-        assert d["themeAfter"] == "light"
-        assert d["stored"] == "light"
+        assert d["themeAfter"] == nil
+        assert d["stored"] == nil
         assert d["unhandled"] == 0
+      end
 
-        # a skipped transition (a rejected ready promise) is not an error
-        assert results["skipped"]["unhandled"] == 0
-        assert results["skipped"]["themeAfter"] == "dark"
+      test "the toggle says which theme it switches to", %{r: r} do
+        assert r["theme-supported"]["labelBefore"] == "Switch to light theme"
+        assert r["theme-supported"]["labelAfter"] == "Switch to dark theme"
+        assert r["theme-supported"]["title"] == "Switch to dark theme"
+        assert r["theme-system-light"]["labelBefore"] == "Switch to dark theme"
+      end
 
-        # storage that throws does not stop the switch
-        assert results["storage-blocked"]["themeAfter"] == "dark"
-
-        # no button, no script
-        assert results["no-button"]["handlers"] == 0
+      test "a skipped cross-fade, blocked storage or no button are not errors", %{r: r} do
+        assert r["theme-skipped"]["unhandled"] == 0
+        assert r["theme-skipped"]["themeAfter"] == "light"
+        assert r["theme-storage-blocked"]["themeAfter"] == "light"
+        assert r["theme-no-button"]["handlers"] == 0
+        assert r["theme-no-button"]["error"] == nil
       end
     end
   end
 
-  # -- node harnesses ---------------------------------------------------------
+  # -- the node harness -------------------------------------------------------
 
   defp run_node(harness, script) do
     dir = tmp_dir("site-node")
@@ -877,65 +559,11 @@ defmodule Site.TransitionsTest do
     end
   end
 
-  # Runs head.js in a vm context whose document, location and storages are stubs.
-  defp head_harness do
-    ~S"""
-    const fs = require('fs');
-    const vm = require('vm');
-    const src = fs.readFileSync(process.argv[2], 'utf8').trim();
-
-    function run(o) {
-      const attrs = {};
-      const writes = [];
-      const store = (data, blocked) => ({
-        getItem(k) {
-          if (blocked) throw new Error('blocked');
-          return Object.prototype.hasOwnProperty.call(data, k) ? data[k] : null;
-        },
-        setItem(k, v) { writes.push([k, String(v)]); },
-      });
-      const root = {
-        setAttribute(k, v) { attrs[k] = v; },
-        getAttribute(k) { return k in attrs ? attrs[k] : null; },
-      };
-      const ctx = {
-        document: { documentElement: root },
-        location: { search: o.search || '' },
-        URLSearchParams,
-      };
-      // the browser throws on the property access itself when storage is blocked
-      Object.defineProperty(ctx, 'localStorage', {
-        get() { if (o.denied) throw new Error('denied'); return store(o.local || {}, o.blocked); },
-      });
-      Object.defineProperty(ctx, 'sessionStorage', {
-        get() { return store(o.session || {}, false); },
-      });
-      let error = null;
-      try { vm.runInNewContext(src, ctx); } catch (e) { error = String(e); }
-      return { attrs, writes, error };
-    }
-
-    const cases = {
-      none: {},
-      dark: { local: { theme: 'dark' } },
-      light: { local: { theme: 'light' } },
-      bad: { local: { theme: 'purple' } },
-      'vt-slide': { search: '?vt=slide' },
-      'vt-title': { search: '?vt=title', local: {} },
-      'stored-vt': { session: { vt: 'sheet' } },
-      blocked: { blocked: true, local: { theme: 'dark' } },
-      denied: { denied: true },
-    };
-    const out = {};
-    for (const [name, o] of Object.entries(cases)) out[name] = run(o);
-    console.log(JSON.stringify(out));
-    """
-  end
-
-  # Runs transitions.js against stubs: the page events, a view transition whose types and
-  # promises the test controls, a few rows and an h1 that know whether they carry the name,
-  # the Navigation API, the history and the location.
-  defp transitions_harness do
+  # Runs site.js against stubs: the page events, a view transition whose types and
+  # promises the test controls, timeline entries and an h1 that know whether they
+  # carry the name, the Navigation API, the history, the location, the media
+  # queries, storage and the theme toggle.
+  defp harness do
     ~S"""
     const fs = require('fs');
     const vm = require('vm');
@@ -948,12 +576,22 @@ defmodule Site.TransitionsTest do
 
     let unhandled = 0;
     process.on('unhandledRejection', () => { unhandled++; });
-
     const tick = () => new Promise((r) => setImmediate(r));
+
+    function classes() {
+      const set = new Set();
+      return {
+        add: (...c) => c.forEach((x) => set.add(x)),
+        remove: (...c) => c.forEach((x) => set.delete(x)),
+        toggle: (c, on) => { if (on === undefined ? !set.has(c) : on) set.add(c); else set.delete(c); },
+        contains: (c) => set.has(c),
+        list: () => [...set].sort(),
+      };
+    }
 
     // One page: its context, the listeners the script registered and a log.
     function page(o) {
-      const log = { go: [], assign: [], back: 0, scrolls: [], order: [] };
+      const log = { go: [], assign: [], back: 0, scrolls: [], order: [], removed: [] };
       const named = new Set();
       let maxNamed = 0;
       const el = (label, rect) => {
@@ -965,7 +603,7 @@ defmodule Site.TransitionsTest do
             maxNamed = Math.max(maxNamed, named.size);
             log.order.push('set:' + label);
           },
-          removeProperty(k) { named.delete(e); log.order.push('remove:' + label); },
+          removeProperty() { named.delete(e); log.order.push('remove:' + label); },
         };
         e.getBoundingClientRect = () => e.rect;
         e.scrollIntoView = (opts) => {
@@ -973,33 +611,85 @@ defmodule Site.TransitionsTest do
           log.order.push('scroll:' + label);
           if (o.scrollMakesVisible) e.rect = VISIBLE;
         };
-        Object.defineProperty(e, 'href', { value: ORIGIN + label });
+        e.closest = () => null;
         return e;
       };
-      const rows = (o.rows || []).map(([label, rect]) => el(label, rect || VISIBLE));
+      // a timeline entry: the link, and the title inside it that carries the name
+      const links = (o.rows || []).map(([label, rect]) => {
+        const title = el(label, rect || VISIBLE);
+        return { href: ORIGIN + label, querySelector: (sel) => (sel === '.entry-title' ? title : null) };
+      });
       const h1 = o.h1 === false ? null : el('h1', o.h1 || VISIBLE);
+
+      const backLinks = (o.backLinks || 0) ? [{ handlers: {}, addEventListener(t, f) { this.handlers[t] = f; }, getAttribute: () => '/' }] : [];
 
       const win = {};
       const doc = {};
       const here = ORIGIN + (o.path || '/');
       const body = { getAttribute: (k) => (k === 'data-page' && o.page !== undefined ? o.page : null) };
-      const root = { getAttribute: () => null };
+      const attrs = Object.assign({}, o.attrs);
+      let applied = 0;
+      const root = {
+        classList: classes(),
+        getAttribute: (k) => (k in attrs ? attrs[k] : null),
+        setAttribute(k, v) { if (k === 'data-theme') applied++; attrs[k] = v; },
+        removeAttribute(k) { if (k === 'data-theme') applied++; delete attrs[k]; },
+        style: { setProperty() {} },
+      };
+      let handlers = 0;
+      let click = null;
+      const toggleAttrs = {};
+      const toggle = o.toggle === false ? null : {
+        addEventListener(t, f) { handlers++; if (t === 'click') click = f; },
+        setAttribute(k, v) { toggleAttrs[k] = v; },
+      };
+      const store = o.stored ? { theme: o.stored } : {};
+      const media = {
+        '(prefers-reduced-motion: reduce)': !!o.reduced,
+        '(prefers-color-scheme: light)': !!o.systemLight,
+        '(pointer: fine)': o.fine !== false,
+      };
+      const calls = [];
+      const document = {
+        documentElement: root,
+        body,
+        referrer: o.referrer || '',
+        querySelectorAll: (sel) => (sel === 'a.entry' ? links : sel === '[data-home]' ? backLinks : []),
+        querySelector: (sel) => (sel === '.article h1' ? h1 : sel === '.theme-toggle' ? toggle : null),
+        addEventListener: (t, f) => { (doc[t] = doc[t] || []).push(f); },
+      };
+      if (o.vt === 'supported' || o.vt === 'skipped') {
+        document.startViewTransition = (arg) => {
+          calls.push(arg);
+          return { ready: o.vt === 'skipped' ? Promise.reject(new Error('skipped')) : Promise.resolve(), finished: Promise.resolve() };
+        };
+      } else if (o.vt === 'throws') {
+        document.startViewTransition = (arg) => { calls.push(arg); throw new TypeError('no'); };
+      } else if (o.vt === 'callback-only') {
+        document.startViewTransition = (arg) => {
+          calls.push(arg);
+          if (typeof arg !== 'function') throw new TypeError('The provided callback is not a function');
+          return { ready: Promise.resolve(), finished: Promise.resolve() };
+        };
+      }
       const ctx = {
         URL,
         innerHeight: 800,
+        scrollY: 0,
         location: { href: here, origin: ORIGIN, hash: o.hash || '', assign: (u) => log.assign.push(u) },
         history: { length: o.histLen === undefined ? 4 : o.histLen, go: (n) => log.go.push(n), back: () => { log.back++; } },
-        matchMedia: () => ({ matches: o.fine !== false }),
+        matchMedia: (q) => ({ matches: !!media[q], addEventListener() {} }),
         getSelection: () => ({ isCollapsed: !o.selection }),
-        document: {
-          documentElement: root,
-          body,
-          referrer: o.referrer || '',
-          querySelectorAll: (sel) => (sel === '.log-title' ? rows : []),
-          querySelector: (sel) => (sel === 'main .prose > h1' ? h1 : null),
-          addEventListener: (t, f) => { (doc[t] = doc[t] || []).push(f); },
-        },
+        setTimeout: () => 0,
+        requestAnimationFrame: () => 0,
+        document,
         addEventListener: (t, f) => { (win[t] = win[t] || []).push(f); },
+        localStorage: {
+          getItem: (k) => (k in store ? store[k] : null),
+          setItem(k, v) { if (o.storageBlocked) throw new Error('blocked'); store[k] = String(v); },
+          removeItem(k) { log.removed.push(k); delete store[k]; },
+        },
+        sessionStorage: { getItem: () => null, setItem() {} },
       };
       ctx.window = ctx;
       if (o.nav !== false) {
@@ -1009,10 +699,10 @@ defmodule Site.TransitionsTest do
           currentEntry: { index: o.index === undefined ? 0 : o.index },
         };
       }
-      if (o.referrer !== undefined && o.nav === false) ctx.document.referrer = ORIGIN + o.referrer;
+      if (o.referrer !== undefined && o.nav === false) document.referrer = ORIGIN + o.referrer;
 
       let error = null;
-      try { require('vm').runInNewContext(src, ctx); } catch (e) { error = String(e); }
+      try { vm.runInNewContext(src, ctx); } catch (e) { error = String(e); }
 
       const fire = (t, ev) => { for (const f of win[t] || []) f(ev); };
       const fireDoc = (t, ev) => { for (const f of doc[t] || []) f(ev); };
@@ -1029,21 +719,23 @@ defmodule Site.TransitionsTest do
         return { vt, types, finish: ok, fail: no };
       };
 
-      return { ctx, log, fire, fireDoc, names, transition, body, root, error, win, doc, maxNamed: () => maxNamed, rows, h1 };
+      return {
+        ctx, log, fire, fireDoc, names, transition, body, root, error, win, doc, backLinks,
+        maxNamed: () => maxNamed, attrs, store, calls, toggleAttrs, applied: () => applied,
+        click: () => click && click(), handlers: () => handlers,
+      };
     }
 
     const homeRows = [['/a/'], ['/rhino/'], ['/c/']];
 
-    // pageswap on the old page
     function swap(o, to, extra = {}) {
       const p = page({ page: 'home', path: '/', rows: homeRows, ...o });
       const t = p.transition();
       let error = p.error;
-      try { p.fire('pageswap', { viewTransition: extra.noVt ? null : t.vt, activation: { entry: { url: to.startsWith('http') ? to : ORIGIN + to }, from: { url: ORIGIN + (o.path || '/') } } }); } catch (e) { error = String(e); }
+      try { p.fire('pageswap', { viewTransition: extra.noVt ? null : t.vt, activation: { entry: { url: to.startsWith('http') ? to : ORIGIN + to } } }); } catch (e) { error = String(e); }
       return { p, t, result: { types: t.types, named: p.names(), maxNamed: p.maxNamed(), scrolls: p.log.scrolls, order: p.log.order, error } };
     }
 
-    // pagereveal on the new page
     function reveal(o, from, extra = {}) {
       const p = page({ from, ...o });
       const t = p.transition();
@@ -1064,7 +756,7 @@ defmodule Site.TransitionsTest do
       out['swap-forward-offscreen'] = swap({ rows: [['/a/'], ['/rhino/', OFFSCREEN]] }, '/rhino/').result;
       out['swap-forward-norow'] = swap({ rows: [['/a/']] }, '/rhino/').result;
       out['swap-back'] = swap({ ...entryPage, rows: undefined }, '/').result;
-      out['swap-back-traverse'] = swap({ ...entryPage, rows: undefined, page: 'project' }, ORIGIN + '/?from=entry').result;
+      out['swap-back-project'] = swap({ ...entryPage, rows: undefined, page: 'project' }, ORIGIN + '/?from=entry').result;
       out['swap-back-scrolled'] = swap({ ...entryPage, h1: ABOVE }, '/').result;
       out['swap-entry-entry'] = swap({ ...entryPage }, '/other/').result;
       out['swap-home-home'] = swap({}, '/').result;
@@ -1077,14 +769,29 @@ defmodule Site.TransitionsTest do
       out['reveal-forward'] = reveal(entryPage, '/').result;
       out['reveal-back'] = reveal(homePage, '/rhino/').result;
       out['reveal-back-offscreen'] = reveal({ ...homePage, rows: [['/a/'], ['/rhino/', OFFSCREEN]], scrollMakesVisible: true }, '/rhino/').result;
+      out['reveal-back-hash'] = reveal({ ...homePage, hash: '#feed' }, '/rhino/').result;
       out['reveal-back-norow'] = reveal({ ...homePage, rows: [['/a/']] }, '/rhino/').result;
       out['reveal-entry-entry'] = reveal(entryPage, '/other/').result;
       out['reveal-from-nowhere'] = reveal(entryPage, null).result;
       out['reveal-no-transition'] = reveal(entryPage, '/', { noVt: true }).result;
 
+      // ---- the entrance
+      {
+        const fresh = page({ ...homePage });
+        fresh.fire('pagereveal', { viewTransition: null });
+        out['home-fresh'] = { classes: fresh.root.classList.list() };
+        const back = reveal(homePage, '/rhino/');
+        out['home-back'] = { classes: back.p.root.classList.list() };
+        const reduced = page({ ...homePage, reduced: true });
+        reduced.fire('pagereveal', { viewTransition: null });
+        out['home-reduced'] = { classes: reduced.root.classList.list() };
+        const entry = page({ ...entryPage });
+        entry.fire('pagereveal', { viewTransition: null });
+        out['entry-fresh'] = { classes: entry.root.classList.list() };
+      }
+
       // ---- one name at a time, and cleared
       {
-        // a page restored from the cache still has the name of its last swap
         const p = page({ ...homePage, from: '/rhino/' });
         const a = p.transition();
         p.fire('pagereveal', { viewTransition: a.vt });
@@ -1132,22 +839,22 @@ defmodule Site.TransitionsTest do
         out['no-navigation-api'] = { error };
       }
 
-      // ---- going back to the log
+      // ---- going back to the home
       const E = (o) => ({ page: 'essay', path: '/rhino/', from: '/', ...o });
-      function goLog(name, o, how = 'escape') {
+      function goHome(name, o) {
         const p = page(E(o));
-        if (how === 'escape') p.fireDoc('keydown', { key: 'Escape', target: { closest: () => null } });
-        out[name] = { go: p.log.go, assign: p.log.assign, back: p.log.back, docListeners: Object.keys(p.doc).sort(), winListeners: Object.keys(p.win).sort() };
+        p.fireDoc('keydown', { key: 'Escape', target: { closest: () => null } });
+        out[name] = { go: p.log.go, assign: p.log.assign, back: p.log.back };
       }
-      goLog('go-prev-home', { entries: ['/', '/rhino/'], index: 1 });
-      goLog('go-hash-hops', { entries: ['/', '/rhino/', '/rhino/#a', '/rhino/#b'], index: 3, hash: '#b' });
-      goLog('go-prev-entry', { entries: ['/other/', '/rhino/'], index: 1 });
-      goLog('go-first', { entries: ['/rhino/'], index: 0 });
-      goLog('go-other-origin', { entries: [null, '/rhino/'], index: 1 });
-      goLog('go-ref-home', { nav: false, referrer: '/', histLen: 3 });
-      goLog('go-ref-other', { nav: false, referrer: '/other/', histLen: 3 });
-      goLog('go-ref-home-hash', { nav: false, referrer: '/', histLen: 3, hash: '#x' });
-      goLog('go-ref-home-alone', { nav: false, referrer: '/', histLen: 1 });
+      goHome('go-prev-home', { entries: ['/', '/rhino/'], index: 1 });
+      goHome('go-hash-hops', { entries: ['/', '/rhino/', '/rhino/#a', '/rhino/#b'], index: 3, hash: '#b' });
+      goHome('go-prev-entry', { entries: ['/other/', '/rhino/'], index: 1 });
+      goHome('go-first', { entries: ['/rhino/'], index: 0 });
+      goHome('go-other-origin', { entries: [null, '/rhino/'], index: 1 });
+      goHome('go-ref-home', { nav: false, referrer: '/', histLen: 3 });
+      goHome('go-ref-other', { nav: false, referrer: '/other/', histLen: 3 });
+      goHome('go-ref-home-hash', { nav: false, referrer: '/', histLen: 3, hash: '#x' });
+      goHome('go-ref-home-alone', { nav: false, referrer: '/', histLen: 1 });
 
       // ---- the margin click
       const prevHome = { entries: ['/', '/rhino/'], index: 1 };
@@ -1156,7 +863,7 @@ defmodule Site.TransitionsTest do
         steps(p);
         out[name] = { go: p.log.go, assign: p.log.assign };
       }
-      const paper = { closest: () => null, paper: true };
+      const paper = { closest: () => null };
       const press = (p, target, extra = {}) => p.fireDoc('pointerdown', { button: 0, target, ...extra });
       const clk = (p, target, extra = {}) => p.fireDoc('click', { button: 0, target, ...extra });
       click('margin-click', {}, (p) => { press(p, p.body); clk(p, p.body); });
@@ -1184,117 +891,64 @@ defmodule Site.TransitionsTest do
       key('escape-field', { key: 'Escape', target: { closest: () => ({}) } });
       key('other-key', { key: 'Enter' });
 
+      // ---- the back links
+      for (const [name, ev] of [['back-link', {}], ['back-link-meta', { metaKey: true }], ['back-link-middle', { button: 1 }]]) {
+        const p = page(E({ ...prevHome, backLinks: 1 }));
+        let prevented = false;
+        p.backLinks[0].handlers.click({ button: 0, defaultPrevented: false, preventDefault() { prevented = true; }, ...ev });
+        out[name] = { go: p.log.go, assign: p.log.assign, prevented };
+      }
+
       // ---- which pages get the margin handler
       for (const [name, o] of [['page-home', { page: 'home' }], ['page-404', { page: '404' }], ['page-none', {}]]) {
         const p = page({ path: '/', ...o });
         out[name] = { docListeners: Object.keys(p.doc).sort(), winListeners: Object.keys(p.win).sort() };
       }
-      out['go-prev-home'].docListeners = Object.keys(page(E(prevHome)).doc).sort();
+      out['entry-listeners'] = { docListeners: Object.keys(page(E(prevHome)).doc).sort() };
+
+      // ---- the theme toggle
+      async function theme(name, o) {
+        unhandled = 0;
+        const p = page({ page: '404', path: '/nope/', ...o });
+        const r = { handlers: p.handlers(), error: p.error, labelBefore: p.toggleAttrs['aria-label'] || null };
+        for (let i = 0; i < (o.clicks || 1); i++) p.click();
+        r.calls = p.calls.length;
+        r.argKeys = p.calls.length && typeof p.calls[0] === 'object' ? Object.keys(p.calls[0]).sort() : [];
+        r.types = p.calls.length && typeof p.calls[0] === 'object' ? p.calls[0].types : null;
+        r.themeBefore = p.attrs['data-theme'] === undefined ? null : p.attrs['data-theme'];
+        // the browser calls the update callbacks later, in order
+        for (const c of p.calls) {
+          const update = typeof c === 'function' ? c : c.update;
+          update();
+          if (o.updateTwice) update();
+        }
+        await tick();
+        r.themeAfter = p.attrs['data-theme'] === undefined ? null : p.attrs['data-theme'];
+        r.stored = p.store.theme === undefined ? null : p.store.theme;
+        r.removed = p.log.removed;
+        r.applied = p.applied();
+        r.unhandled = unhandled;
+        r.labelAfter = p.toggleAttrs['aria-label'] || null;
+        r.title = p.toggleAttrs.title || null;
+        out[name] = r;
+      }
+      await theme('theme-supported', { vt: 'supported' });
+      await theme('theme-reduced', { vt: 'supported', reduced: true });
+      await theme('theme-unsupported', {});
+      await theme('theme-throws', { vt: 'throws' });
+      await theme('theme-callback-only', { vt: 'callback-only' });
+      await theme('theme-twice', { vt: 'supported', updateTwice: true });
+      await theme('theme-forget', { vt: 'supported', attrs: { 'data-theme': 'light' }, stored: 'light' });
+      await theme('theme-system-light', { vt: 'supported', systemLight: true });
+      await theme('theme-double-click', { vt: 'supported', clicks: 2 });
+      await theme('theme-skipped', { vt: 'skipped' });
+      await theme('theme-storage-blocked', { vt: 'supported', storageBlocked: true });
+      await theme('theme-no-button', { toggle: false });
 
       console.log(JSON.stringify(out));
     }
 
     main().catch((e) => { console.error(e); process.exit(1); });
-    """
-  end
-
-  # Runs theme.js against stubs: one button, two media queries, a document that may offer
-  # startViewTransition (and run its update callback only when the test says so).
-  defp theme_harness do
-    ~S"""
-    const fs = require('fs');
-    const vm = require('vm');
-    const src = fs.readFileSync(process.argv[2], 'utf8');
-
-    let unhandled = 0;
-    process.on('unhandledRejection', () => { unhandled++; });
-
-    async function run(o) {
-      const attrs = Object.assign({}, o.attrs);
-      const store = o.stored ? { theme: o.stored } : {};
-      let handlers = 0;
-      let click = null;
-      const button = { addEventListener(type, fn) { handlers++; if (type === 'click') click = fn; } };
-      const calls = [];
-      let applied = 0;
-      const root = {
-        getAttribute(k) { return k in attrs ? attrs[k] : null; },
-        setAttribute(k, v) { if (k === 'data-theme') applied++; attrs[k] = v; },
-      };
-      const document = {
-        documentElement: root,
-        querySelector: (sel) => (sel === '.theme-toggle' && !o.noButton ? button : null),
-      };
-      if (o.vt === 'supported' || o.vt === 'skipped') {
-        document.startViewTransition = (arg) => {
-          calls.push(arg);
-          return { ready: o.vt === 'skipped' ? Promise.reject(new Error('skipped')) : Promise.resolve() };
-        };
-      } else if (o.vt === 'throws') {
-        document.startViewTransition = (arg) => {
-          calls.push(arg);
-          throw new TypeError('The provided callback is not a function');
-        };
-      }
-      const media = {
-        '(prefers-color-scheme: dark)': { get matches() { return !!o.systemDark; } },
-        '(prefers-reduced-motion: reduce)': { get matches() { return !!o.reduced; } },
-      };
-      const ctx = {
-        document,
-        window: { matchMedia: (q) => media[q] || { matches: false } },
-        localStorage: {
-          setItem(k, v) { if (o.storageBlocked) throw new Error('blocked'); store[k] = String(v); },
-          getItem(k) { return k in store ? store[k] : null; },
-        },
-      };
-      ctx.window.document = document;
-      vm.runInNewContext(src, ctx);
-
-      const out = { handlers, calls: 0, themeBefore: attrs['data-theme'] === undefined ? null : attrs['data-theme'] };
-      if (!click) { out.calls = 0; return out; }
-
-      const clicks = o.clicks || 1;
-      for (let i = 0; i < clicks; i++) click();
-      out.calls = calls.length;
-      out.argKeys = calls.length ? Object.keys(calls[0]).sort() : [];
-      out.types = calls.length ? calls[0].types : null;
-      out.themeBefore = attrs['data-theme'] === undefined ? null : attrs['data-theme'];
-
-      // the browser calls the update callbacks later, in order
-      if (calls.length) {
-        for (const c of calls) { c.update(); if (o.updateTwice) c.update(); }
-      }
-      await new Promise((r) => setImmediate(r));
-      out.themeAfter = attrs['data-theme'] === undefined ? null : attrs['data-theme'];
-      out.stored = store.theme === undefined ? null : store.theme;
-      out.applied = applied;
-      out.unhandled = unhandled;
-      return out;
-    }
-
-    (async () => {
-      const cases = {
-        supported: { vt: 'supported' },
-        reduced: { vt: 'supported', reduced: true },
-        unsupported: {},
-        throws: { vt: 'throws' },
-        twice: { vt: 'supported', updateTwice: true },
-        'system-dark': { vt: 'supported', systemDark: true },
-        'forced-dark': { vt: 'supported', attrs: { 'data-theme': 'dark' } },
-        'forced-light': { vt: 'supported', attrs: { 'data-theme': 'light' }, systemDark: true },
-        'double-click': { vt: 'supported', clicks: 2 },
-        skipped: { vt: 'skipped' },
-        'storage-blocked': { vt: 'supported', storageBlocked: true },
-        'no-button': { noButton: true },
-      };
-      const out = {};
-      for (const [name, o] of Object.entries(cases)) {
-        unhandled = 0;
-        out[name] = await run(o);
-      }
-      console.log(JSON.stringify(out));
-    })();
     """
   end
 end

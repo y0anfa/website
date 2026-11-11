@@ -138,38 +138,44 @@ defmodule Site.OGTest do
 
     defp entry_card(attrs \\ []) do
       Map.merge(
-        %{key: "a-slug", kind: :entry, title: "A title", kicker: "essay · 2026-03-28"},
+        %{key: "a-slug", kind: :entry, title: "A title", kicker: "28 Mar 2026"},
         Map.new(attrs)
       )
     end
 
-    test "uses the light palette and the two fonts' families", %{fonts: fonts} do
+    test "uses the dark palette, the lamp and Inter only", %{fonts: fonts} do
       svg = svg(entry_card(), fonts)
 
-      for colour <- ~w(#f4efe4 #262523 #6b675f #ddd6c8), do: assert(svg =~ colour)
+      for colour <- ~w(#0d0f14 #ecebe8 #d6d5d2 #a2a6ae #80848d #f2c47c), do: assert(svg =~ colour)
       assert svg =~ ~s(width="1200" height="630")
       assert svg =~ ~s(font-family="Inter" font-weight="700")
-      assert svg =~ ~s(font-family="JetBrains Mono")
+      refute svg =~ "JetBrains"
+
+      # the old beige palette and its contours are gone
+      for old <- ~w(#f4efe4 #262523 #6b675f #ddd6c8), do: refute(svg =~ old)
+      refute svg =~ ~r/<path stroke-width/
     end
 
-    test "has the kicker, the title, the name and the domain", %{fonts: fonts} do
+    test "the lamp glows from the top left, as over every page", %{fonts: fonts} do
       svg = svg(entry_card(), fonts)
 
-      assert svg =~ ">essay · 2026-03-28</text>"
+      assert length(Regex.scan(~r/<radialGradient id="glow-\d"/, svg)) == 3
+      assert length(Regex.scan(~r|fill="url\(#glow-\d\)"|, svg)) == 3
+
+      # every card has the same light: it does not depend on the title
+      glow = fn svg -> Regex.scan(~r|<radialGradient id="glow.*?</radialGradient>|, svg) end
+      assert glow.(svg) == glow.(svg(entry_card(key: "other", title: "Other"), fonts))
+    end
+
+    test "has the lit mark and the date, the title, the name and the domain", %{fonts: fonts} do
+      svg = svg(entry_card(), fonts)
+
+      assert svg =~ ~s|fill="url(#mark-glow)"|
+      assert svg =~ ~r|<circle [^>]*r="7" fill="#f2c47c"/>|
+      assert svg =~ ">28 Mar 2026</text>"
       assert svg =~ ">A title</text>"
       assert svg =~ ">Yoan Faure</text>"
       assert svg =~ ~s(text-anchor="end">yoanfaure.com</text>)
-    end
-
-    test "has contour lines seeded by the slug", %{fonts: fonts} do
-      a = svg(entry_card(key: "one"), fonts)
-      b = svg(entry_card(key: "one"), fonts)
-      c = svg(entry_card(key: "two"), fonts)
-
-      assert a =~ ~r/<path stroke-width="1.5" d="M[^"]+"\/>/
-      assert a =~ ~r/<path stroke-width="2.5" d="M[^"]+"\/>/
-      assert a == b
-      refute a == c
     end
 
     test "escapes the title, so it cannot add markup", %{fonts: fonts} do
@@ -182,23 +188,32 @@ defmodule Site.OGTest do
     test "never loads anything: no image, link or external reference", %{fonts: fonts} do
       svg = svg(entry_card(), fonts)
 
-      refute svg =~ ~r/<image|xlink:href|href=|url\(|<use|<script|<style|@import/
+      refute svg =~ ~r/<image|xlink:href|href=|<use|<script|<style|@import/
       refute svg =~ ~r{https?://(?!www\.w3\.org/2000/svg)}
+
+      # url() only ever points inside the SVG, at its own gradients
+      for [ref] <- Regex.scan(~r/url\([^)]*\)/, svg) do
+        assert ref =~ ~r/\Aurl\(#[a-z-]+(-\d)?\)\z/, ref
+      end
     end
 
-    test "the home is the name, the tagline and the domain", %{content: content, fonts: fonts} do
+    test "the home is the name on two lines, the position and the domain", %{
+      content: content,
+      fonts: fonts
+    } do
       card = %{
         key: "home",
         kind: :home,
         title: content.home.title,
-        subtitle: content.home.tagline
+        subtitle: "Security engineer at Riot"
       }
 
       svg = svg(card, fonts)
-      assert svg =~ ">Test Person</text>"
-      assert svg =~ ">Fixture tagline for the home page.</text>"
+      assert svg =~ ">Test</text>"
+      assert svg =~ ">Person</text>"
+      assert svg =~ ">Security engineer at Riot</text>"
       assert svg =~ ">yoanfaure.com</text>"
-      refute svg =~ "essay"
+      refute svg =~ "Fixture tagline"
     end
   end
 
@@ -211,13 +226,41 @@ defmodule Site.OGTest do
       end
     end
 
-    test "publishes no font file: the TTFs are build-only (priv/og-fonts/)", %{tree: tree} do
+    test "publishes no font file: the TTF is build-only (priv/og-fonts/)", %{tree: tree} do
       refute Enum.any?(Map.keys(tree), &String.ends_with?(&1, [".ttf", ".otf"]))
       assert File.exists?("priv/og-fonts/Inter-Bold.ttf")
-      assert File.exists?("priv/og-fonts/JetBrainsMono-Regular.ttf")
       assert File.exists?("priv/og-fonts/Inter-OFL.txt")
-      assert File.exists?("priv/og-fonts/JetBrainsMono-OFL.txt")
+
+      assert Path.wildcard("priv/og-fonts/*") |> Enum.map(&Path.basename/1) |> Enum.sort() ==
+               ["Inter-Bold.ttf", "Inter-OFL.txt"]
+
       assert Path.wildcard("assets/**/*.{ttf,otf}") == []
+    end
+
+    test "the home image says the position shown on the home", %{content: content} do
+      files = Map.new(OG.files(content))
+      fonts = OG.fonts!()
+
+      role = Site.Config.role()
+
+      card = %{
+        key: "home",
+        kind: :home,
+        title: content.home.title,
+        subtitle: "#{role.title} at #{role.company}"
+      }
+
+      png =
+        card
+        |> OG.svg(fonts)
+        |> IO.iodata_to_binary()
+        |> Resvg.svg_string_to_png_binary(
+          fontdb: fonts.db,
+          resources_dir: "priv/og-fonts",
+          font_family: "Inter"
+        )
+
+      assert {:ok, files["og/home.png"]} == png
     end
 
     test "an entry page carries og:image, its size, its alt text and the large card",
@@ -289,8 +332,7 @@ defmodule Site.OGTest do
           date: ~D[2026-10-28],
           description: "d",
           html: "",
-          file: "x.md",
-          commit: nil
+          file: "x.md"
         },
         Map.new(attrs)
       )

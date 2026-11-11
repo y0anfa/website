@@ -3,45 +3,55 @@ defmodule Site.OG do
   The share images (`og:image`): one 1200x630 PNG per entry at `og/<slug>.png`,
   and `og/home.png` for the home page.
 
-  Each image is drawn as an SVG string in the light palette: faint topographic
-  contour lines seeded from the slug, a small mono line with the date,
-  the title in Inter Bold, and the name and domain along the bottom. The SVG is
-  rasterised at build time by `resvg` (a precompiled Rust NIF) with only the two
-  fonts in `priv/og-fonts/`; system fonts are never read, so the output does not
-  depend on the machine. The fonts live outside `assets/` because the build
-  uses them but the site does not publish them.
+  Each image is drawn as an SVG string in the site's dark palette: graphite, with
+  the warm lamp glowing from the top left as it does over every page. An entry
+  shows the lit mark and its date, the title in Inter Bold, and the name and the
+  domain along the bottom; the home shows the name on two lines and the position.
+  The SVG is rasterised at build time by `resvg` (a precompiled Rust NIF) with only
+  the font in `priv/og-fonts/`; system fonts are never read, so the output does not
+  depend on the machine. The font lives outside `assets/` because the build uses it
+  but the site does not publish it.
 
   The output is deterministic: no timestamps, no random state, no PNG metadata.
   """
 
   alias Site.{Content, Entry}
-  alias Site.OG.{Contours, Text}
+  alias Site.OG.Text
 
   @width 1200
   @height 630
   @margin 72
 
-  # The light palette of SPEC section 8.
-  @bg "#f4efe4"
-  @fg "#262523"
-  @muted "#6b675f"
-  @rule "#ddd6c8"
+  # The dark palette of SPEC section 8: --bg, --text, --name, --text-2, --text-3,
+  # --lamp, and the three glows of the lamp over the page.
+  @bg "#0d0f14"
+  @text "#ecebe8"
+  @name "#d6d5d2"
+  @text_2 "#a2a6ae"
+  @text_3 "#80848d"
+  @lamp "#f2c47c"
+
+  # {centre x, centre y, radius x, radius y, colour, opacity, where it fades out},
+  # in the proportions of the page's `body::before`, a little warmer for a card.
+  @glows [
+    {0.20, -0.06, 0.30, 0.46, "#ffdeb4", 0.16, 0.7},
+    {0.24, -0.14, 0.52, 0.64, "#f2aa5c", 0.16, 0.72},
+    {0.70, -0.24, 0.72, 0.70, "#6e82be", 0.09, 0.7}
+  ]
 
   @fonts_dir Path.expand("../../priv/og-fonts", __DIR__)
   @sans_file "Inter-Bold.ttf"
-  @mono_file "JetBrainsMono-Regular.ttf"
   @sans "Inter"
-  @mono "JetBrains Mono"
 
   # Font sizes in pixels, largest first: the first that fits in the allowed number
-  # of lines is used. Titles are tightened by 2% of the em, like the site's headings.
+  # of lines is used. Titles are tightened like the site's headings.
   @title_sizes [96, 84, 72, 62, 54]
   @title_lines 3
   @title_baseline 468
-  @name_sizes [152, 128, 104, 84, 68]
-  @tagline_sizes [52, 44, 38]
-  @tracking_em -0.02
-  @name_tracking_em -0.03
+  @name_sizes [168, 152, 128, 104, 84, 68]
+  @role_size 40
+  @tracking_em -0.03
+  @name_tracking_em -0.035
   @line_height 1.1
 
   @home_key "home"
@@ -81,7 +91,14 @@ defmodule Site.OG do
   # -- cards -----------------------------------------------------------------------
 
   defp home_card(%Content{home: home}) do
-    %{key: @home_key, kind: :home, title: home.title, subtitle: home.tagline}
+    role = Site.Config.role()
+
+    %{
+      key: @home_key,
+      kind: :home,
+      title: home.title,
+      subtitle: "#{role.title} at #{role.company}"
+    }
   end
 
   defp entry_card(%Entry{} = entry) do
@@ -89,30 +106,29 @@ defmodule Site.OG do
       key: entry.slug,
       kind: :entry,
       title: entry.title,
-      kicker: Date.to_iso8601(entry.date)
+      kicker: Site.View.long_date(entry.date)
     }
   end
 
   # -- fonts -----------------------------------------------------------------------
 
   @doc false
-  # The fonts of every image: the shared font database and the measures of both faces.
+  # The font of every image: the shared font database and the measures of the face.
   @spec fonts!() :: map()
   def fonts!() do
-    files = Enum.map([@sans_file, @mono_file], &Path.join(@fonts_dir, &1))
+    file = Path.join(@fonts_dir, @sans_file)
 
     db =
       [
-        font_files: files,
+        font_files: [file],
         skip_system_fonts: true,
         font_family: @sans,
-        sans_serif_family: @sans,
-        monospace_family: @mono
+        sans_serif_family: @sans
       ]
       |> Resvg.init_fontdb()
-      |> ok_or_raise("cannot load the fonts in #{@fonts_dir}")
+      |> ok_or_raise("cannot load the font in #{@fonts_dir}")
 
-    %{db: db, sans: Text.load!(hd(files)), mono: Text.load!(List.last(files))}
+    %{db: db, sans: Text.load!(file)}
   end
 
   defp ok_or_raise({:ok, value}, _message), do: value
@@ -137,66 +153,101 @@ defmodule Site.OG do
   # The SVG of a card, as iodata. Public so tests can look at it.
   @spec svg(map(), map()) :: iodata()
   def svg(card, fonts) do
-    %{minor: minor, major: major} = Contours.paths(card.key, @width, @height)
-
     [
       ~s(<svg xmlns="http://www.w3.org/2000/svg" width="#{@width}" height="#{@height}" ),
       ~s(viewBox="0 0 #{@width} #{@height}">),
+      defs(),
       ~s(<rect width="#{@width}" height="#{@height}" fill="#{@bg}"/>),
-      ~s(<g fill="none" stroke="#{@rule}" stroke-linecap="round" stroke-linejoin="round">),
-      path_element(minor, 1.5),
-      path_element(major, 2.5),
-      "</g>",
+      for(index <- 1..length(@glows), do: glow_rect(index)),
       body(card, fonts),
       "</svg>"
     ]
   end
 
-  defp path_element("", _width), do: []
-  defp path_element(d, width), do: [~s(<path stroke-width="#{width}" d="#{d}"/>)]
+  defp glow_rect(index),
+    do: ~s|<rect width="#{@width}" height="#{@height}" fill="url(#glow-#{index})"/>|
 
-  # The home: the name, the tagline, the domain.
+  # The lamp: one radial gradient per glow, an ellipse drawn as a circle squashed
+  # around its centre. And the halo of the lit mark.
+  defp defs do
+    glows =
+      @glows
+      |> Enum.with_index(1)
+      |> Enum.map(fn {{x, y, rx, ry, colour, opacity, fade}, index} ->
+        cx = x * @width
+        cy = y * @height
+        r = rx * @width
+        squash = ry * @height / r
+
+        [
+          ~s(<radialGradient id="glow-#{index}" gradientUnits="userSpaceOnUse" ),
+          ~s(cx="#{num(cx)}" cy="#{num(cy)}" r="#{num(r)}" ),
+          ~s|gradientTransform="translate(#{num(cx)} #{num(cy)}) scale(1 #{num(squash)}) |,
+          ~s|translate(#{num(-cx)} #{num(-cy)})">|,
+          ~s(<stop offset="0" stop-color="#{colour}" stop-opacity="#{num(opacity)}"/>),
+          ~s(<stop offset="#{num(fade)}" stop-color="#{colour}" stop-opacity="0"/>),
+          "</radialGradient>"
+        ]
+      end)
+
+    [
+      "<defs>",
+      glows,
+      ~s(<radialGradient id="mark-glow">),
+      ~s(<stop offset="0" stop-color="#{@lamp}" stop-opacity="0.45"/>),
+      ~s(<stop offset="1" stop-color="#{@lamp}" stop-opacity="0"/>),
+      "</radialGradient>",
+      "</defs>"
+    ]
+  end
+
+  # The home: the name on two lines, the position, the domain.
   defp body(%{kind: :home} = card, fonts) do
-    {name_size, name_lines} = fit(fonts.sans, card.title, @name_sizes, 2, @name_tracking_em)
-    name_leading = name_size * @line_height
-    name_baseline = 350
+    {size, lines} = fit_words(fonts.sans, card.title, @name_sizes, @name_tracking_em)
+    last_baseline = 400
+    first_baseline = last_baseline - size * (length(lines) - 1)
 
-    name =
-      lines_at(
-        name_lines,
-        name_baseline - name_leading * (length(name_lines) - 1),
-        name_leading,
-        name_size,
-        @fg,
-        @name_tracking_em
-      )
-
-    tagline =
+    role =
       case card[:subtitle] do
         nil ->
           []
 
-        tagline ->
-          {size, lines} = fit(fonts.sans, tagline, @tagline_sizes, 2, @tracking_em)
-          lines_at(lines, name_baseline + 86, size * @line_height, size, @muted, @tracking_em)
+        subtitle ->
+          {role_size, role_lines} = fit(fonts.sans, subtitle, [@role_size, 34, 28], 2, -0.01)
+
+          lines_at(role_lines, last_baseline + 76, role_size * 1.3, role_size, @text_2, -0.01)
       end
 
-    [name, tagline, text(domain(), @margin, @height - 64, @mono, 28, @muted)]
+    [
+      lines_at(lines, first_baseline, size, size, @name, @name_tracking_em),
+      role,
+      text(domain(), @margin, @height - 64, 26, @text_3)
+    ]
   end
 
-  # An entry: the kicker, the title, the name and the domain.
+  # An entry: the lit mark and the date, the title, the name and the domain.
   defp body(%{kind: :entry} = card, fonts) do
     {size, lines} = fit(fonts.sans, card.title, @title_sizes, @title_lines, @tracking_em)
 
     leading = size * @line_height
     first_baseline = @title_baseline - leading * (length(lines) - 1)
-    kicker_baseline = first_baseline - size * 0.73 - 38
+    kicker_baseline = first_baseline - size * 0.73 - 44
 
     [
-      text(clean(fonts.mono, card.kicker), @margin, kicker_baseline, @mono, 28, @muted),
-      lines_at(lines, first_baseline, leading, size, @fg, @tracking_em),
-      text(Site.Config.name(), @margin, @height - 64, @sans, 30, @fg),
-      text(domain(), @width - @margin, @height - 64, @mono, 28, @muted, anchor: "end")
+      mark(@margin + 7, kicker_baseline - 10),
+      text(clean(fonts.sans, card.kicker), @margin + 34, kicker_baseline, 28, @text_2),
+      lines_at(lines, first_baseline, leading, size, @text, @tracking_em),
+      text(Site.Config.name(), @margin, @height - 64, 30, @name),
+      text(domain(), @width - @margin, @height - 64, 26, @text_3, anchor: "end")
+    ]
+  end
+
+  # The entry's mark from the timeline, lit: a dot of lamp light with its ring and glow.
+  defp mark(x, y) do
+    [
+      ~s|<circle cx="#{num(x)}" cy="#{num(y)}" r="34" fill="url(#mark-glow)"/>|,
+      ~s(<circle cx="#{num(x)}" cy="#{num(y)}" r="13" fill="#{@lamp}" fill-opacity="0.18"/>),
+      ~s(<circle cx="#{num(x)}" cy="#{num(y)}" r="7" fill="#{@lamp}"/>)
     ]
   end
 
@@ -210,11 +261,27 @@ defmodule Site.OG do
     )
   end
 
+  # One word a line, as the name is set on the home, at the largest size where the
+  # widest word fits; a name that cannot be set that way is fitted like a title.
+  defp fit_words(font, string, sizes, tracking_em) do
+    words = font |> clean(string) |> String.split()
+    max_width = @width - 2 * @margin
+
+    fits? = fn size ->
+      Enum.all?(words, &(Text.width(font, &1, size, size * tracking_em) <= max_width))
+    end
+
+    case {words, Enum.find(sizes, fits?)} do
+      {[_ | _], size} when length(words) <= 3 and is_number(size) -> {size, words}
+      _ -> fit(font, string, sizes, 3, tracking_em)
+    end
+  end
+
   defp lines_at(lines, first_baseline, leading, size, fill, tracking_em) do
     lines
     |> Enum.with_index()
     |> Enum.map(fn {line, index} ->
-      text(line, @margin, first_baseline + index * leading, @sans, size, fill,
+      text(line, @margin, first_baseline + index * leading, size, fill,
         tracking: size * tracking_em
       )
     end)
@@ -224,13 +291,12 @@ defmodule Site.OG do
 
   defp domain, do: Site.View.display_url(Site.Config.absolute(""))
 
-  defp text(string, x, y, family, size, fill, opts \\ []) do
-    weight = if family == @sans, do: ~s( font-weight="700"), else: ""
+  defp text(string, x, y, size, fill, opts \\ []) do
     tracking = if t = opts[:tracking], do: ~s( letter-spacing="#{num(t)}"), else: ""
     anchor = if a = opts[:anchor], do: ~s( text-anchor="#{a}"), else: ""
 
     [
-      ~s(<text x="#{num(x)}" y="#{num(y)}" font-family="#{family}"#{weight} ),
+      ~s(<text x="#{num(x)}" y="#{num(y)}" font-family="#{@sans}" font-weight="700" ),
       ~s(font-size="#{num(size)}" fill="#{fill}"#{tracking}#{anchor}>),
       Site.HTML.escape(string),
       "</text>"

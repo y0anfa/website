@@ -1,0 +1,16 @@
+<section class="timeline" id="feed" aria-labelledby="feed-label">
+  <h2 class="visually-hidden" id="feed-label">Entries, newest first</h2>
+<%= if @years == [] do %>  <p class="empty">Nothing here yet.</p>
+<% else %><%= for {year, rows} <- @years do %>  <p class="year" aria-hidden="true"><%= escape(year) %></p>
+  <div class="tl">
+    <ol class="feed">
+<%= for row <- rows do %>      <li class="entry-row" data-row="<%= escape(row.n) %>" data-month="<%= escape(row.month) %>">
+        <a class="entry" href="<%= escape(row.href) %>"<%= if row.external do %> rel="noopener"<% end %>>
+          <span class="entry-title"><%= escape(row.title) %><%= if row.external do %><span class="entry-out" aria-hidden="true">↗</span><span class="visually-hidden"> (<%= escape(row.external) %>)</span><% end %></span>
+<%= if row.summary != "" do %>          <span class="entry-desc"><%= escape(row.summary) %></span>
+<% end %>        </a>
+        <time class="entry-date" datetime="<%= escape(row.date) %>"><%= escape(row.day) %><span class="visually-hidden"> <%= escape(row.year) %></span></time>
+      </li>
+<% end %>    </ol>
+  </div>
+<% end %><% end %></section>

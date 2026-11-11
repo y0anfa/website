@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><%= escape(@title) %></title>
 <meta name="description" content="<%= escape(@description) %>">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark light">
 <%= if @url do %><link rel="canonical" href="<%= escape(@url) %>">
 <meta property="og:url" content="<%= escape(@url) %>">
 <% end %><meta property="og:title" content="<%= escape(@title) %>">
@@ -23,17 +23,12 @@
 <script><%= raw(@head_js) %></script>
 <script type="speculationrules"><%= raw(@speculation) %></script>
 <link rel="stylesheet" href="/assets/css/site.css">
-<script defer blocking="render" src="/assets/js/transitions.js"></script>
-<script type="module" src="/assets/js/field.js"></script>
+<script defer blocking="render" src="/assets/js/site.js"></script>
 <%= for src <- @scripts do %><script defer src="<%= escape(src) %>"></script>
 <% end %></head>
 <body data-page="<%= escape(@page_key) %>">
-<a class="skip-link" href="#main">skip to content</a>
-<div class="field" data-field-root aria-hidden="true"><canvas class="field-canvas"></canvas></div>
-<%= header() %>
-<main id="main">
+<a class="skip-link" href="<%= escape(@skip.href) %>"><%= escape(@skip.label) %></a>
+
 <%= raw(@content) %>
-</main>
-<%= footer(%{build: @build}) %>
 </body>
 </html>
