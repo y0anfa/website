@@ -291,7 +291,7 @@ defmodule Site.OGTest do
       assert html =~ ~s(<meta property="og:image" content="https://yoanfaure.com/og/home.png">)
 
       assert html =~
-               ~s(<meta property="og:image:alt" content="Yoan Faure — security engineer who builds">)
+               ~s(<meta property="og:image:alt" content="Yoan Faure — Security engineer at Riot">)
     end
 
     test "every og:image on the site is an image the build wrote", %{tree: tree} do

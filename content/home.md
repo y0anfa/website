@@ -1,7 +1,7 @@
 ---
 title: Yoan Faure
-description: Security engineer who builds. Paris.
-tagline: Security engineer who builds.
+description: Security engineer at Riot.
+tagline: Security engineer at Riot.
 ---
 
 I work on the balance between security and productivity. I build systems that stay out of the way and automation that removes toil. I treat AI as a teammate.

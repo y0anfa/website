@@ -133,7 +133,7 @@ defmodule Site.BuildTest do
   describe "head" do
     test "titles", %{tree: tree} do
       assert page(tree, "index.html") =~
-               "<title>Yoan Faure — security engineer who builds</title>"
+               "<title>Yoan Faure — Security engineer at Riot</title>"
 
       assert page(tree, "first-essay/index.html") =~
                "<title>First essay — Yoan Faure</title>"

@@ -6,7 +6,7 @@ defmodule Site.Llms do
 
       # Yoan Faure
 
-      > Security engineer who builds. Paris.
+      > Security engineer at Riot.
 
       I work on the balance between security and productivity. …
 

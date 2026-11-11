@@ -25,7 +25,7 @@ defmodule Site.Config do
   @site_paths ~w(assets 404 404.html home index index.html llms llms.txt og robots.txt _headers _redirects)
 
   def name, do: "Yoan Faure"
-  def home_title, do: "Yoan Faure — security engineer who builds"
+  def home_title, do: "Yoan Faure — Security engineer at Riot"
   def repo_url, do: "https://github.com/y0anfa/website"
 
   @doc "The position under the name on the home: `Security engineer at Riot`, Riot linked."

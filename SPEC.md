@@ -4,7 +4,7 @@ The contract every contributor (human or agent) builds against. If code and spec
 
 ## 1. Intent
 
-Personal site of **Yoan Faure, security engineer who builds** (Riot, Paris).
+Personal site of **Yoan Faure, security engineer at Riot** (Paris).
 It shows who he is, what he thinks, and what he makes.
 
 - **Audience:** security peers and curious strangers. Not recruiters.
@@ -202,7 +202,7 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 
 **Global shell**
 - `<html lang="en">`, `<body data-page="home|essay|note|project|404">`, then one skip link: `Skip to the entries` (`#feed`) on the home, `Skip to the content` (`#main`) elsewhere. Each page template writes the rest. There is no nav, no site header and no site footer.
-- `<head>`: `<title>` is `<Page> — Yoan Faure` (home: `Yoan Faure — security engineer who builds`); meta description, `color-scheme` `dark light`, canonical, `og:title/description/url/type`, `og:image` with its width, height and alt, and `twitter:card` (`summary_large_image`; the 404 has no image and keeps `summary`; §4), the favicon, and a preload for `/assets/fonts/InterVariable.woff2` (with `crossorigin`). An entry page also has `<link rel="alternate" type="text/markdown" href="/<slug>.md">`. Nothing is loaded from another origin: no Google Fonts, no preconnect.
+- `<head>`: `<title>` is `<Page> — Yoan Faure` (home: `Yoan Faure — Security engineer at Riot`); meta description, `color-scheme` `dark light`, canonical, `og:title/description/url/type`, `og:image` with its width, height and alt, and `twitter:card` (`summary_large_image`; the 404 has no image and keeps `summary`; §4), the favicon, and a preload for `/assets/fonts/InterVariable.woff2` (with `crossorigin`). An entry page also has `<link rel="alternate" type="text/markdown" href="/<slug>.md">`. Nothing is loaded from another origin: no Google Fonts, no preconnect.
 - Two inline scripts: `head.js` (applies `localStorage.theme`, `light` or `dark`, to `data-theme` before the first paint, and nothing else) and `<script type="speculationrules">` (the constant in `Site.Speculation`: prerender same-origin page links, `href_matches: "/*"`, with `eagerness: "moderate"`, except `/*.md`, `/llms.txt`, `/assets/*` and `rel~=nofollow`). The CSP allows both by sha256 (§11).
 - One stylesheet, `/assets/css/site.css`. Then `<script defer blocking="render" src="/assets/js/site.js">`, render-blocking so its `pagereveal` listener and the `js` class exist before the first frame, and `favicon.js` (plus `404.js` on the 404) as plain `defer` scripts.
 - **Favicon.** `assets/favicon.svg` is the mark: a 32×32 graphite square with the timeline's axis and a lit entry on it (a lamp dot and its halo). `assets/favicon-sleep.svg` is the same square with the lamp out (a grey ring). `favicon.js` swaps the `link[rel=icon]` href to the sleeping one when the tab becomes hidden (`visibilitychange`) and back when it is visible.
