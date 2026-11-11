@@ -211,7 +211,7 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 **Home** (`home.html.eex`)
 
 ```html
-<div class="corner"> the theme toggle </div>
+<div class="corner"> a.corner-link LinkedIn · the theme toggle </div>
 <main id="main" class="stage">
   <section class="identity" aria-labelledby="name">
     <div class="name-wrap">
@@ -234,6 +234,7 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
   - the lit name: an aria-hidden copy of the name in `--lit`, seen through a 220px window that follows the light's height, so the light rakes across the letters.
 - **The decrypt.** Once a visit (`sessionStorage.decrypted`), on a fresh load: the real h1 stays in place and in the accessibility tree but transparent, while an aria-hidden overlay puts one slot over each letter, at its measured place, cycles random glyphs in the lamp's colour and locks the letters left to right (about 0.6s), then removes itself.
 - **The entrance.** On a fresh load only (not when a transition brings the home back), `site.js` adds `.intro`: the name rises into its lines (or decrypts), the position fades up, the axis draws down, each entry slides in as the axis reaches it (`--i`, its place, from `site.js`), then the light comes on (`beam-on`, after 1150ms).
+- **The LinkedIn link.** The site's one contact, on the home only: a 16px monochrome glyph in the same 36px square as the toggle, just before it, muted (`--text-2`) and brightened on hover. Named `LinkedIn` for screen readers (`aria-label`, the glyph aria-hidden), `rel="me noopener"`. It shows without script.
 - **The theme toggle.** A 36px button with a sun and a moon (aria-hidden SVGs); the icon shows the theme a click switches to, and `site.js` labels it `Switch to light theme` or `Switch to dark theme`. Choosing what the system prefers forgets the choice (`localStorage.theme` removed), so the page follows the system again. The switch is one 280ms cross-fade (a view transition of type `theme`), at once under reduced motion or without view transitions. Without script the toggle is hidden.
 
 **Entries** (`article.html.eex`, `project.html.eex`)
@@ -305,8 +306,8 @@ Plus the glows of the lamp (`--glow-hot`, `--glow-core`, `--glow-wide`, `--spot`
 ## 9. Accessibility and reduced motion
 
 - Every page has a skip link, one h1, and landmarks (`main`; on entries a `header` bar and the article's `footer`). The timeline is an ordered list under a visually hidden h2; years are aria-hidden and every date carries its year for a screen reader.
-- Keyboard: Tab reaches the toggle, the company link and every entry; focus is always visible and lights an entry exactly like hover, description included. Escape goes back home from an entry.
-- Decorative things are aria-hidden: the lit name, the decrypt overlay, the light, the toggle's icons, the arrows, the separators and the `Esc` hint.
+- Keyboard: Tab reaches the LinkedIn link, the toggle, the company link and every entry; focus is always visible and lights an entry exactly like hover, description included. Escape goes back home from an entry.
+- Decorative things are aria-hidden: the lit name, the decrypt overlay, the light, the toggle's icons, the LinkedIn glyph, the arrows, the separators and the `Esc` hint.
 - **Reduced motion:** no decrypt, no light (it stays off; hover and focus still brighten), no entrance, no navigation transition, no theme cross-fade, the arrows do not lean, and every remaining animation and transition is cut to 0.01ms.
 - **Without script:** the name, the position, the timeline and every entry read and link as normal; the description shows on hover and focus; the light, the lit name and the theme toggle (which needs script) are not shown.
 

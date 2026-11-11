@@ -232,10 +232,15 @@ defmodule Site.BuildTest do
       end
     end
 
-    test "the home has the theme toggle in a corner and no bar", %{tree: tree} do
+    test "the home has the LinkedIn link and the theme toggle in a corner, and no bar", %{
+      tree: tree
+    } do
       html = page(tree, "index.html")
+      [corner] = Regex.run(~r{<div class="corner">.*?</div>}s, html)
 
-      assert html =~ ~s(<div class="corner">\n<button class="theme-toggle" type="button")
+      assert corner =~
+               ~r{^<div class="corner">\n<a class="corner-link" [^>]*>.*?</a>\n<button class="theme-toggle" type="button"}s
+
       refute html =~ ~s(class="bar")
       assert length(Regex.scan(~r/class="theme-toggle"/, html)) == 1
     end
@@ -280,7 +285,8 @@ defmodule Site.BuildTest do
         refute html =~ "site-footer", path
         refute html =~ "built from", path
         refute html =~ "mailto:", path
-        refute html =~ "linkedin", path
+        # LinkedIn only in the home's corner
+        if path != "index.html", do: refute(html =~ "linkedin", path)
       end
     end
 
@@ -333,6 +339,17 @@ defmodule Site.BuildTest do
 
       assert main =~
                ~r{<div class="name-lit" aria-hidden="true">\s*<div class="name-lit-inner">\s*<p class="name">\s*<span class="name-line"><span>Test</span></span>}
+    end
+
+    test "the one contact is a quiet LinkedIn icon in the corner, named for screen readers", %{
+      tree: tree
+    } do
+      html = page(tree, "index.html")
+
+      assert html =~
+               ~s(<a class="corner-link" href="https://www.linkedin.com/in/yoan-faure" rel="me noopener" aria-label="LinkedIn">)
+
+      assert length(Regex.scan(~r/linkedin\.com/, html)) == 1
     end
 
     test "the position links the company", %{tree: tree} do

@@ -31,6 +31,9 @@ defmodule Site.Config do
   @doc "The position under the name on the home: `Security engineer at Riot`, Riot linked."
   def role, do: %{title: "Security engineer", company: "Riot", url: "https://tryriot.com"}
 
+  @doc "The one contact on the site: a quiet LinkedIn icon in the home's top corner."
+  def linkedin, do: "https://www.linkedin.com/in/yoan-faure"
+
   @doc "Entry types that appear on the timeline."
   def types, do: Keyword.keys(@types)
 
