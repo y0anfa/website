@@ -192,7 +192,7 @@ defmodule Site.BuildTest do
       refute @head_js =~ "field"
     end
 
-    test "one stylesheet, site.js render-blocking, favicon.js deferred, nothing else", %{
+    test "one stylesheet, site.js render-blocking, favicon.js deferred, a page's own script", %{
       tree: tree
     } do
       for path <- @pages do
@@ -206,7 +206,14 @@ defmodule Site.BuildTest do
 
         srcs = Regex.scan(~r/<script[^>]*\ssrc="([^"]+)"/, html) |> Enum.map(&List.last/1)
         expected = ["/assets/js/site.js", "/assets/js/favicon.js"]
-        expected = if path == "404.html", do: expected ++ ["/assets/js/404.js"], else: expected
+
+        expected =
+          case path do
+            "404.html" -> expected ++ ["/assets/js/404.js"]
+            "index.html" -> expected ++ ["/assets/js/radar.js"]
+            _ -> expected
+          end
+
         assert srcs == expected, path
       end
     end

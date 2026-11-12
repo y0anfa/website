@@ -461,6 +461,36 @@ a:is(:hover, :focus-visible) > .link-out {
   }
 }
 
+/* ---------- home: the scope ----------
+   Unannounced (radar.js): holding the name's mark opens a radar scope over the
+   page. The script draws it on one canvas; while it is open (.radar-on) the page
+   under it is dimmed almost away and the canvas takes the pointer. */
+
+.radar {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.radar-on .radar {
+  cursor: crosshair;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.stage,
+.corner,
+.line {
+  transition: opacity 400ms var(--ease);
+}
+
+.radar-on :is(.stage, .corner, .line) {
+  opacity: 0.05;
+}
+
 /* ---------- home: the entrance ----------
    Once, on a fresh load (site.js adds .intro): the line is drawn from the top and
    each mark appears as it passes, with its words (--at, from site.js). The words

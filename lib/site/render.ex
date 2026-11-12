@@ -43,6 +43,7 @@ defmodule Site.Render do
       description: content.home.description,
       og_image: Site.OG.url(Site.OG.home_key()),
       page_key: "home",
+      scripts: @scripts ++ ["/assets/js/radar.js"],
       skip: %{href: "#feed", label: "Skip to the entries"}
     )
   end
