@@ -463,8 +463,9 @@ a:is(:hover, :focus-visible) > .link-out {
 
 /* ---------- home: the entrance ----------
    Once, on a fresh load (site.js adds .intro): the line is drawn from the top and
-   each mark appears as it passes, with its words (--at, from site.js). Never when
-   a page transition brings the home back, never under reduced motion. */
+   each mark appears as it passes, with its words (--at, from site.js). The words
+   do not fade in: they glitch in, for half a second, like a signal locking on.
+   Never when a page transition brings the home back, never under reduced motion. */
 
 @media (prefers-reduced-motion: no-preference) {
   .intro .line path {
@@ -475,9 +476,12 @@ a:is(:hover, :focus-visible) > .link-out {
     animation: tie 380ms var(--ease) var(--at, 600ms) both;
   }
 
-  .intro :is(.identity, .entry-row) > *,
   .intro .year {
     animation: arrive 700ms var(--ease) var(--at, 300ms) both;
+  }
+
+  .intro :is(.identity, .entry-row) > * {
+    animation: glitch 560ms step-end var(--at, 300ms) both;
   }
 }
 
@@ -496,6 +500,75 @@ a:is(:hover, :focus-visible) > .link-out {
 @keyframes arrive {
   from {
     opacity: 0;
+  }
+}
+
+/* The glitch, in ink only. Each step holds until the next (step-end): the words
+   jump a few pixels sideways, show as a band or with a band missing (clip-path,
+   open at the sides so the ghosts are not cut), and throw a grey ghost of
+   themselves to one side (a text-shadow with no blur), then settle. The last step
+   names nothing, so each element ends as its own rules say. */
+@keyframes glitch {
+  0% {
+    opacity: 0;
+  }
+
+  8% {
+    opacity: 1;
+    transform: translateX(-5px);
+    clip-path: inset(0 -12px 58% -12px);
+    text-shadow: 7px 0 0 var(--text-3);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translateX(4px);
+    clip-path: inset(46% -12px 0 -12px);
+    text-shadow: -6px 0 0 var(--hair);
+  }
+
+  28% {
+    opacity: 0.4;
+    transform: none;
+    clip-path: none;
+    text-shadow: none;
+  }
+
+  38% {
+    opacity: 1;
+    transform: translateX(2px) skewX(-8deg);
+    clip-path: polygon(-12px 0, calc(100% + 12px) 0, calc(100% + 12px) 30%, -12px 30%, -12px 48%, calc(100% + 12px) 48%, calc(100% + 12px) 100%, -12px 100%);
+    text-shadow:
+      -4px 0 0 var(--text-3),
+      5px 0 0 var(--hair);
+  }
+
+  52% {
+    opacity: 1;
+    transform: translateX(-2px);
+    clip-path: polygon(-12px 0, calc(100% + 12px) 0, calc(100% + 12px) 62%, -12px 62%, -12px 74%, calc(100% + 12px) 74%, calc(100% + 12px) 100%, -12px 100%);
+    text-shadow: 3px 0 0 var(--text-3);
+  }
+
+  64% {
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+    text-shadow: -2px 0 0 var(--text-3);
+  }
+
+  76% {
+    opacity: 0.75;
+    transform: none;
+    clip-path: none;
+    text-shadow: none;
+  }
+
+  86% {
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+    text-shadow: none;
   }
 }
 

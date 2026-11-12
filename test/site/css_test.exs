@@ -214,6 +214,29 @@ defmodule Site.CSSTest do
       end
     end
 
+    test "on a fresh load the words glitch in, in ink only, and settle as their own rules say" do
+      assert rule!(".intro :is(.identity, .entry-row) > *") ==
+               "animation: glitch 560ms step-end var(--at, 300ms) both;"
+
+      [glitch] = Regex.run(~r/@keyframes glitch \{.*?\n\}\n/s, @code)
+
+      # hidden until its moment; the last step it names is the plain text
+      assert glitch =~ ~r/0% \{\s*opacity: 0;\s*\}/
+      refute glitch =~ ~r/^\s*(100%|to) \{/m
+
+      assert glitch =~
+               ~r/86% \{\s*opacity: 1;\s*transform: none;\s*clip-path: none;\s*text-shadow: none;\s*\}/
+
+      # small: nothing moves more than a few pixels, and the ghosts are grey, not coloured
+      for [_, px] <- Regex.scan(~r/translateX\((-?\d+)px\)/, glitch) do
+        assert abs(String.to_integer(px)) <= 6
+      end
+
+      for [_, colour] <- Regex.scan(~r/px 0 0 ([^,;]+)/, glitch) do
+        assert colour in ["var(--text-3)", "var(--hair)"]
+      end
+    end
+
     test "reduced motion stops every animation and transition" do
       [_, reduce] =
         Regex.run(
