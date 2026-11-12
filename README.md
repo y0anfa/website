@@ -14,7 +14,7 @@ Personal site of Yoan Faure. A static site built by a small Elixir generator and
 ```sh
 mix deps.get       # fetch dependencies
 mix site.serve     # build and serve at http://localhost:4000 (--port to change)
-mix site.build     # write the site to dist/ (pages, assets, _headers, _redirects, robots.txt, <slug>.md twins, llms.txt, og/ share images)
+mix site.build     # write the site to dist/ (pages, assets, _headers, _redirects, robots.txt, .well-known/security.txt, <slug>.md twins, llms.txt, og/ share images)
 mix site.verify    # build twice into temporary directories and compare; fails on any difference
 mix test           # run the test suite
 ```
@@ -69,6 +69,7 @@ The old Hugo URLs are redirected by `dist/_redirects`, which the build writes: `
 - **Entry links.** Under each entry, next to `All entries`, `Markdown` links to the twin and `Ask Claude ↗` opens `claude.ai/new` with a prompt that names the page and tells Claude to use only what is on it. The prompt is in `Site.View.ask_prompt/1`.
 - **Content-Type.** `_headers` pins `text/markdown; charset=utf-8` for `/*.md` and `text/plain; charset=utf-8` for `/llms.txt`. Cloudflare's docs say a `_headers` rule overrides the default `Content-Type`. After the first deploy, check with `curl -sI https://yoanfaure.com/rhino.md`; if the type is wrong or duplicated, remove those two rules and Cloudflare's own MIME types apply.
 - **Instant navigation.** Every page carries a `<script type="speculationrules">` that prerenders same-origin page links on hover or focus (`eagerness: moderate`), except the twins, `llms.txt`, `/assets/*` and `rel~=nofollow` links. The CSP allows it by its sha256, next to the one for `head.js`; both are computed at build time (`Site.Speculation`, `Site.Headers`).
+- **`security.txt`.** `/.well-known/security.txt` (RFC 9116) names the LinkedIn page as the contact. Its `Expires` date is `Site.Config.security_expires/0`, currently 1 November 2027. Once it has passed, `mix test` fails and so does the deploy: move the date forward, by less than a year, and update it in `test/site/security_txt_test.exs` and SPEC §4.
 - **Sleepy favicon.** While the tab is hidden, `assets/js/favicon.js` swaps the icon for `assets/favicon-sleep.svg` (the same square, with the timeline's filled mark emptied to a ring), and swaps it back when the tab is visible.
 
 ## Share images

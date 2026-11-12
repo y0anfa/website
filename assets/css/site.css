@@ -1039,11 +1039,76 @@ body:not([data-page="home"])::before {
   }
 }
 
-/* ---------- 404 ---------- */
+/* ---------- 404 ----------
+   The line is broken here. Where an entry has its mark, the 404 has none, and
+   the line goes to dashes as it passes: a patch of the page colour over it, with
+   the dashes drawn where it runs (3px into the patch). The heading never quite
+   settles either: every few seconds it flickers, once, like the titles on the
+   home. */
 
 .not-found .path {
   color: var(--text);
   overflow-wrap: anywhere;
+}
+
+.not-found .meta::before {
+  height: 60px;
+  margin-top: -30px;
+  border-radius: 0;
+  background: repeating-linear-gradient(transparent 0 4px, var(--hair) 4px 8px) 3px 0 / 1px 100% no-repeat var(--bg);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .not-found h1 {
+    animation: stutter 6s step-end 1200ms infinite;
+  }
+}
+
+/* Two beats in six seconds, the rest still. Every step names all three
+   properties, so the heading is whole again the moment a beat ends. */
+@keyframes stutter {
+  38% {
+    transform: translateX(3px);
+    clip-path: inset(0 -12px 52% -12px);
+    text-shadow: -5px 0 0 var(--text-3);
+  }
+
+  39% {
+    transform: none;
+    clip-path: none;
+    text-shadow: none;
+  }
+
+  90% {
+    transform: translateX(-4px);
+    clip-path: inset(0 -12px 58% -12px);
+    text-shadow: 6px 0 0 var(--text-3);
+  }
+
+  91% {
+    transform: translateX(3px);
+    clip-path: inset(44% -12px 0 -12px);
+    text-shadow: -5px 0 0 var(--hair);
+  }
+
+  92% {
+    transform: translateX(1px) skewX(-6deg);
+    clip-path: polygon(-12px 0, calc(100% + 12px) 0, calc(100% + 12px) 34%, -12px 34%, -12px 50%, calc(100% + 12px) 50%, calc(100% + 12px) 100%, -12px 100%);
+    text-shadow: -3px 0 0 var(--text-3);
+  }
+
+  93% {
+    transform: none;
+    clip-path: none;
+    text-shadow: 2px 0 0 var(--text-3);
+  }
+
+  94% {
+    transform: none;
+    clip-path: none;
+    text-shadow: none;
+  }
 }
 
 /* ---------- small screens ---------- */

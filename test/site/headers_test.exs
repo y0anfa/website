@@ -71,12 +71,14 @@ defmodule Site.HeadersTest do
                %{pattern: "/*", headers: all},
                %{pattern: "/*.md"},
                %{pattern: "/llms.txt"},
+               %{pattern: "/.well-known/security.txt", headers: security_txt},
                %{pattern: "/assets/fonts/*", headers: fonts}
              ] = rules
 
       assert {"X-Frame-Options", "DENY"} in all
       assert {"Content-Security-Policy", Headers.csp(@hash)} in all
       assert fonts == [{"Cache-Control", "public, max-age=31536000, immutable"}]
+      assert security_txt == [{"Content-Type", "text/plain; charset=utf-8"}]
     end
 
     test "/* matches every path", %{rules: rules} do
@@ -85,6 +87,12 @@ defmodule Site.HeadersTest do
         assert {"X-Content-Type-Options", "nosniff"} in headers
         refute Enum.any?(headers, &match?({"Cache-Control", _}, &1))
       end
+    end
+
+    test "security.txt is plain text with a charset, as RFC 9116 asks", %{rules: rules} do
+      headers = Headers.for_path(rules, "/.well-known/security.txt")
+      assert {"Content-Type", "text/plain; charset=utf-8"} in headers
+      assert {"X-Content-Type-Options", "nosniff"} in headers
     end
 
     test "fonts get both rules", %{rules: rules} do

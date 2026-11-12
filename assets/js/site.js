@@ -13,7 +13,8 @@
  *    title on the line, the h1 on the entry.
  * 3. The home: the line. One path the height of the window, still unless a mouse
  *    comes close: then it leans a few pixels toward it and eases back. Each row's
- *    mark follows it through one custom property; the words never move.
+ *    mark follows it through one custom property; the words never move. Five quick
+ *    presses on the name's mark draw it all again.
  * 4. An entry page: a click in the side margins, or Escape, goes back to the home.
  *
  * No inline handlers and no inline style attributes (the CSP is strict): positions
@@ -388,18 +389,57 @@
     window.addEventListener('resize', refresh);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
 
+    // Each mark appears as the drawn line reaches it: --at is its moment.
+    function time() {
+      for (var i = 0; i < rows.length; i++) {
+        var when = Math.round(160 + ((rows[i].y - window.scrollY) / H) * 820);
+        rows[i].el.style.setProperty('--at', when + 'ms');
+      }
+    }
+
+    // Unannounced: five quick presses on the name's mark play the entrance again.
+    // The mark is a pseudo-element, so the press is placed by its coordinates.
+    var HIT = 12; // px around the centre of the mark
+    var QUICK = 600; // ms between two presses at most
+    var presses = 0;
+    var pressedAt = 0;
+
+    function onNameMark(event) {
+      var name = rows[0]; // the name is the first row
+      if (!name) return false;
+      var dx = event.clientX - (x0 + name.dx);
+      var dy = event.clientY - (name.y - window.scrollY);
+      return dx * dx + dy * dy <= HIT * HIT;
+    }
+
+    document.addEventListener('pointerdown', function (event) {
+      if (!on || event.button !== 0 || event.isPrimary === false || !onNameMark(event)) {
+        presses = 0;
+        return;
+      }
+      presses = presses && event.timeStamp - pressedAt <= QUICK ? presses + 1 : 1;
+      pressedAt = event.timeStamp;
+      if (presses < 5) return;
+      presses = 0;
+      if (reduceMotion.matches) return;
+      root.classList.remove('intro');
+      void root.offsetWidth; // the class must be seen to leave, or nothing restarts
+      time();
+      root.classList.add('intro');
+    });
+
+    // A second quick press there would select the name, as any double click does.
+    document.addEventListener('mousedown', function (event) {
+      if (on && event.detail > 1 && onNameMark(event)) event.preventDefault();
+    });
+
     return {
-      // Draw the line. On a fresh load, each mark appears as the drawn line reaches
-      // it: --at is its moment in the entrance.
+      // Draw the line. On a fresh load it is drawn from the top.
       start: function (intro) {
         if (on) return;
         on = true;
         measure();
-        if (!intro) return;
-        for (var i = 0; i < rows.length; i++) {
-          var when = Math.round(160 + ((rows[i].y - window.scrollY) / H) * 820);
-          rows[i].el.style.setProperty('--at', when + 'ms');
-        }
+        if (intro) time();
       }
     };
   }

@@ -421,6 +421,38 @@ defmodule Site.TransitionsTest do
         end
       end
 
+      test "five quick presses on the name's mark play the entrance again", %{r: r} do
+        assert r["mark-five"]["error"] == nil
+        assert r["mark-five"]["replays"] == 1
+        assert r["mark-five"]["intro"] == true
+        assert r["mark-ten"]["replays"] == 2
+
+        # not four, not with a press elsewhere or a pause in between, not another button
+        for name <- ~w(mark-four mark-missed mark-slow mark-other-button mark-second-finger) do
+          assert r[name]["replays"] == 0, name
+        end
+
+        # reduced motion: nothing to play
+        assert r["mark-reduced"]["replays"] == 0
+        assert r["mark-reduced"]["intro"] == false
+
+        # a home a transition brought back never had its entrance: it has one now,
+        # and every row gets its moment
+        back = r["mark-after-transition"]
+        assert back["atBefore"] == [nil, nil, nil]
+        assert back["replays"] == 1
+        assert back["intro"] == true
+        assert Enum.all?(back["at"], &(&1 =~ ~r/^\d+ms$/))
+      end
+
+      test "a repeated press on the mark does not select the name", %{r: r} do
+        m = r["mark-mousedown"]
+        assert m["first"] == false
+        assert m["second"] == true
+        assert m["elsewhere"] == false
+        assert m["docListeners"] == ["mousedown", "mouseout", "pointerdown", "pointermove"]
+      end
+
       test "on an entry page the margins and Escape go back to the home", %{r: r} do
         assert r["go-prev-home"]["go"] == [-1]
         assert r["go-prev-home"]["assign"] == []
@@ -583,8 +615,10 @@ defmodule Site.TransitionsTest do
 
     function classes() {
       const set = new Set();
+      const added = [];
       return {
-        add: (...c) => c.forEach((x) => set.add(x)),
+        added,
+        add: (...c) => c.forEach((x) => { set.add(x); added.push(x); }),
         remove: (...c) => c.forEach((x) => set.delete(x)),
         toggle: (c, on) => { if (on === undefined ? !set.has(c) : on) set.add(c); else set.delete(c); },
         contains: (c) => set.has(c),
@@ -626,6 +660,13 @@ defmodule Site.TransitionsTest do
 
       const backLinks = (o.backLinks || 0) ? [{ handlers: {}, addEventListener(t, f) { this.handlers[t] = f; }, getAttribute: () => '/' }] : [];
 
+      // the home's line: the svg and its path, the stage, and three rows, the name first
+      const lineRows = !o.line ? [] : [0, 1, 2].map((i) => {
+        const props = {};
+        return { props, style: { setProperty(k, v) { props[k] = v; } }, getBoundingClientRect: () => ({ left: 100, top: 100 + 80 * i }) };
+      });
+      const svg = !o.line ? null : { setAttribute() {}, querySelector: (sel) => (sel === 'path' ? { setAttribute() {} } : null) };
+
       const win = {};
       const doc = {};
       const here = ORIGIN + (o.path || '/');
@@ -657,8 +698,8 @@ defmodule Site.TransitionsTest do
         documentElement: root,
         body,
         referrer: o.referrer || '',
-        querySelectorAll: (sel) => (sel === 'a.entry' ? links : sel === '[data-home]' ? backLinks : []),
-        querySelector: (sel) => (sel === '.article h1' ? h1 : sel === '.theme-toggle' ? toggle : null),
+        querySelectorAll: (sel) => (sel === 'a.entry' ? links : sel === '[data-home]' ? backLinks : sel === '.identity, .entry-row' ? lineRows : []),
+        querySelector: (sel) => (sel === '.article h1' ? h1 : sel === '.theme-toggle' ? toggle : sel === '.line' ? svg : sel === '.stage' && o.line ? {} : null),
         addEventListener: (t, f) => { (doc[t] = doc[t] || []).push(f); },
       };
       if (o.vt === 'supported' || o.vt === 'skipped') {
@@ -695,6 +736,12 @@ defmodule Site.TransitionsTest do
         sessionStorage: { getItem: () => null, setItem() {} },
       };
       ctx.window = ctx;
+      if (o.line) {
+        // the axis is 96px into the stage; a mark is 7px, 11px under its row's top
+        ctx.innerWidth = 1000;
+        ctx.onpagereveal = null;
+        ctx.getComputedStyle = (el, pseudo) => (pseudo ? { top: '11px', height: '7px' } : { getPropertyValue: () => '96px' });
+      }
       if (o.nav !== false) {
         ctx.navigation = {
           activation: o.from === undefined ? null : { from: o.from === null ? null : { url: ORIGIN + o.from } },
@@ -723,7 +770,7 @@ defmodule Site.TransitionsTest do
       };
 
       return {
-        ctx, log, fire, fireDoc, names, transition, body, root, error, win, doc, backLinks,
+        ctx, log, fire, fireDoc, names, transition, body, root, error, win, doc, backLinks, lineRows,
         maxNamed: () => maxNamed, attrs, store, calls, toggleAttrs, applied: () => applied,
         click: () => click && click(), handlers: () => handlers,
       };
@@ -912,6 +959,47 @@ defmodule Site.TransitionsTest do
         out[name] = { docListeners: Object.keys(p.doc).sort(), winListeners: Object.keys(p.win).sort() };
       }
       out['entry-listeners'] = { docListeners: Object.keys(page(E(prevHome)).doc).sort() };
+
+      // ---- the name's mark: five quick presses play the entrance again
+      {
+        // the stubs put the name's mark at (196.5, 114.5)
+        const lined = { ...homePage, line: true };
+        const on = (t, extra = {}) => ({ clientX: 197, clientY: 115, button: 0, isPrimary: true, timeStamp: t, ...extra });
+        function mark(name, o, presses, from) {
+          const p = from === undefined ? page(o) : page({ ...o, from });
+          p.fire('pagereveal', { viewTransition: from === undefined ? null : p.transition().vt });
+          const before = p.root.classList.added.filter((c) => c === 'intro').length;
+          const atBefore = p.lineRows.map((r) => r.props['--at'] || null);
+          for (const ev of presses) p.fireDoc('pointerdown', ev);
+          out[name] = {
+            replays: p.root.classList.added.filter((c) => c === 'intro').length - before,
+            intro: p.root.classList.contains('intro'),
+            atBefore,
+            at: p.lineRows.map((r) => r.props['--at'] || null),
+            error: p.error,
+          };
+        }
+        const quick = (n, start = 1000) => Array.from({ length: n }, (_, i) => on(start + 150 * i));
+        mark('mark-five', lined, quick(5));
+        mark('mark-four', lined, quick(4));
+        mark('mark-ten', lined, quick(10));
+        mark('mark-missed', lined, [...quick(4), on(1600, { clientX: 240 }), on(1750)]);
+        mark('mark-slow', lined, [...quick(3), on(2100), on(2250)]);
+        mark('mark-other-button', lined, quick(5).map((ev) => ({ ...ev, button: 2 })));
+        mark('mark-second-finger', lined, quick(5).map((ev) => ({ ...ev, isPrimary: false })));
+        mark('mark-reduced', { ...lined, reduced: true }, quick(5));
+        mark('mark-after-transition', lined, quick(5), '/rhino/');
+
+        const p = page(lined);
+        p.fire('pagereveal', { viewTransition: null });
+        const down = (ev) => { let prevented = false; p.fireDoc('mousedown', { ...ev, preventDefault() { prevented = true; } }); return prevented; };
+        out['mark-mousedown'] = {
+          first: down(on(0, { detail: 1 })),
+          second: down(on(0, { detail: 2 })),
+          elsewhere: down(on(0, { detail: 2, clientX: 400 })),
+          docListeners: Object.keys(p.doc).sort(),
+        };
+      }
 
       // ---- the theme toggle
       async function theme(name, o) {

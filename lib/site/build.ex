@@ -5,7 +5,8 @@ defmodule Site.Build do
   1. Load and validate `content/` (nothing is written if this fails).
   2. Render the pages.
   3. Clean the output directory and write pages, assets, `_headers`, `_redirects`,
-     `robots.txt`, the Markdown twin of every entry, `llms.txt` and the share images.
+     `robots.txt`, `security.txt`, the Markdown twin of every entry, `llms.txt` and
+     the share images.
 
   The output is deterministic: no timestamps, sorted iteration, so the same
   content, assets and environment always produce byte-identical trees.
@@ -57,7 +58,8 @@ defmodule Site.Build do
       [
         {"_headers", Headers.render(script_hashes)},
         {"_redirects", Redirects.render()},
-        {"robots.txt", "User-agent: *\nAllow: /\n"}
+        {"robots.txt", "User-agent: *\nAllow: /\n"},
+        {Site.SecurityTxt.path(), Site.SecurityTxt.render()}
       ] ++
         Site.Twin.files(content) ++ Site.OG.files(content)
 

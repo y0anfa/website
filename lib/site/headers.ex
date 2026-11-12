@@ -58,8 +58,9 @@ defmodule Site.Headers do
   @doc """
   Renders the `_headers` file. Takes the inline-script hash, or a list of them.
 
-  The Markdown twins and `llms.txt` get an explicit `Content-Type`, so they are
-  served as text with a charset whatever the platform guesses from the extension.
+  The Markdown twins, `llms.txt` and `security.txt` get an explicit `Content-Type`,
+  so they are served as text with a charset whatever the platform guesses from the
+  extension.
   """
   @spec render(String.t() | [String.t()]) :: String.t()
   def render(script_hashes) do
@@ -69,6 +70,7 @@ defmodule Site.Headers do
       {"/*", all},
       {"/*.md", [{"Content-Type", "text/markdown; charset=utf-8"}]},
       {"/llms.txt", [{"Content-Type", "text/plain; charset=utf-8"}]},
+      {"/.well-known/security.txt", [{"Content-Type", "text/plain; charset=utf-8"}]},
       {"/assets/fonts/*", [{"Cache-Control", "public, max-age=31536000, immutable"}]}
     ]
 

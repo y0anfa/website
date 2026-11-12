@@ -52,7 +52,7 @@ It shows who he is, what he thinks, and what he makes.
 ├── assets/                    copied verbatim to dist/assets/
 │   ├── css/site.css
 │   ├── js/head.js             inlined into <head>; its sha256 goes in the CSP; applies the saved theme
-│   ├── js/site.js             the theme toggle, the page transitions, the home's line and its entrance, the margins and Escape (a deferred, render-blocking script on every page)
+│   ├── js/site.js             the theme toggle, the page transitions, the home's line, its entrance and its replay, the margins and Escape (a deferred, render-blocking script on every page)
 │   ├── js/404.js              fills the missing path on the 404 page
 │   ├── js/favicon.js          swaps the favicon to the sleeping one while the tab is hidden
 │   ├── fonts/InterVariable.woff2, InterVariable-Italic.woff2 + Inter-OFL.txt
@@ -74,12 +74,15 @@ It shows who he is, what he thinks, and what he makes.
 | `/<slug>/` | one project (`content/projects/*.md`) | `project.html.eex` |
 | `/<slug>.md` | the Markdown twin of the same entry (see below) | `Site.Twin` |
 | `/llms.txt` | an index of the twins, for language models | `Site.Llms` |
+| `/.well-known/security.txt` | where to report a problem with the site (see below) | `Site.SecurityTxt` |
 | `/404.html` | — | `404.html.eex` |
 
 Every page is written as `<path>/index.html`. Slug = filename without `.md` and without a leading `YYYY-MM-DD-` prefix.
 The content folder (`essays/`, `notes/`, `projects/`) sets the entry's type, not its URL: `content/essays/2026-03-28-threat-modeling-with-claude-code.md` is `/threat-modeling-with-claude-code/`, and `content/projects/rhino.md` is `/rhino/`. There are no `/essays/`, `/notes/`, `/projects/`, `/uses/` or `/cv/` pages.
 A project with a `link` is not linked from the home (its timeline entry goes to the link), but its page, its twin and its `llms.txt` line are built all the same, so its URL keeps working.
 Also emit `robots.txt` (allow all), `_headers` (§11) and `_redirects`. There is no sitemap and no feed.
+
+**`security.txt`.** `dist/.well-known/security.txt` follows RFC 9116. It is one comment, `# This site is a folder of static files. If you still found a way in, tell me.`, then `Contact:` (the LinkedIn URL, the site's one contact), `Expires:` and `Canonical:` (its own address). The expiry is a constant, `Site.Config.security_expires/0` (`2027-11-01T00:00:00Z`), not the build date, so the build stays deterministic: it is the one timestamp in the output. A test fails once the date has passed, or if it is set more than a year ahead: move it forward before then. `_headers` (§11) serves the file as `text/plain; charset=utf-8`.
 
 **Markdown twins and `llms.txt`.** Every entry (essay, note, project) is also written as `dist/<slug>.md`, served at `/<slug>.md`, so a person or a model can read the words without the page. It is plain text built from the content, with no timestamps:
 
@@ -226,6 +229,7 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 - **The line** (`site.js`, home only). The `svg.line` is fixed over the whole window, behind the content; its one path is drawn at the axis, on the pixel grid, in `--hair`. It is still. When a mouse comes within 64px of it, the points of the line within about 84px above and below lean toward the pointer, most (about 6px) at a third of that reach and not at all when the pointer is on the line, so crossing it is one smooth pass; they follow with a 130ms time constant and never overshoot. Each row gets `--lean`, the line's lean at its mark's height, and the mark is translated by it, so it stays on the line; the words never move. A finger does nothing to it. Everything is written through the CSSOM once a frame at most, and only while the line moves.
 - **Without script** the path has nothing to draw: `.stage::before`, a fixed 1px `--hair` rule at the same place, stands in for it (hidden under `.js`).
 - **The entrance.** On a fresh load only (not when a transition brings the home back), `site.js` adds `.intro`: the line is drawn from the top in 1200ms, and each mark appears, with its words, as the line reaches it (`--at`, its moment, from `site.js`). The words do not fade in: they glitch in (`@keyframes glitch`, 560ms, `step-end`, CSS only): they jump at most 5px sideways, show as a band or with a band missing (`clip-path`), throw a grey ghost of themselves to one side (a `text-shadow` without blur, in `--text-3` or `--hair`), then settle. The year label only fades.
+- **The name's mark, pressed five times** (`site.js`, unannounced). Five presses (`pointerdown`, primary button) within 12px of the centre of the name's mark, each at most 600ms after the one before, play the entrance again: `.intro` is taken off, a reflow is forced, every row gets its `--at` again, and `.intro` is put back, so the line is drawn from the top and the words glitch in. A press anywhere else starts the count over. It also works on a home that a transition brought back, which never had its entrance. Under reduced motion it does nothing. The mark is a pseudo-element, so the press is placed by its coordinates; a `mousedown` there with `detail` above 1 is prevented, so the repeated press does not select the name. Nothing on the page says any of this, and the pointer does not change.
 - **The flicker.** The same glitch, smaller, when the pointer or the keyboard reaches an entry's link (`.entry:is(:hover, :focus-visible) .entry-title`, `@keyframes flicker`, 280ms, `step-end`): the title jumps at most 3px, shows as a band, throws a grey ghost, and is itself again. Once on arriving, never on leaving; only where there is a pointer to hover with, and never under reduced motion. During a navigation the animation is off, so the title that grows into the heading is captured whole.
 - **The LinkedIn link.** The site's one contact, on the home only: a 16px monochrome glyph in the same 36px square as the toggle, just before it, muted (`--text-2`) and brightened on hover. Named `LinkedIn` for screen readers (`aria-label`, the glyph aria-hidden), `rel="me noopener"`. It shows without script.
 - **The theme toggle.** A 36px button with a sun and a moon (aria-hidden SVGs); the icon shows the theme a click switches to, and `site.js` labels it `Switch to light theme` or `Switch to dark theme`. Choosing what the system prefers forgets the choice (`localStorage.theme` removed), so the page follows the system again. The switch is one 280ms cross-fade (a view transition of type `theme`), at once under reduced motion or without view transitions. Without script the toggle is hidden.
@@ -251,6 +255,9 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 - There is no site footer on an entry either: no email, no LinkedIn, no build hash.
 
 **404** (`404.html.eex`): the bar (without the `Esc` hint), then in the reading column a meta line `404`, the h1 `Not found`, `There is no page at <span data-path>this address</span>.` (`404.js` puts `location.pathname` in it via `textContent`), and the `All entries` link.
+
+- **The broken line.** An entry has its mark on the line; the 404 has none, and the line breaks into dashes there. `.not-found .meta::before` is not a dot but a 7×60px patch of `--bg` over the line, centred on the meta line, with the line drawn again inside it as dashes (a `repeating-linear-gradient` of `--hair`, 4px on and 4px off, 1px wide, exactly where the line runs, a gap at both ends). So the line is solid, goes to seven dashes as it passes the `404`, and is solid again; there is no mark. It scrolls with the page, like a mark.
+- **The heading never quite settles.** `.not-found h1` runs `@keyframes stutter` (6s, `step-end`, infinite, after 1200ms): two beats in each six seconds, one single step at 38% and one of four steps from 90%, each step 60ms; the rest of the time the heading is whole. The steps are the home's flicker at the heading's size: at most 4px sideways, a band (`clip-path`), a grey ghost (`--text-3` or `--hair`). Only inside `prefers-reduced-motion: no-preference`.
 
 **Back home from an entry.** On an entry page (`data-page` is `essay`, `note` or `project`), a click on the side margins, Escape, and both back links (`[data-home]`) go back home. All in `site.js`:
 
@@ -300,7 +307,7 @@ Plus `--hover` and `--card`, both `light-dark()` pairs. `--focus` is the same pa
 - Every page has a skip link, one h1, and landmarks (`main`; on entries a `header` bar and the article's `footer`). The timeline is an ordered list under a visually hidden h2; years are aria-hidden and every date carries its year for a screen reader.
 - Keyboard: Tab reaches the LinkedIn link, the toggle, the company link and every entry; focus is always visible and fills an entry's mark exactly like hover. Escape goes back home from an entry.
 - Decorative things are aria-hidden: the line, the toggle's icons, the LinkedIn glyph, the arrows, the separators and the `Esc` hint.
-- **Reduced motion:** no lean (the line is drawn and stays still), no entrance, no navigation transition, no theme cross-fade, the arrows do not lean, and every remaining animation and transition is cut to 0.01ms.
+- **Reduced motion:** no lean (the line is drawn and stays still), no entrance (the name's mark replays nothing), no stutter on the 404's heading, no navigation transition, no theme cross-fade, the arrows do not lean, and every remaining animation and transition is cut to 0.01ms.
 - **Without script:** the name, the position, the timeline and every entry read and link as normal; a plain rule stands in for the line; the theme toggle (which needs script) is not shown.
 
 **Removed with the redesigns:** the ASCII topographic field (`field.js`, its canvas and CSS, and later its playground in `lab/`), the git-log list and its commit hashes, the beige palette, `theme.js` and `transitions.js` (both in `site.js` now), the site header and footer, the home intro text, the terminal 404; then the lamp (the glow at the top of the page, the pointer's light, the scan line and its bead, the lit copy of the name, the decrypt), the amber accent, the two-column poster and its large name, the date tints, and the summaries on the home.
@@ -317,11 +324,11 @@ Plus `--hover` and `--card`, both `light-dark()` pairs. `--focus` is the same pa
   3. Render the EEx templates. **EEx does not escape:** every interpolated string goes through `Site.HTML.escape/1`, and only rendered Markdown is inserted raw. The build does not read git.
   4. Copy `assets/` to `dist/assets/` as is (no fingerprinting).
   5. Inline `assets/js/head.js` (trimmed) into `<head>` and compute its `sha256-…` for the CSP. Compute the `sha256-…` of the speculation rules (`Site.Speculation.rules/0`) too.
-  6. Write `_headers` (§11), `_redirects` (§4), `robots.txt`, `404.html`, the Markdown twin of every entry, `llms.txt` and the share images in `og/` (§4).
+  6. Write `_headers` (§11), `_redirects` (§4), `robots.txt`, `security.txt` (§4), `404.html`, the Markdown twin of every entry, `llms.txt` and the share images in `og/` (§4).
 - **Deterministic:** no build timestamps; sorted iteration everywhere; identical output for identical sources and env.
 - **`mix site.verify`:** builds twice into temporary dirs, compares a SHA-256 over every file path and content, fails on mismatch, and prints the tree hash.
 - **`mix site.serve [--port 4000]`:** builds, serves `dist/` with Bandit and Plug, and applies the headers parsed from `dist/_headers`, so CSP violations show up locally exactly as in production. It polls `content/`, `templates/`, `assets/` and `lib/` mtimes every second and rebuilds on change (no file_system dep). Missing paths serve `404.html` with status 404, and `/x/` serves `/x/index.html`.
-- **Tests:** frontmatter parsing and validation (the `summary` field too), flat URLs, slugs (global uniqueness and reserved slugs), `_redirects`, escaping, timeline order, rows and years, no nav, no footer and no list pages, the home markup (name, position, timeline structure, no summary, the external project link and its label, no drafts, the line), the entry, project and 404 markup, the CSS invariants (the palette and its contrast, no accent, the fonts, focus, the line and its marks, reduced-motion guards, no trace of the old designs), CSP hashes (head.js and the speculation rules) and no inline style, the Markdown twins and `llms.txt`, the entry links and their escaping, the favicon pair and its script, the share images (size, palette, no metadata chunks, determinism, text wrapping, meta tags), the `stats` callouts, the page transitions in CSS, and `site.js` run under node with stubs when `node` is installed (direction and names, the margins, Escape and the back links, the theme toggle, the entrance), and a determinism smoke test, all using `test/fixtures/content`.
+- **Tests:** frontmatter parsing and validation (the `summary` field too), flat URLs, slugs (global uniqueness and reserved slugs), `_redirects`, escaping, timeline order, rows and years, no nav, no footer and no list pages, the home markup (name, position, timeline structure, no summary, the external project link and its label, no drafts, the line), the entry, project and 404 markup, the CSS invariants (the palette and its contrast, no accent, the fonts, focus, the line and its marks, the 404's broken line and its stutter, reduced-motion guards, no trace of the old designs), `security.txt` (its fields, its place, its type, and that it has not expired), CSP hashes (head.js and the speculation rules) and no inline style, the Markdown twins and `llms.txt`, the entry links and their escaping, the favicon pair and its script, the share images (size, palette, no metadata chunks, determinism, text wrapping, meta tags), the `stats` callouts, the page transitions in CSS, and `site.js` run under node with stubs when `node` is installed (direction and names, the margins, Escape and the back links, the theme toggle, the entrance, the five presses on the name's mark), and a determinism smoke test, all using `test/fixtures/content`.
 
 ## 11. Security headers (`dist/_headers`)
 
@@ -339,13 +346,15 @@ Plus `--hover` and `--card`, both `light-dark()` pairs. `--focus` is the same pa
   Content-Type: text/markdown; charset=utf-8
 /llms.txt
   Content-Type: text/plain; charset=utf-8
+/.well-known/security.txt
+  Content-Type: text/plain; charset=utf-8
 /assets/fonts/*
   Cache-Control: public, max-age=31536000, immutable
 ```
 
 **Two inline scripts, two hashes.** `script-src` carries exactly two `sha256-…` sources: `assets/js/head.js` and the Speculation Rules (`<script type="speculationrules">`, §7). The build hashes the exact text of each, so the same JSON always gives the same hash, and `'inline-speculation-rules'` is not used. A change to either script changes its hash in the same build.
 
-**Content-Type.** The Cloudflare Workers static assets docs say the defaults it sends, `Content-Type` included, can be overridden by a `_headers` rule ("Headers defined in the `_headers` file override what Cloudflare ordinarily sends"), so the `.md` and `llms.txt` rules pin the types. `mix site.serve` applies them too, and falls back to the file extension's type for everything else. If a deploy ever shows a duplicated or wrong `Content-Type`, delete those two rules and Cloudflare's own types apply.
+**Content-Type.** The Cloudflare Workers static assets docs say the defaults it sends, `Content-Type` included, can be overridden by a `_headers` rule ("Headers defined in the `_headers` file override what Cloudflare ordinarily sends"), so the `.md`, `llms.txt` and `security.txt` rules pin the types (RFC 9116 asks for `text/plain; charset=utf-8`). `mix site.serve` applies them too, and falls back to the file extension's type for everything else. If a deploy ever shows a duplicated or wrong `Content-Type`, delete those rules and Cloudflare's own types apply.
 
 The two Cloudflare hosts are always in the CSP, because Web Analytics runs on automatic setup: Cloudflare injects `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"…"}'></script>` into the HTML at the edge. The build never writes that tag, so no built page contains `beacon.min.js` or `data-cf-beacon`.
 The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `dist/_redirects` (§4) sits next to `_headers`; Cloudflare reads both from the assets directory, and the build writes both.

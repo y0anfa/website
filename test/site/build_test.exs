@@ -24,6 +24,7 @@ defmodule Site.BuildTest do
     _headers
     _redirects
     robots.txt
+    .well-known/security.txt
     llms.txt
     escape-me.md
     first-essay.md
@@ -93,6 +94,10 @@ defmodule Site.BuildTest do
 
     test "robots.txt allows everything and names no sitemap", %{tree: tree} do
       assert page(tree, "robots.txt") == "User-agent: *\nAllow: /\n"
+    end
+
+    test "security.txt is written under .well-known, as rendered", %{tree: tree} do
+      assert page(tree, ".well-known/security.txt") == Site.SecurityTxt.render()
     end
 
     test "copies assets verbatim, skipping dotfiles", %{tree: tree} do
@@ -671,7 +676,12 @@ defmodule Site.BuildTest do
     end
 
     test "no build timestamp leaks into the output", %{tree: tree} do
+      # the one timestamp in the output is security.txt's expiry, a constant in Site.Config
+      expires = "Expires: #{DateTime.to_iso8601(Site.Config.security_expires())}\n"
+      assert tree[".well-known/security.txt"] =~ expires
+
       for {path, content} <- tree, String.ends_with?(path, [".html", "_headers", ".txt"]) do
+        content = String.replace(content, expires, "")
         refute content =~ ~r/\b20\d\d-\d\d-\d\dT\d\d:\d\d/, "#{path}: looks like a timestamp"
       end
     end

@@ -206,14 +206,45 @@ defmodule Site.CSSTest do
       entrance = media("@media (prefers-reduced-motion: no-preference) {\n  .intro .line path")
       assert is_binary(entrance)
 
-      # every animation outside the view transitions sits in that block, but one:
-      # the flicker of a title under the pointer or the keyboard
+      # every animation outside the view transitions sits in that block, but two:
+      # the flicker of a title under the pointer or the keyboard, and the 404's heading
       for {selector, body} <- rules(),
           body =~ ~r/(?<![-\w])animation\s*:/,
           not String.contains?(selector, "view-transition") do
         assert String.starts_with?(selector, ".intro") or
-                 selector == ".entry:is(:hover, :focus-visible) .entry-title",
+                 selector in [
+                   ".entry:is(:hover, :focus-visible) .entry-title",
+                   ".not-found h1"
+                 ],
                selector
+      end
+    end
+
+    test "the 404's heading never quite settles: two beats in six seconds, then whole" do
+      assert @code =~
+               ~r/@media \(prefers-reduced-motion: no-preference\) \{\s*\.not-found h1 \{\s*animation: stutter 6s step-end 1200ms infinite;\s*\}\s*\}/
+
+      [stutter] = Regex.run(~r/@keyframes stutter \{.*?\n\}\n/s, @code)
+
+      # it starts and ends as the heading's own rules say, and is never hidden
+      refute stutter =~ ~r/^\s*(0%|from|100%|to) \{/m
+      refute stutter =~ "opacity"
+
+      # each beat ends on a step that puts everything back
+      whole = ~r/\{\s*transform: none;\s*clip-path: none;\s*text-shadow: none;\s*\}/
+      steps = Regex.scan(~r/(\d+)% (\{[^}]*\})/, stutter)
+      assert Enum.map(steps, fn [_, at, _] -> at end) == ~w(38 39 90 91 92 93 94)
+
+      for [_, at, body] <- steps, at in ~w(39 94) do
+        assert body =~ whole, at
+      end
+
+      for [_, px] <- Regex.scan(~r/translateX\((-?\d+)px\)/, stutter) do
+        assert abs(String.to_integer(px)) <= 4
+      end
+
+      for [_, colour] <- Regex.scan(~r/px 0 0 ([^,;]+)/, stutter) do
+        assert colour in ["var(--text-3)", "var(--hair)"]
       end
     end
 
@@ -308,6 +339,23 @@ defmodule Site.CSSTest do
       assert line =~ "background: var(--hair);"
 
       assert rule!(".meta::before") =~ "background: var(--text);"
+    end
+
+    test "on the 404 the line is broken: dashes where the mark would be, and no mark" do
+      broken = rule!(".not-found .meta::before")
+
+      # a patch of the page colour over the line, where a mark would sit, and no dot
+      assert broken =~ "height: 60px;"
+      assert broken =~ "margin-top: -30px;"
+      assert broken =~ "border-radius: 0;"
+      assert broken =~ "box-shadow: none;"
+
+      # the dashes are drawn where the line runs: 3px into the patch (the patch is at
+      # -30px, the line at -27px), 1px wide, in the line's colour, a gap at both ends
+      assert broken =~
+               "background: repeating-linear-gradient(transparent 0 4px, var(--hair) 4px 8px) 3px 0 / 1px 100% no-repeat var(--bg);"
+
+      assert rule!(".meta::before") =~ "left: -30px;"
     end
 
     test "nothing of the lamp is left" do

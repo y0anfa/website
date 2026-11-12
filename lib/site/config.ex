@@ -34,6 +34,12 @@ defmodule Site.Config do
   @doc "The one contact on the site: a quiet LinkedIn icon in the home's top corner."
   def linkedin, do: "https://www.linkedin.com/in/yoan-faure"
 
+  @doc """
+  When `/.well-known/security.txt` stops being valid. RFC 9116 asks for less than
+  a year ahead: move it forward before it passes (a test fails once it has).
+  """
+  def security_expires, do: ~U[2027-11-01 00:00:00Z]
+
   @doc "Entry types that appear on the timeline."
   def types, do: Keyword.keys(@types)
 
