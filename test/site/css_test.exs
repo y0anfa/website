@@ -206,12 +206,37 @@ defmodule Site.CSSTest do
       entrance = media("@media (prefers-reduced-motion: no-preference) {\n  .intro .line path")
       assert is_binary(entrance)
 
-      # every animation outside the view transitions sits in that block
+      # every animation outside the view transitions sits in that block, but one:
+      # the flicker of a title under the pointer or the keyboard
       for {selector, body} <- rules(),
           body =~ ~r/(?<![-\w])animation\s*:/,
-          not String.contains?(selector, "::view-transition") do
-        assert String.starts_with?(selector, ".intro"), selector
+          not String.contains?(selector, "view-transition") do
+        assert String.starts_with?(selector, ".intro") or
+                 selector == ".entry:is(:hover, :focus-visible) .entry-title",
+               selector
       end
+    end
+
+    test "a title flickers once when the pointer or the keyboard reaches its link" do
+      hover = media("@media (hover: hover) and (prefers-reduced-motion: no-preference)")
+
+      assert hover =~
+               ".entry:is(:hover, :focus-visible) .entry-title {\n    animation: flicker 280ms step-end both;"
+
+      [flicker] = Regex.run(~r/@keyframes flicker \{.*?\n\}\n/s, @code)
+
+      # smaller than the entrance's glitch, never hidden, and it ends as plain text
+      refute flicker =~ "opacity"
+      refute flicker =~ ~r/^\s*(100%|to) \{/m
+      assert flicker =~ ~r/82% \{\s*transform: none;\s*clip-path: none;\s*text-shadow: none;\s*\}/
+
+      for [_, px] <- Regex.scan(~r/translateX\((-?\d+)px\)/, flicker) do
+        assert abs(String.to_integer(px)) <= 3
+      end
+
+      # the title that grows into the heading is captured whole
+      assert rule!(":root:active-view-transition-type(forward, back) .entry-title") ==
+               "animation: none;"
     end
 
     test "on a fresh load the words glitch in, in ink only, and settle as their own rules say" do

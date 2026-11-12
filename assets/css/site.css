@@ -572,6 +572,47 @@ a:is(:hover, :focus-visible) > .link-out {
   }
 }
 
+/* The same glitch, smaller and shorter, when the pointer or the keyboard reaches an
+   entry's link: its title flickers once and is itself again. It plays on arriving
+   only (an animation starts when its rule starts to apply), never on leaving. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .entry:is(:hover, :focus-visible) .entry-title {
+    animation: flicker 280ms step-end both;
+  }
+}
+
+@keyframes flicker {
+  0% {
+    transform: translateX(-3px);
+    clip-path: inset(0 -8px 55% -8px);
+    text-shadow: 4px 0 0 var(--text-3);
+  }
+
+  22% {
+    transform: translateX(2px);
+    clip-path: inset(48% -8px 0 -8px);
+    text-shadow: -3px 0 0 var(--hair);
+  }
+
+  44% {
+    transform: translateX(1px) skewX(-6deg);
+    clip-path: polygon(-8px 0, calc(100% + 8px) 0, calc(100% + 8px) 34%, -8px 34%, -8px 50%, calc(100% + 8px) 50%, calc(100% + 8px) 100%, -8px 100%);
+    text-shadow: -2px 0 0 var(--text-3);
+  }
+
+  66% {
+    transform: none;
+    clip-path: none;
+    text-shadow: 2px 0 0 var(--text-3);
+  }
+
+  82% {
+    transform: none;
+    clip-path: none;
+    text-shadow: none;
+  }
+}
+
 /* ---------- entry pages: the line ----------
    The same line, in the margin of the column: the entry is one stop on the
    timeline. Part of the root image, so it stays put while a transition runs. */
@@ -1236,11 +1277,10 @@ body:not([data-page="home"])::before {
     0 0 0.5em var(--bg);
 }
 
-/* The clicked entry is captured without its hover glow. */
-:root:active-view-transition-type(forward, back) .entry {
-  background: none;
-  box-shadow: none;
-  transition: none;
+/* The clicked title is captured whole: a hover flicker still running is stopped,
+   so the picture that grows into the heading is never a band of it. */
+:root:active-view-transition-type(forward, back) .entry-title {
+  animation: none;
 }
 
 /* A title with no partner on the other page (it was off screen) is ordinary
