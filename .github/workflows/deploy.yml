@@ -60,6 +60,8 @@ jobs:
           name: dist
           path: dist
           if-no-files-found: error
+          # dist/.well-known/ is a dot directory: left out by default
+          include-hidden-files: true
 
   deploy:
     needs: build
