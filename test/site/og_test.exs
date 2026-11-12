@@ -143,35 +143,38 @@ defmodule Site.OGTest do
       )
     end
 
-    test "uses the dark palette, the lamp and Inter only", %{fonts: fonts} do
+    test "uses the dark palette, no colour, and Inter only", %{fonts: fonts} do
       svg = svg(entry_card(), fonts)
 
-      for colour <- ~w(#0d0f14 #ecebe8 #d6d5d2 #a2a6ae #80848d #f2c47c), do: assert(svg =~ colour)
+      for colour <- ~w(#0e0f12 #ecebe8 #9c9fa6 #80848d #34373e), do: assert(svg =~ colour)
       assert svg =~ ~s(width="1200" height="630")
       assert svg =~ ~s(font-family="Inter" font-weight="700")
       refute svg =~ "JetBrains"
 
-      # the old beige palette and its contours are gone
-      for old <- ~w(#f4efe4 #262523 #6b675f #ddd6c8), do: refute(svg =~ old)
+      # the lamp, the beige palette and its contours are gone
+      for old <- ~w(#f2c47c #0d0f14 #f4efe4 #262523 #6b675f #ddd6c8), do: refute(svg =~ old)
+      refute svg =~ "Gradient"
+      refute svg =~ "url("
       refute svg =~ ~r/<path stroke-width/
     end
 
-    test "the lamp glows from the top left, as over every page", %{fonts: fonts} do
+    test "the timeline's line runs the height of the card, the same on every card", %{
+      fonts: fonts
+    } do
       svg = svg(entry_card(), fonts)
+      line = ~s(<rect x="119" y="0" width="2" height="630" fill="#34373e"/>)
 
-      assert length(Regex.scan(~r/<radialGradient id="glow-\d"/, svg)) == 3
-      assert length(Regex.scan(~r|fill="url\(#glow-\d\)"|, svg)) == 3
-
-      # every card has the same light: it does not depend on the title
-      glow = fn svg -> Regex.scan(~r|<radialGradient id="glow.*?</radialGradient>|, svg) end
-      assert glow.(svg) == glow.(svg(entry_card(key: "other", title: "Other"), fonts))
+      assert svg =~ line
+      assert svg(entry_card(key: "other", title: "Other"), fonts) =~ line
+      assert svg(%{key: "home", kind: :home, title: "A Name"}, fonts) =~ line
     end
 
-    test "has the lit mark and the date, the title, the name and the domain", %{fonts: fonts} do
+    test "has its filled mark and the date, the title, the name and the domain", %{fonts: fonts} do
       svg = svg(entry_card(), fonts)
 
-      assert svg =~ ~s|fill="url(#mark-glow)"|
-      assert svg =~ ~r|<circle [^>]*r="7" fill="#f2c47c"/>|
+      # the mark sits on the line, in a ring of the page colour that cuts it
+      assert svg =~ ~r|<circle cx="120" cy="[\d.]+" r="20" fill="#0e0f12"/>|
+      assert svg =~ ~r|<circle cx="120" cy="[\d.]+" r="9" fill="#ecebe8"/>|
       assert svg =~ ">28 Mar 2026</text>"
       assert svg =~ ">A title</text>"
       assert svg =~ ">Yoan Faure</text>"
@@ -197,7 +200,7 @@ defmodule Site.OGTest do
       end
     end
 
-    test "the home is the name on two lines, the position and the domain", %{
+    test "the home is the name on one line, the position and the domain", %{
       content: content,
       fonts: fonts
     } do
@@ -209,8 +212,8 @@ defmodule Site.OGTest do
       }
 
       svg = svg(card, fonts)
-      assert svg =~ ">Test</text>"
-      assert svg =~ ">Person</text>"
+      assert svg =~ ">Test Person</text>"
+      assert svg =~ ~r|<circle cx="120" cy="[\d.]+" r="9" fill="#ecebe8"/>|
       assert svg =~ ">Security engineer at Riot</text>"
       assert svg =~ ">yoanfaure.com</text>"
       refute svg =~ "Fixture tagline"

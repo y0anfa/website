@@ -44,21 +44,22 @@ defmodule Site.FaviconTest do
         assert svg =~ square
         assert svg =~ axis
         assert svg =~ ~S|viewBox="0 0 32 32"|
-        assert svg =~ ".bg { fill: #0d0f14; }"
+        assert svg =~ ".bg { fill: #0e0f12; }"
       end
     end
 
-    test "awake, the entry's mark is lit; asleep, the lamp is out" do
-      assert @awake =~ ".lamp { fill: #f2c47c; }"
-      assert @awake =~ ~S|<circle class="lamp"|
-      assert @awake =~ ~S|<circle class="halo"|
+    test "awake, the mark is filled; asleep, it is an empty ring; neither has a colour" do
+      assert @awake =~ ".mark { fill: #ecebe8; stroke: #0e0f12; }"
+      assert @asleep =~ ".mark { fill: #0e0f12; stroke: #80848d; }"
 
-      refute @asleep =~ "#f2c47c"
-      assert @asleep =~ ".mark { fill: #0d0f14; stroke: #80848d; }"
+      for svg <- [@awake, @asleep] do
+        assert length(Regex.scan(~r/<circle class="mark"/, svg)) == 1
+        refute svg =~ "#f2c47c"
+      end
     end
 
-    test "the old palette is gone" do
-      for svg <- [@awake, @asleep], old <- ~w(#262523 #f4efe4) do
+    test "the old palettes are gone" do
+      for svg <- [@awake, @asleep], old <- ~w(#262523 #f4efe4 #0d0f14) do
         refute svg =~ old
       end
     end

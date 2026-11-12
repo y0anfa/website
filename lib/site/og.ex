@@ -3,10 +3,11 @@ defmodule Site.OG do
   The share images (`og:image`): one 1200x630 PNG per entry at `og/<slug>.png`,
   and `og/home.png` for the home page.
 
-  Each image is drawn as an SVG string in the site's dark palette: graphite, with
-  the warm lamp glowing from the top left as it does over every page. An entry
-  shows the lit mark and its date, the title in Inter Bold, and the name and the
-  domain along the bottom; the home shows the name on two lines and the position.
+  Each image is drawn as an SVG string in the site's dark palette, with no colour:
+  the timeline's line down the left of the card and one filled mark on it. An
+  entry shows its date beside the mark, the title in Inter Bold, and the name and
+  the domain along the bottom; the home shows the name beside the mark, the
+  position under it and the domain.
   The SVG is rasterised at build time by `resvg` (a precompiled Rust NIF) with only
   the font in `priv/og-fonts/`; system fonts are never read, so the output does not
   depend on the machine. The font lives outside `assets/` because the build uses it
@@ -22,22 +23,17 @@ defmodule Site.OG do
   @height 630
   @margin 72
 
-  # The dark palette of SPEC section 8: --bg, --text, --name, --text-2, --text-3,
-  # --lamp, and the three glows of the lamp over the page.
-  @bg "#0d0f14"
-  @text "#ecebe8"
-  @name "#d6d5d2"
-  @text_2 "#a2a6ae"
-  @text_3 "#80848d"
-  @lamp "#f2c47c"
+  # The timeline: the line stands here, and the words start to its right.
+  @axis 120
+  @left 164
 
-  # {centre x, centre y, radius x, radius y, colour, opacity, where it fades out},
-  # in the proportions of the page's `body::before`, a little warmer for a card.
-  @glows [
-    {0.20, -0.06, 0.30, 0.46, "#ffdeb4", 0.16, 0.7},
-    {0.24, -0.14, 0.52, 0.64, "#f2aa5c", 0.16, 0.72},
-    {0.70, -0.24, 0.72, 0.70, "#6e82be", 0.09, 0.7}
-  ]
+  # The dark palette of SPEC section 8: --bg, --text, --text-2, --text-3. The line is
+  # a step lighter than --hair, so it survives a thumbnail.
+  @bg "#0e0f12"
+  @text "#ecebe8"
+  @text_2 "#9c9fa6"
+  @text_3 "#80848d"
+  @line "#34373e"
 
   @fonts_dir Path.expand("../../priv/og-fonts", __DIR__)
   @sans_file "Inter-Bold.ttf"
@@ -48,7 +44,7 @@ defmodule Site.OG do
   @title_sizes [96, 84, 72, 62, 54]
   @title_lines 3
   @title_baseline 468
-  @name_sizes [168, 152, 128, 104, 84, 68]
+  @name_sizes [132, 120, 104, 84, 68]
   @role_size 40
   @tracking_em -0.03
   @name_tracking_em -0.035
@@ -156,55 +152,17 @@ defmodule Site.OG do
     [
       ~s(<svg xmlns="http://www.w3.org/2000/svg" width="#{@width}" height="#{@height}" ),
       ~s(viewBox="0 0 #{@width} #{@height}">),
-      defs(),
       ~s(<rect width="#{@width}" height="#{@height}" fill="#{@bg}"/>),
-      for(index <- 1..length(@glows), do: glow_rect(index)),
+      ~s(<rect x="#{@axis - 1}" y="0" width="2" height="#{@height}" fill="#{@line}"/>),
       body(card, fonts),
       "</svg>"
     ]
   end
 
-  defp glow_rect(index),
-    do: ~s|<rect width="#{@width}" height="#{@height}" fill="url(#glow-#{index})"/>|
-
-  # The lamp: one radial gradient per glow, an ellipse drawn as a circle squashed
-  # around its centre. And the halo of the lit mark.
-  defp defs do
-    glows =
-      @glows
-      |> Enum.with_index(1)
-      |> Enum.map(fn {{x, y, rx, ry, colour, opacity, fade}, index} ->
-        cx = x * @width
-        cy = y * @height
-        r = rx * @width
-        squash = ry * @height / r
-
-        [
-          ~s(<radialGradient id="glow-#{index}" gradientUnits="userSpaceOnUse" ),
-          ~s(cx="#{num(cx)}" cy="#{num(cy)}" r="#{num(r)}" ),
-          ~s|gradientTransform="translate(#{num(cx)} #{num(cy)}) scale(1 #{num(squash)}) |,
-          ~s|translate(#{num(-cx)} #{num(-cy)})">|,
-          ~s(<stop offset="0" stop-color="#{colour}" stop-opacity="#{num(opacity)}"/>),
-          ~s(<stop offset="#{num(fade)}" stop-color="#{colour}" stop-opacity="0"/>),
-          "</radialGradient>"
-        ]
-      end)
-
-    [
-      "<defs>",
-      glows,
-      ~s(<radialGradient id="mark-glow">),
-      ~s(<stop offset="0" stop-color="#{@lamp}" stop-opacity="0.45"/>),
-      ~s(<stop offset="1" stop-color="#{@lamp}" stop-opacity="0"/>),
-      "</radialGradient>",
-      "</defs>"
-    ]
-  end
-
-  # The home: the name on two lines, the position, the domain.
+  # The home: the name beside its mark, the position, the domain.
   defp body(%{kind: :home} = card, fonts) do
-    {size, lines} = fit_words(fonts.sans, card.title, @name_sizes, @name_tracking_em)
-    last_baseline = 400
+    {size, lines} = fit(fonts.sans, card.title, @name_sizes, 2, @name_tracking_em)
+    last_baseline = 340
     first_baseline = last_baseline - size * (length(lines) - 1)
 
     role =
@@ -215,17 +173,18 @@ defmodule Site.OG do
         subtitle ->
           {role_size, role_lines} = fit(fonts.sans, subtitle, [@role_size, 34, 28], 2, -0.01)
 
-          lines_at(role_lines, last_baseline + 76, role_size * 1.3, role_size, @text_2, -0.01)
+          lines_at(role_lines, last_baseline + 68, role_size * 1.3, role_size, @text_2, -0.01)
       end
 
     [
-      lines_at(lines, first_baseline, size, size, @name, @name_tracking_em),
+      mark(first_baseline - size * 0.36),
+      lines_at(lines, first_baseline, size, size, @text, @name_tracking_em),
       role,
-      text(domain(), @margin, @height - 64, 26, @text_3)
+      text(domain(), @left, @height - 64, 26, @text_3)
     ]
   end
 
-  # An entry: the lit mark and the date, the title, the name and the domain.
+  # An entry: its mark and the date, the title, the name and the domain.
   defp body(%{kind: :entry} = card, fonts) do
     {size, lines} = fit(fonts.sans, card.title, @title_sizes, @title_lines, @tracking_em)
 
@@ -234,54 +193,38 @@ defmodule Site.OG do
     kicker_baseline = first_baseline - size * 0.73 - 44
 
     [
-      mark(@margin + 7, kicker_baseline - 10),
-      text(clean(fonts.sans, card.kicker), @margin + 34, kicker_baseline, 28, @text_2),
+      mark(kicker_baseline - 10),
+      text(clean(fonts.sans, card.kicker), @left, kicker_baseline, 28, @text_2),
       lines_at(lines, first_baseline, leading, size, @text, @tracking_em),
-      text(Site.Config.name(), @margin, @height - 64, 30, @name),
+      text(Site.Config.name(), @left, @height - 64, 30, @text),
       text(domain(), @width - @margin, @height - 64, 26, @text_3, anchor: "end")
     ]
   end
 
-  # The entry's mark from the timeline, lit: a dot of lamp light with its ring and glow.
-  defp mark(x, y) do
+  # The mark on the line, filled: a dot of the text colour, with a ring of the page
+  # colour that cuts the line around it.
+  defp mark(y) do
     [
-      ~s|<circle cx="#{num(x)}" cy="#{num(y)}" r="34" fill="url(#mark-glow)"/>|,
-      ~s(<circle cx="#{num(x)}" cy="#{num(y)}" r="13" fill="#{@lamp}" fill-opacity="0.18"/>),
-      ~s(<circle cx="#{num(x)}" cy="#{num(y)}" r="7" fill="#{@lamp}"/>)
+      ~s(<circle cx="#{@axis}" cy="#{num(y)}" r="20" fill="#{@bg}"/>),
+      ~s(<circle cx="#{@axis}" cy="#{num(y)}" r="9" fill="#{@text}"/>)
     ]
   end
 
-  # The text laid out in lines no wider than the canvas minus its margins.
+  # The text laid out in lines that fit between the line and the right margin.
   defp fit(font, string, sizes, max_lines, tracking_em) do
     Text.fit(font, clean(font, string),
       sizes: sizes,
       max_lines: max_lines,
-      max_width: @width - 2 * @margin,
+      max_width: @width - @left - @margin,
       tracking_em: tracking_em
     )
-  end
-
-  # One word a line, as the name is set on the home, at the largest size where the
-  # widest word fits; a name that cannot be set that way is fitted like a title.
-  defp fit_words(font, string, sizes, tracking_em) do
-    words = font |> clean(string) |> String.split()
-    max_width = @width - 2 * @margin
-
-    fits? = fn size ->
-      Enum.all?(words, &(Text.width(font, &1, size, size * tracking_em) <= max_width))
-    end
-
-    case {words, Enum.find(sizes, fits?)} do
-      {[_ | _], size} when length(words) <= 3 and is_number(size) -> {size, words}
-      _ -> fit(font, string, sizes, 3, tracking_em)
-    end
   end
 
   defp lines_at(lines, first_baseline, leading, size, fill, tracking_em) do
     lines
     |> Enum.with_index()
     |> Enum.map(fn {line, index} ->
-      text(line, @margin, first_baseline + index * leading, size, fill,
+      text(line, @left, first_baseline + index * leading, size, fill,
         tracking: size * tracking_em
       )
     end)

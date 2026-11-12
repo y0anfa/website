@@ -22,7 +22,7 @@ It shows who he is, what he thinks, and what he makes.
 | URLs | Flat: every entry lives at `/<slug>/`, whatever its type. The content folder sets the type (which only orders the timeline and picks the project template), not the URL. Slugs are unique across all types. The old Hugo URLs are redirected (§4). |
 | Signature | The line: one hairline that runs every page, the home's timeline and the margin of an entry. On the home it is still unless a mouse comes close: then it leans a few pixels toward it and eases back. Nothing else moves. |
 | Type | Inter (variable, self-hosted, with its optical-size axis) for all text and UI. JetBrains Mono 400, self-hosted, only for code. |
-| Color | Monochrome: ink, one secondary grey and a hairline, on a near-white or near-black page. No accent colour. Dark first, light as well: both follow the system, with a manual toggle. (The favicon and the share images still carry the old lamp colour.) |
+| Color | Monochrome: ink, one secondary grey and a hairline, on a near-white or near-black page. No accent colour. Dark first, light as well: both follow the system, with a manual toggle. The favicon and the share images follow it. |
 | Motion | The line's lean, the home's entrance (the line is drawn, each mark appears as it passes), and the shared-title view transition between the home and an entry (§7). `prefers-reduced-motion` gets none of it: no lean, no entrance, no navigation transition. |
 | Page transitions | **The shared title**: the clicked title lifts off the axis and grows into the entry's h1, and settles back on its row on the way home; the content around it rises 12px as it arrives. A click on the side margins of an entry, or Escape, goes back home (§7). |
 | Build | Hand-rolled static generator in Elixir: EEx templates, MDEx for Markdown, YamlElixir for frontmatter. |
@@ -57,8 +57,8 @@ It shows who he is, what he thinks, and what he makes.
 │   ├── js/favicon.js          swaps the favicon to the sleeping one while the tab is hidden
 │   ├── fonts/InterVariable.woff2, InterVariable-Italic.woff2 + Inter-OFL.txt
 │   ├── fonts/JetBrainsMono-Regular.woff2 + JetBrainsMono-OFL.txt
-│   ├── favicon.svg            the mark: the timeline's axis and a lit entry on graphite
-│   └── favicon-sleep.svg      the same mark with the lamp out
+│   ├── favicon.svg            the mark: the timeline's line and one filled mark on the dark page colour
+│   └── favicon-sleep.svg      the same square with the mark emptied to a ring
 ├── lab/                       playgrounds and design samples (never built or deployed)
 ├── wrangler.jsonc             the site Worker (yoanfaure.com)
 ├── redirect/                  worker.js + wrangler.jsonc: 301s yoanfau.re and www to yoanfaure.com
@@ -100,9 +100,9 @@ A `<slug>.md` cannot collide with a page or a site file: `llms` and `llms.txt` a
 
 **Share images.** Every entry has a 1200×630 PNG at `dist/og/<slug>.png`, and the home has `dist/og/home.png` (`Site.OG`). Each page points at its own with `og:image` (absolute URL), `og:image:width` 1200, `og:image:height` 630 and `og:image:alt` (the page title); `twitter:card` is `summary_large_image`. The 404 has no image and keeps `twitter:card=summary`. An image is drawn as an SVG in the dark palette (§8) and rasterised at build time by `resvg`:
 
-- Background: `--bg` graphite, with the lamp glowing from the top left: three radial gradients, the glow the pages themselves no longer have. The same on every card.
-- An entry: the lit mark (a lamp-coloured dot with its ring and glow) and the full date (`28 Mar 2026`) in `--text-2`, then the title in Inter Bold, `--text`, -0.03em, left-aligned. The title takes the largest of 96, 84, 72, 62 and 54px that fits in three lines (lines balanced); past three lines at 54px it ends with `…`. `Yoan Faure` bottom-left in `--name`, `yoanfaure.com` bottom-right in `--text-3`.
-- The home: the name from `home.md`, one word a line as on the page (up to 168px, -0.035em, `--name`), the position (`Security engineer at Riot`) under it in `--text-2`, and `yoanfaure.com` bottom-left.
+- Background: the dark `--bg`, flat, with the timeline's line down the left: a 2px rule the height of the card at x=120, a step lighter than `--hair` (`#34373e`) so it survives a thumbnail. The same on every card. No colour, no gradient.
+- An entry: its mark on the line (a 9px-radius `--text` dot in a 20px ring of the page colour) and, to the right of the line (x=164), the full date (`28 Mar 2026`) in `--text-2`, then the title in Inter Bold, `--text`, -0.03em, left-aligned. The title takes the largest of 96, 84, 72, 62 and 54px that fits in three lines (lines balanced); past three lines at 54px it ends with `…`. `Yoan Faure` bottom-left in `--text`, `yoanfaure.com` bottom-right in `--text-3`.
+- The home: the name from `home.md` on one line beside its mark (up to 132px, -0.035em, `--text`; two lines if it cannot fit), the position (`Security engineer at Riot`) under it in `--text-2`, and `yoanfaure.com` bottom-left.
 - Text is measured from the font file's glyph advances (`Site.OG.Text`, no kerning, so lines are never too wide) and a character the font lacks is dropped, never drawn as a box.
 - Font: only `priv/og-fonts/Inter-Bold.ttf` (resvg cannot read WOFF2), loaded with `skip_system_fonts`, so no system font ever changes an image. It sits outside `assets/` because the build uses it and the site does not publish it.
 - Deterministic: no timestamps and no random state, and the PNG has only `IHDR`, `IDAT` and `IEND` chunks, so `mix site.verify` covers the images too. They are not cached between builds, so that it does.
@@ -204,7 +204,7 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 - `<head>`: `<title>` is `<Page> — Yoan Faure` (home: `Yoan Faure — Security engineer at Riot`); meta description, `color-scheme` `dark light`, canonical, `og:title/description/url/type`, `og:image` with its width, height and alt, and `twitter:card` (`summary_large_image`; the 404 has no image and keeps `summary`; §4), the favicon, and a preload for `/assets/fonts/InterVariable.woff2` (with `crossorigin`). An entry page also has `<link rel="alternate" type="text/markdown" href="/<slug>.md">`. Nothing is loaded from another origin: no Google Fonts, no preconnect.
 - Two inline scripts: `head.js` (applies `localStorage.theme`, `light` or `dark`, to `data-theme` before the first paint, and nothing else) and `<script type="speculationrules">` (the constant in `Site.Speculation`: prerender same-origin page links, `href_matches: "/*"`, with `eagerness: "moderate"`, except `/*.md`, `/llms.txt`, `/assets/*` and `rel~=nofollow`). The CSP allows both by sha256 (§11).
 - One stylesheet, `/assets/css/site.css`. Then `<script defer blocking="render" src="/assets/js/site.js">`, render-blocking so its `pagereveal` listener and the `js` class exist before the first frame, and `favicon.js` (plus `404.js` on the 404) as plain `defer` scripts.
-- **Favicon.** `assets/favicon.svg` is the mark: a 32×32 graphite square with the timeline's axis and a lit entry on it (a lamp dot and its halo). `assets/favicon-sleep.svg` is the same square with the lamp out (a grey ring). `favicon.js` swaps the `link[rel=icon]` href to the sleeping one when the tab becomes hidden (`visibilitychange`) and back when it is visible.
+- **Favicon.** `assets/favicon.svg` is the mark: a 32×32 square of the dark page colour with the timeline's line and one filled mark on it (a `--text` dot with a ring of the page colour). `assets/favicon-sleep.svg` is the same square with the mark emptied to a grey ring. `favicon.js` swaps the `link[rel=icon]` href to the sleeping one when the tab becomes hidden (`visibilitychange`) and back when it is visible.
 - **The line on an entry.** `body::before` on every page but the home is a fixed 1px `--hair` rule in the margin of the reading column (`left: calc(50% - 317px)`; `13px` under 700px, where the bar and the column take a 40px left padding). It is part of the root image, so it stays put during a transition.
 
 **Home** (`home.html.eex`)
