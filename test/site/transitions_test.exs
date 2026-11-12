@@ -426,6 +426,8 @@ defmodule Site.TransitionsTest do
         assert r["mark-five"]["replays"] == 1
         assert r["mark-five"]["intro"] == true
         assert r["mark-ten"]["replays"] == 2
+        assert r["mark-touch"]["replays"] == 1
+        assert r["mark-mouse-wide"]["replays"] == 0
 
         # not four, not with a press elsewhere or a pause in between, not another button
         for name <- ~w(mark-four mark-missed mark-slow mark-other-button mark-second-finger) do
@@ -983,6 +985,9 @@ defmodule Site.TransitionsTest do
         mark('mark-five', lined, quick(5));
         mark('mark-four', lined, quick(4));
         mark('mark-ten', lined, quick(10));
+        // a finger has a wider target: 20px off the mark counts for it, not for a mouse
+        mark('mark-touch', lined, quick(5).map((ev) => ({ ...ev, clientX: 216, pointerType: 'touch' })));
+        mark('mark-mouse-wide', lined, quick(5).map((ev) => ({ ...ev, clientX: 216 })));
         mark('mark-missed', lined, [...quick(4), on(1600, { clientX: 240 }), on(1750)]);
         mark('mark-slow', lined, [...quick(3), on(2100), on(2250)]);
         mark('mark-other-button', lined, quick(5).map((ev) => ({ ...ev, button: 2 })));

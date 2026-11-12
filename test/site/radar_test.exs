@@ -82,6 +82,18 @@ defmodule Site.RadarTest do
         assert r["reduced"]["mounted"] == 0
       end
 
+      test "a finger gets a wider target and room to wander, and its hold is not a scroll",
+           %{r: r} do
+        assert r["touch-near"]["on"] == true
+        assert r["mouse-near"]["on"] == false
+        assert r["touch-far"]["on"] == false
+        assert r["touch-drift"]["on"] == true
+        assert r["touch-left"]["on"] == false
+
+        assert r["touchstart"] == %{"idle" => false, "held" => true}
+        assert @script =~ "{ passive: false }"
+      end
+
       test "the canvas is drawn in the page's resolved colours, never in a custom property",
            %{r: r} do
         assert r["hold"]["probed"] == ~w[var(--text) var(--text-2) var(--text-3) var(--hair)]
@@ -218,6 +230,20 @@ defmodule Site.RadarTest do
     { const p = page(); p.down(400, 300); p.run(2100); out['elsewhere'] = p.state(); }
     { const p = page(); p.down(196, 115, { button: 2 }); p.run(2100); out['other-button'] = p.state(); }
     { const p = page({ reduced: true }); p.down(); p.run(2100); out['reduced'] = p.state(); }
+
+    // ---- a finger: a wider target (24px), room to wander (40px), and no scroll
+    const touch = { pointerType: 'touch' };
+    { const p = page(); p.down(216, 115, touch); p.run(2100); out['touch-near'] = p.state(); }
+    { const p = page(); p.down(216, 115); p.run(2100); out['mouse-near'] = p.state(); }
+    { const p = page(); p.down(226, 115, touch); p.run(2100); out['touch-far'] = p.state(); }
+    { const p = page(); p.down(196, 115, touch); p.run(600); p.move(226, 115); p.run(2000); out['touch-drift'] = p.state(); }
+    { const p = page(); p.down(196, 115, touch); p.run(600); p.move(246, 115); p.run(2000); out['touch-left'] = p.state(); }
+    {
+      const start = (p) => { let prevented = false; p.fire('touchstart', { cancelable: true, preventDefault() { prevented = true; } }); return prevented; };
+      const idle = page();
+      const held = page(); held.down(196, 115, touch);
+      out['touchstart'] = { idle: start(idle), held: start(held) };
+    }
 
     // ---- the game. The scope plays from 2050ms; the first contact leaves the rim
     // (864, 400) 900ms later and has come 0.07 * 364px inward for every second since.

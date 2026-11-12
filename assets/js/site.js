@@ -400,6 +400,7 @@
     // Unannounced: five quick presses on the name's mark play the entrance again.
     // The mark is a pseudo-element, so the press is placed by its coordinates.
     var HIT = 12; // px around the centre of the mark
+    var TOUCH = 24; // the same for a finger: as far as the name's first letter
     var QUICK = 600; // ms between two presses at most
     var presses = 0;
     var pressedAt = 0;
@@ -409,7 +410,8 @@
       if (!name) return false;
       var dx = event.clientX - (x0 + name.dx);
       var dy = event.clientY - (name.y - window.scrollY);
-      return dx * dx + dy * dy <= HIT * HIT;
+      var reach = event.pointerType === 'touch' ? TOUCH : HIT;
+      return dx * dx + dy * dy <= reach * reach;
     }
 
     document.addEventListener('pointerdown', function (event) {

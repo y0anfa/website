@@ -22,6 +22,8 @@
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   var HIT = 12; // px around the centre of the mark, as in site.js
+  var TOUCH = 24; // the same for a finger: as far as the name's first letter
+  var DRIFT = 40; // px a finger may wander during the hold; a mouse stays within HIT
   var HOLD = 1500; // ms the mark is held before the scope opens
   var SHOWN = 250; // ms before the hold shows at all: a plain press shows nothing
   var OPEN = 520; // ms the scope takes to open, and to fold
@@ -41,6 +43,7 @@
   var mode = 'idle'; // idle, hold, open, play, over, fold
   var since = 0; // when the mode began
   var from = null; // the mark, where the scope opens from and folds to
+  var finger = false; // the hold is a finger's
   var game = null;
 
   // ---- the mark ----------------------------------------------------------------
@@ -285,13 +288,14 @@
   function drawHold(now) {
     var k = (now - since - SHOWN) / (HOLD - SHOWN);
     if (k <= 0) return;
-    ring(from.x, from.y, 6 + 12 * ease(k), ink['text-2'], 0.9, 1);
+    var r = finger ? 28 + 12 * ease(k) : 6 + 12 * ease(k); // a finger hides a small ring
+    ring(from.x, from.y, r, ink['text-2'], 0.9, 1);
     // the arc fills as the hold goes on
     ctx.globalAlpha = 1;
     ctx.strokeStyle = ink.text;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(from.x, from.y, 6 + 12 * ease(k), -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, k));
+    ctx.arc(from.x, from.y, r, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, k));
     ctx.stroke();
   }
 
@@ -396,8 +400,10 @@
     if (mode !== 'idle' || reduceMotion.matches) return;
     if (event.button !== 0 || event.isPrimary === false) return;
     var at = mark();
-    if (!near(event, at, HIT) || !mount()) return;
+    var touch = event.pointerType === 'touch';
+    if (!near(event, at, touch ? TOUCH : HIT) || !mount()) return;
     from = at;
+    finger = touch;
     set('hold', event.timeStamp);
     last = 0;
     raf = window.requestAnimationFrame(frame);
@@ -410,8 +416,19 @@
   document.addEventListener('pointerup', letGo);
   document.addEventListener('pointercancel', letGo);
   document.addEventListener('pointermove', function (event) {
-    if (mode === 'hold' && !near(event, from, HIT)) unmount();
+    if (mode === 'hold' && !near(event, from, finger ? DRIFT : HIT)) unmount();
   });
+
+  // A finger held on the mark would otherwise start a scroll at its first tremor
+  // (the browser then cancels the pointer), or bring up the selection handles.
+  // touchstart comes after pointerdown, so the hold has begun by then.
+  document.addEventListener(
+    'touchstart',
+    function (event) {
+      if (mode === 'hold' && event.cancelable) event.preventDefault();
+    },
+    { passive: false }
+  );
 
   // a long press on a touch screen would open the system's menu, or select the name
   document.addEventListener('contextmenu', function (event) {
