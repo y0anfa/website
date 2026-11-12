@@ -32,7 +32,7 @@ defmodule Site.Render do
   defp home(content, rows, context) do
     inner =
       Templates.home(%{
-        name_lines: View.name_lines(content.home.title),
+        name: content.home.title,
         role: Site.Config.role(),
         linkedin: Site.Config.linkedin(),
         years: Log.years(rows)

@@ -10,12 +10,10 @@
  * 2. The title transition. Cross-document view transitions, typed "forward" (the
  *    home to an entry) or "back" (an entry to the home), plus "leaving" and
  *    "arriving". One element per page carries the name "entry-title": the clicked
- *    title on the axis, the h1 on the entry.
- * 3. The home: the light, a warm glow that follows the pointer (or holds a height
- *    while a touch screen scrolls) and rides the timeline, lighting the entry it
- *    reaches and raking across the name; the name's decrypt, once a visit; the
- *    date tints. The light is two custom properties written once a frame at most;
- *    CSS does the motion.
+ *    title on the line, the h1 on the entry.
+ * 3. The home: the line. One path the height of the window, still unless a mouse
+ *    comes close: then it leans a few pixels toward it and eases back. Each row's
+ *    mark follows it through one custom property; the words never move.
  * 4. An entry page: a click in the side margins, or Escape, goes back to the home.
  *
  * No inline handlers and no inline style attributes (the CSP is strict): positions
@@ -226,11 +224,8 @@
 
     // The entrance plays on a fresh load of the home only.
     var intro = !vt && thisPage() === 'home' && !reduceMotion.matches;
-    if (intro) {
-      root.classList.add('intro');
-      decrypt();
-    }
-    if (light) light.start(intro);
+    if (intro) root.classList.add('intro');
+    if (line) line.start(intro);
 
     try {
       var activation = window.navigation && window.navigation.activation;
@@ -251,7 +246,6 @@
           // to land (the old picture covers the jump).
           if (!location.hash) row.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
           if (inView(row)) claim(row);
-          if (light) light.hold(row.closest('.entry-row'));
         }
       }
     } catch (e) {}
@@ -262,348 +256,150 @@
     if (event.persisted) clear();
   });
 
-  // ---- 3. the home: the light, the decrypt, the date tints -------------------
+  // ---- 3. the home: the line -------------------------------------------------
 
-  var light = thisPage() === 'home' ? makeLight() : null;
-  if (thisPage() === 'home') tintDates();
-  if (light && !('onpagereveal' in window)) light.start(false);
+  var line = thisPage() === 'home' ? makeLine() : null;
+  if (line && !('onpagereveal' in window)) line.start(false);
 
-  // On each entry: --age, 0 for the newest and 1 for the oldest, from the dates
-  // (the stylesheet tints the date with it, and has a fallback by position); --i,
-  // its place in the entrance.
-  function tintDates() {
-    var times = document.querySelectorAll('.entry-row > .entry-date[datetime]');
-    var stamps = [];
-    for (var i = 0; i < times.length; i++) stamps.push(Date.parse(times[i].getAttribute('datetime')));
-    var valid = stamps.filter(function (s) {
-      return !isNaN(s);
-    });
-    var newest = Math.max.apply(null, valid);
-    var oldest = Math.min.apply(null, valid);
-    var span = newest - oldest || 1;
-    for (var j = 0; j < times.length; j++) {
-      var row = times[j].parentNode;
-      row.style.setProperty('--i', String(j + 1));
-      if (isNaN(stamps[j])) continue;
-      row.style.setProperty('--age', ((newest - stamps[j]) / span).toFixed(3));
-    }
-  }
+  function makeLine() {
+    var svg = document.querySelector('.line');
+    var path = svg && svg.querySelector('path');
+    var stage = document.querySelector('.stage');
+    if (!path || !stage) return null;
 
-  // The name decrypts: once a visit, on a fresh load, never under reduced motion.
-  // The real name stays in the h1 (read by assistive tech, holding the layout); an
-  // aria-hidden overlay puts one slot over each letter, at the letter's measured
-  // place and width, cycles glyphs in it and locks the letters left to right.
-  var DECRYPT_KEY = 'decrypted';
+    var N = 72; // points along the line
+    var REACH = 64; // px either side of the line within which it feels the pointer
+    var SPREAD = 84; // px up and down the line that lean with it
+    var TAU = 130; // ms: how softly it follows. No spring: it never overshoots.
 
-  function decrypt() {
-    var wrap = document.querySelector('.name-wrap');
-    var name = wrap && wrap.querySelector('.name');
-    if (!name || reduceMotion.matches || !document.createRange) return;
-    try {
-      if (sessionStorage.getItem(DECRYPT_KEY)) return;
-      sessionStorage.setItem(DECRYPT_KEY, '1');
-    } catch (e) {
-      return;
-    }
-    wrap.classList.add('no-rise', 'is-decrypting');
-    var begun = false;
-    var go = function () {
-      if (begun) return;
-      begun = true;
-      scramble(wrap, name);
-    };
-    // measure with the real font, but never wait long for it
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(go, go);
-    window.setTimeout(go, 400);
-  }
-
-  function scramble(wrap, name) {
-    var GLYPHS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghkmnpqrstuvwxyz0123456789#%&*+=<>/';
-    var pick = function () {
-      return GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length));
-    };
-    var box = wrap.getBoundingClientRect();
-    var overlay = document.createElement('div');
-    overlay.className = 'name name-scramble';
-    overlay.setAttribute('aria-hidden', 'true');
-    var range = document.createRange();
-    var slots = [];
-    var lines = name.querySelectorAll('.name-line > span');
-    for (var l = 0; l < lines.length; l++) {
-      var node = lines[l].firstChild;
-      if (!node || node.nodeType !== 3) continue;
-      for (var i = 0; i < node.length; i++) {
-        range.setStart(node, i);
-        range.setEnd(node, i + 1);
-        var r = range.getBoundingClientRect();
-        var el = document.createElement('span');
-        el.className = 'scramble-slot';
-        el.style.setProperty('left', (r.left - box.left).toFixed(2) + 'px');
-        el.style.setProperty('top', (r.top - box.top).toFixed(2) + 'px');
-        el.style.setProperty('width', r.width.toFixed(2) + 'px');
-        el.style.setProperty('height', r.height.toFixed(2) + 'px');
-        el.style.setProperty('line-height', r.height.toFixed(2) + 'px');
-        el.textContent = pick();
-        overlay.appendChild(el);
-        slots.push({ el: el, ch: node.data.charAt(i), at: 140 + slots.length * 52, next: 60, done: false });
-      }
-    }
-    wrap.appendChild(overlay);
-
-    var t0 = 0;
-    var tick = function (now) {
-      if (!t0) t0 = now;
-      var t = now - t0;
-      var left = 0;
-      for (var s = 0; s < slots.length; s++) {
-        var slot = slots[s];
-        if (slot.done) continue;
-        if (t >= slot.at) {
-          // the real letter, set where the real letter sits
-          slot.el.textContent = slot.ch;
-          slot.el.classList.add('is-locked');
-          slot.done = true;
-          continue;
-        }
-        left++;
-        if (t >= slot.next) {
-          slot.el.textContent = pick();
-          slot.next = t + 55;
-        }
-      }
-      if (left) {
-        window.requestAnimationFrame(tick);
-        return;
-      }
-      wrap.classList.remove('is-decrypting');
-      overlay.remove();
-    };
-    window.requestAnimationFrame(tick);
-  }
-
-  function makeLight() {
-    var bead = document.querySelector('.bead');
-    var readout = bead && bead.querySelector('.bead-date');
-    var tls = document.querySelectorAll('.tl');
-    var tl = tls[0];
-    var last = tls[tls.length - 1];
-    var wrap = document.querySelector('.name-wrap');
-    if (!bead || !readout || !tl || !wrap) return null;
-
-    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
-
-    // Measured on start, resize and font load only, in document coordinates.
-    var rows = []; // one per entry, top to bottom
-    var ax = 0; // the axis, in viewport x
-    var tlBox = null; // the timeline: left and right in viewport x, top and bottom in document y
-    var wrapTop = 0; // the top of the name
-    var restTop = null; // where the light rests with a mouse: the newest entry
-    var restHeld = false; // or the entry the back transition landed on
-
-    var sy = window.scrollY;
-    var px = null; // the pointer, null while it is off the page
-    var py = null;
-    var queued = 0;
+    var rows = []; // the name and every entry: the element, its mark's height, its lean
+    var u = []; // how far each point of the line leans, px
+    var H = 0;
+    var x0 = 0;
+    var pointer = null; // a mouse on the page, in viewport coordinates
     var on = false;
-    var lastWy = null;
+    var raf = 0;
+    var last = 0;
 
-    var litRow = null;
-    var scrubbed = null;
-    var shown = '';
+    for (var n = 0; n <= N; n++) u.push(0);
+    Array.prototype.forEach.call(document.querySelectorAll('.identity, .entry-row'), function (el) {
+      rows.push({ el: el, y: 0, dx: 0 });
+    });
 
+    // On start, resize and font load only. The marks are pseudo-elements, so their
+    // place is read from the row and the stylesheet: on the axis, at their own top.
     function measure() {
-      sy = window.scrollY;
-      var box = tl.getBoundingClientRect();
-      var end = last.getBoundingClientRect();
-      tlBox = { left: box.left, right: box.right, top: box.top + sy, bottom: end.bottom + sy };
-      var axis = parseFloat(window.getComputedStyle(tl).getPropertyValue('--axis')) || 96;
-      ax = Math.round(box.left + axis);
-      root.style.setProperty('--ax', ax + 'px');
-
-      var byRow = {};
-      var items = document.querySelectorAll('.timeline [data-row]');
-      for (var i = 0; i < items.length; i++) {
-        var el = items[i];
-        var n = Number(el.getAttribute('data-row'));
-        var r = el.getBoundingClientRect();
-        byRow[n] = {
-          n: n,
-          top: r.top + sy,
-          bottom: r.bottom + sy,
-          month: el.getAttribute('data-month'),
-          from: el.getAttribute('data-month-from'), // a folded stretch of empty months
-
-          entry: el.classList.contains('entry-row') ? el : null,
-          label: el.classList.contains('month') ? el : null
-        };
-      }
-      rows = Object.keys(byRow)
-        .map(function (k) {
-          return byRow[k];
-        })
-        .sort(function (a, b) {
-          return a.n - b.n;
-        });
-      for (var j = 0; j < rows.length - 1; j++) rows[j].bottom = rows[j + 1].top;
-      if (restTop === null || !restHeld) {
-        restTop = null;
-        for (var k = 0; k < rows.length; k++) {
-          if (rows[k].entry) {
-            restTop = rows[k].top + 15;
-            break;
-          }
-        }
-      }
-      wrapTop = wrap.getBoundingClientRect().top + sy;
-    }
-
-    // Where the light rests, in viewport y: with a mouse, on the newest entry (or the
-    // one the back transition landed on); on a touch screen, a fixed height the page
-    // scrolls past.
-    function restY() {
-      if (finePointer.matches && restTop !== null) return restTop - sy;
-      return Math.round(window.innerHeight * 0.42);
-    }
-
-    // The light's height: the pointer's while it is on the page, else where it rests.
-    function lightY() {
-      return py !== null ? py : restY();
-    }
-
-    // Is the pointer on the timeline itself? Only then does the scan line show and the
-    // light pick the entry; elsewhere the glow follows the pointer and the entries rest.
-    function onTimeline() {
-      if (px === null || py === null || !tlBox) return false;
-      var docY = py + sy;
-      return px >= tlBox.left && px <= tlBox.right && docY >= tlBox.top && docY <= tlBox.bottom;
-    }
-
-    function rowAt(docY) {
+      H = window.innerHeight;
+      svg.setAttribute('viewBox', '0 0 ' + window.innerWidth + ' ' + H);
+      var axis = parseFloat(window.getComputedStyle(stage).getPropertyValue('--axis')) || 0;
       for (var i = 0; i < rows.length; i++) {
-        if (docY >= rows[i].top && docY < rows[i].bottom) return rows[i];
+        var box = rows[i].el.getBoundingClientRect();
+        var mark = window.getComputedStyle(rows[i].el, '::before');
+        rows[i].y = box.top + window.scrollY + (parseFloat(mark.top) || 0) + (parseFloat(mark.height) || 0) / 2;
+        x0 = Math.round(box.left + axis) + 0.5; // on the pixel grid: a 1px line stays sharp
       }
-      return null;
+      draw();
     }
 
-    // An empty month reads from its last day at the top to its first at the bottom;
-    // a folded stretch from the last day of its newest month to the first of its oldest.
-    function dateIn(row, docY) {
-      var to = row.month.split('-');
-      var from = (row.from || row.month).split('-');
-      var top = new Date(Number(to[0]), Number(to[1]), 0).getTime(); // last day of the newest
-      var bottom = new Date(Number(from[0]), Number(from[1]) - 1, 1).getTime(); // first of the oldest
-      var f = Math.min(1, Math.max(0, (docY - row.top) / Math.max(1, row.bottom - row.top)));
-      var d = new Date(top - f * (top - bottom));
-      return d.getDate() + ' ' + MONTHS[d.getMonth()];
+    // Where a point of the line wants to be. Toward the pointer, a little: it leans
+    // most (about 6px) at a third of its reach and is back in place at the edge of
+    // it. Zero when the pointer is on the line, so crossing it is one smooth pass.
+    function goal(y) {
+      if (!pointer) return 0;
+      var d = pointer.x - x0;
+      var far = Math.abs(d) / REACH;
+      if (far >= 1) return 0;
+      var dy = (y - pointer.y) / SPREAD;
+      return 0.6 * d * (1 - far) * (1 - far) * Math.exp(-dy * dy);
     }
 
-    // Classes change only when the row under the light changes.
-    function track(docY) {
-      var row = rowAt(docY);
-      var entry = row ? row.entry : null;
-      var label = row ? row.label : null;
-      if (entry !== litRow) {
-        if (litRow) litRow.classList.remove('is-lit');
-        if (entry) entry.classList.add('is-lit');
-        litRow = entry;
+    function at(y) {
+      var f = Math.min(N, Math.max(0, (y / H) * N));
+      var i = Math.min(N - 1, Math.floor(f));
+      return u[i] + (u[i + 1] - u[i]) * (f - i);
+    }
+
+    function draw() {
+      var step = H / N;
+      var d = 'M' + x0.toFixed(1) + ' -2';
+      for (var i = 1; i < N; i++) {
+        d +=
+          ' Q' + (x0 + u[i]).toFixed(2) + ' ' + (i * step).toFixed(1) +
+          ' ' + (x0 + (u[i] + u[i + 1]) / 2).toFixed(2) + ' ' + ((i + 0.5) * step).toFixed(1);
       }
-      if (label !== scrubbed) {
-        if (scrubbed) scrubbed.classList.remove('is-scrubbed');
-        if (label) label.classList.add('is-scrubbed');
-        scrubbed = label;
-      }
-      bead.classList.toggle('is-off', !row);
-      bead.classList.toggle('is-locked', !!entry);
-      if (label) {
-        var text = dateIn(row, docY);
-        if (text !== shown) readout.textContent = shown = text;
+      path.setAttribute('d', d + ' L' + x0.toFixed(1) + ' ' + (H + 2));
+      for (var r = 0; r < rows.length; r++) {
+        var row = rows[r];
+        var dx = at(row.y - window.scrollY);
+        if (Math.abs(dx - row.dx) < 0.02) continue;
+        row.dx = dx;
+        row.el.style.setProperty('--lean', dx.toFixed(2) + 'px');
       }
     }
 
-    // Once a frame at most: two custom properties (the top of the name too, when
-    // a scroll has moved it), then the row under the light. No layout read here.
-    function apply() {
-      queued = 0;
-      var y = lightY();
-      root.style.setProperty('--mx', (px === null ? ax : px) + 'px');
-      root.style.setProperty('--my', y + 'px');
-      var wy = wrapTop - sy;
-      if (wy !== lastWy) {
-        root.style.setProperty('--wy', wy + 'px');
-        lastWy = wy;
+    function frame(now) {
+      raf = 0;
+      var k = 1 - Math.exp(-(last ? Math.min(64, now - last) : 16) / TAU);
+      last = now;
+      var step = H / N;
+      var moving = false;
+      for (var i = 1; i < N; i++) {
+        var to = goal(i * step);
+        u[i] += (to - u[i]) * k;
+        if (Math.abs(to - u[i]) > 0.02) moving = true;
+        else u[i] = to;
       }
-      var inside = onTimeline();
-      root.classList.toggle('on-timeline', inside);
-      track((inside ? y : restY()) + sy);
+      draw();
+      if (moving) wake();
+      else last = 0;
     }
 
-    function schedule() {
-      if (on && !queued) queued = window.requestAnimationFrame(apply);
+    function wake() {
+      if (on && !raf && !reduceMotion.matches) raf = window.requestAnimationFrame(frame);
     }
 
     function refresh() {
-      if (!on) return;
-      measure();
-      schedule();
+      if (on) measure();
     }
 
     document.addEventListener(
       'pointermove',
       function (event) {
-        if (event.pointerType !== 'mouse' || !finePointer.matches) return;
-        px = event.clientX;
-        py = event.clientY;
-        schedule();
+        if (event.pointerType !== 'mouse') return; // a finger scrolls; the line stays still for it
+        pointer = { x: event.clientX, y: event.clientY };
+        wake();
       },
       { passive: true }
     );
 
     document.addEventListener('mouseout', function (event) {
       if (event.relatedTarget) return; // still on the page
-      px = null;
-      py = null;
-      schedule();
+      pointer = null;
+      wake();
     });
 
     window.addEventListener(
       'scroll',
       function () {
-        sy = window.scrollY;
-        schedule();
+        if (on) draw();
       },
       { passive: true }
     );
-
     window.addEventListener('resize', refresh);
-    if (window.ResizeObserver) {
-      var observer = new ResizeObserver(refresh);
-      for (var t = 0; t < tls.length; t++) observer.observe(tls[t]);
-    }
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
 
     return {
-      // Turn the light on: after the entrance on a fresh load, at once otherwise.
-      // Under reduced motion it stays off; hover and focus still brighten.
+      // Draw the line. On a fresh load, each mark appears as the drawn line reaches
+      // it: --at is its moment in the entrance.
       start: function (intro) {
-        if (on || reduceMotion.matches) return;
+        if (on) return;
         on = true;
         measure();
-        apply();
-        if (intro) {
-          window.setTimeout(function () {
-            root.classList.add('beam-on');
-          }, 1150);
-        } else {
-          root.classList.add('beam-on');
+        if (!intro) return;
+        for (var i = 0; i < rows.length; i++) {
+          var when = Math.round(160 + ((rows[i].y - window.scrollY) / H) * 820);
+          rows[i].el.style.setProperty('--at', when + 'ms');
         }
-      },
-      // Rest the light on an entry (the row the title lands on, back home).
-      hold: function (li) {
-        if (!li) return;
-        restTop = li.getBoundingClientRect().top + window.scrollY + 15;
-        restHeld = true;
-        schedule();
       }
     };
   }

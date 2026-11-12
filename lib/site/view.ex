@@ -86,15 +86,6 @@ defmodule Site.View do
   end
 
   @doc """
-  The lines of the name on the home: one per word.
-
-      iex> Site.View.name_lines("Yoan Faure")
-      ["Yoan", "Faure"]
-  """
-  @spec name_lines(String.t()) :: [String.t()]
-  def name_lines(name), do: String.split(name)
-
-  @doc """
   A URL without scheme or trailing slash, for display.
 
       iex> Site.View.display_url("https://github.com/y0anfa/rhino/")

@@ -331,14 +331,14 @@ defmodule Site.BuildTest do
       refute html =~ ~r/[0-9a-f]{7}-dirty|·······/
     end
 
-    test "the name is the h1, one line per word, with an aria-hidden lit copy", %{tree: tree} do
+    test "the name is the h1, on one line, in the first row of the timeline", %{tree: tree} do
       main = main(page(tree, "index.html"))
 
       assert main =~
-               ~r{<h1 class="name" id="name">\s*<span class="name-line"><span>Test</span></span>\s*<span class="name-line"><span>Person</span></span>\s*</h1>}
+               ~r{<section class="identity" aria-labelledby="name">\s*<h1 class="name" id="name">Test Person</h1>\s*<p class="role">}
 
-      assert main =~
-               ~r{<div class="name-lit" aria-hidden="true">\s*<div class="name-lit-inner">\s*<p class="name">\s*<span class="name-line"><span>Test</span></span>}
+      refute main =~ "name-line"
+      refute main =~ "name-lit"
     end
 
     test "the one contact is a quiet LinkedIn icon in the corner, named for screen readers", %{
@@ -393,28 +393,24 @@ defmodule Site.BuildTest do
              ]
     end
 
-    test "an entry is its title and short description in the link, and its date beside it",
-         %{tree: tree} do
+    test "an entry is its title in the link, and its date beside it", %{tree: tree} do
       main = main(page(tree, "index.html"))
 
       assert main =~
-               ~r{<a class="entry" href="/small-note/">\s*<span class="entry-title">Small note</span>\s*<span class="entry-desc">One idea, briefly.</span>\s*</a>\s*<time class="entry-date" datetime="2026-10-28">28 Oct<span class="visually-hidden"> 2026</span></time>\s*</li>}
+               ~r{<a class="entry" href="/small-note/">\s*<span class="entry-title">Small note</span>\s*</a>\s*<time class="entry-date" datetime="2026-10-28">28 Oct<span class="visually-hidden"> 2026</span></time>\s*</li>}
 
       # the date is day and month; the year is there for a screen reader only
       assert main =~
                ~s(<time class="entry-date" datetime="2026-03-28">28 Mar<span class="visually-hidden"> 2026</span></time>)
     end
 
-    test "the short description is the summary, else the description", %{tree: tree} do
+    test "no summary or description is shown on the home", %{tree: tree} do
       main = main(page(tree, "index.html"))
 
-      # second-essay sets a summary: it wins over the description
-      assert main =~ ~s(<span class="entry-desc">The short line on the timeline.</span>)
+      refute main =~ "entry-desc"
+      refute main =~ "The short line on the timeline."
       refute main =~ "A second essay, with its own description."
-
-      # the others fall back to their description (first-essay: its first paragraph)
-      assert main =~ ~s(<span class="entry-desc">One idea, briefly.</span>)
-      assert main =~ ~s(<span class="entry-desc">An essay without a description)
+      refute main =~ "One idea, briefly."
     end
 
     test "a project with a link goes straight to it, and says so", %{tree: tree} do
@@ -435,22 +431,15 @@ defmodule Site.BuildTest do
       assert Map.has_key?(tree, "og/widget.png")
     end
 
-    test "the light is three empty, aria-hidden layers after main, on the home only", %{
-      tree: tree
-    } do
+    test "the line is one empty, aria-hidden svg after main, on the home only", %{tree: tree} do
       html = page(tree, "index.html")
       [_, after_main] = String.split(html, "</main>")
 
-      for layer <- [
-            ~s(<div class="spot" aria-hidden="true"></div>),
-            ~s(<div class="beam" aria-hidden="true"></div>),
-            ~s(<div class="bead" aria-hidden="true"><span class="bead-date"></span></div>)
-          ] do
-        assert after_main =~ layer
-      end
+      assert after_main =~ ~s(<svg class="line" aria-hidden="true"><path pathLength="1"/></svg>)
+      refute html =~ ~r/class="(spot|beam|bead)"/
 
       for path <- @pages, path != "index.html" do
-        refute page(tree, path) =~ ~r/class="(spot|beam|bead)"/, path
+        refute page(tree, path) =~ ~s(class="line"), path
       end
     end
 

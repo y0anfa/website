@@ -112,21 +112,20 @@ defmodule Site.TemplatesTest do
     refute layout =~ "<main"
   end
 
-  test "the home is the name, the position and the feed, and the light after main" do
+  test "the home is the name, the position and the feed, and the line after main" do
     home = File.read!("templates/home.html.eex")
 
     assert home =~ ~S(<main id="main" class="stage">)
-    assert home =~ ~S(<h1 class="name" id="name">)
-    assert home =~ ~S(<div class="name-lit" aria-hidden="true">)
+    assert home =~ ~S|<h1 class="name" id="name"><%= escape(@name) %></h1>|
     assert home =~ ~S(<p class="role">)
     assert home =~ "<%= feed(%{years: @years}) %>"
     refute home =~ "<footer"
     refute home =~ "raw("
 
     [_, after_main] = String.split(home, "</main>")
-    assert after_main =~ ~S(<div class="spot" aria-hidden="true"></div>)
-    assert after_main =~ ~S(<div class="beam" aria-hidden="true"></div>)
-    assert after_main =~ ~S(<div class="bead" aria-hidden="true">)
+
+    assert String.trim(after_main) ==
+             ~S(<svg class="line" aria-hidden="true"><path pathLength="1"/></svg>)
   end
 
   test "there are no list templates, and no nav anywhere" do
@@ -168,9 +167,9 @@ defmodule Site.TemplatesTest do
     row = entry |> Site.Log.row() |> Map.put(:n, 1)
     html = Site.Templates.feed(%{years: [{2026, [row]}]})
     assert html =~ "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"
-    assert html =~ "&lt;img src=x&gt;"
     refute html =~ "<script>"
-    refute html =~ "<img"
+    # the summary is not on the home at all
+    refute html =~ "src=x"
 
     article =
       Site.Templates.article(%{

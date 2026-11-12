@@ -7,24 +7,11 @@
 
 <main id="main" class="stage">
   <section class="identity" aria-labelledby="name">
-    <div class="name-wrap">
-      <h1 class="name" id="name">
-<%= for line <- @name_lines do %>        <span class="name-line"><span><%= escape(line) %></span></span>
-<% end %>      </h1>
-      <div class="name-lit" aria-hidden="true">
-        <div class="name-lit-inner">
-          <p class="name">
-<%= for line <- @name_lines do %>            <span class="name-line"><span><%= escape(line) %></span></span>
-<% end %>          </p>
-        </div>
-      </div>
-    </div>
+    <h1 class="name" id="name"><%= escape(@name) %></h1>
     <p class="role"><%= escape(@role.title) %> at <a class="text-link" href="<%= escape(@role.url) %>" rel="noopener"><%= escape(@role.company) %></a></p>
   </section>
 
 <%= feed(%{years: @years}) %>
 </main>
 
-<div class="spot" aria-hidden="true"></div>
-<div class="beam" aria-hidden="true"></div>
-<div class="bead" aria-hidden="true"><span class="bead-date"></span></div>
+<svg class="line" aria-hidden="true"><path pathLength="1"/></svg>

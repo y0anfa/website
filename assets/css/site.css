@@ -1,16 +1,16 @@
 /* yoanfaure.com
 
-   Graphite and one warm lamp, set in Inter. Dark first, with a light theme.
+   Ink on one quiet page, set in Inter. No accent colour: ink, one grey for
+   everything secondary, and a hairline. Dark first, with a light theme.
 
-   The home is one poster: the name, the position, and the entries on a vertical
-   axis, newest at the top. A warm light rides the axis: it follows the pointer,
-   rakes across the letters of the name, lights the entry it reaches. An entry
-   page is one centred reading column under the same lamp.
+   The home is a timeline: one faint line the height of the page, with the name
+   as its first mark and the entries as the next ones, all at one size. An entry
+   page is one centred reading column with the same line in its margin.
 
    CSP: no inline style anywhere. Positions the script computes are written
    through the CSSOM (element.style.setProperty), never as attributes.
 
-   Tokens, fonts, base, the theme toggle, the home (stage, name, timeline, light,
+   Tokens, fonts, base, the theme toggle, the home (stage, rows, marks, line,
    entrance), the entry pages (bar, article, prose, end), the 404, small screens,
    page transitions, reduced motion. */
 
@@ -50,28 +50,18 @@
 :root {
   color-scheme: dark light;
 
-  --bg: light-dark(#f7f7f6, #0d0f14);
+  --bg: light-dark(#f4f4f1, #0e0f12);
+  --hair: light-dark(#d6d6d1, #292b31);
   --line: light-dark(rgb(20 22 28 / 0.09), rgb(255 255 255 / 0.07));
   --line-strong: light-dark(rgb(20 22 28 / 0.18), rgb(255 255 255 / 0.15));
   --hover: light-dark(rgb(20 22 28 / 0.04), rgb(255 255 255 / 0.04));
 
-  --text: light-dark(#15171c, #ecebe8);
+  --text: light-dark(#141518, #ecebe8);
   --text-prose: light-dark(#2a2d34, #cfd0d3);
-  --text-2: light-dark(#4d515a, #a2a6ae);
+  --text-2: light-dark(#595c62, #9c9fa6);
   --text-3: light-dark(#62666f, #80848d);
-  --name: light-dark(#15171c, #d6d5d2);
-
-  /* the lamp: the one colour */
-  --lamp: light-dark(#9a5a00, #f2c47c);
-  --focus: light-dark(#9a5a00, #f2c47c);
-  --lit: light-dark(#8a4f00, #fff3df);
-  --lit-glow: light-dark(rgb(255 176 84 / 0.35), rgb(242 180 104 / 0.45));
-  --glow-hot: light-dark(rgb(255 214 168 / 0.30), rgb(255 222 180 / 0.10));
-  --glow-core: light-dark(rgb(255 184 110 / 0.18), rgb(242 170 92 / 0.12));
-  --glow-wide: light-dark(rgb(150 170 220 / 0.12), rgb(110 130 190 / 0.07));
-  --spot: light-dark(rgb(255 178 92 / 0.24), rgb(242 180 104 / 0.11));
+  --focus: light-dark(#141518, #ecebe8);
   --card: light-dark(rgb(255 255 255 / 0.75), rgb(255 255 255 / 0.03));
-  --beam-line: light-dark(rgb(154 90 0 / 0.30), rgb(242 196 124 / 0.30));
 
   --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -124,26 +114,6 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* The lamp over the page. Part of the root image, so it stays put while a page
-   transition runs. */
-body::before {
-  content: "";
-  position: absolute;
-  z-index: -2;
-  inset: 0 0 auto;
-  height: min(860px, 120vh);
-  pointer-events: none;
-  background:
-    radial-gradient(30% 46% at 20% -6%, var(--glow-hot), transparent 70%),
-    radial-gradient(52% 64% at 24% -14%, var(--glow-core), transparent 72%),
-    radial-gradient(72% 70% at 70% -24%, var(--glow-wide), transparent 70%);
-}
-
-body:not([data-page="home"])::before {
-  height: min(560px, 80vh);
-  opacity: 0.7;
-}
-
 p,
 h1,
 h2,
@@ -168,7 +138,7 @@ pre {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--lamp) 30%, transparent);
+  background: color-mix(in srgb, var(--text) 16%, transparent);
   color: var(--text);
 }
 
@@ -225,7 +195,7 @@ pre {
 .prose a:hover,
 .facts a:hover {
   color: var(--text);
-  text-decoration-color: var(--lamp);
+  text-decoration-color: currentColor;
 }
 
 /* ---------- theme toggle ---------- */
@@ -291,149 +261,135 @@ pre {
   gap: 4px;
 }
 
-/* ---------- home: the stage ----------
-   Two columns on a wide screen, centred together: the name on the left, the
-   timeline on the right, close enough to read as a pair. */
+/* ---------- home: the timeline ----------
+   One narrow column in the middle of the page. --axis is where the line runs in
+   it: dates to its left, words to its right. The name is the first row, the
+   entries are the next ones, and every row hangs on the line by its mark. */
 
 .stage {
+  --axis: 96px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 520px);
-  align-items: center;
-  column-gap: clamp(40px, 5vw, 88px);
+  align-content: center;
   width: 100%;
-  max-width: calc(1040px + 2 * var(--gutter));
+  max-width: calc(540px + 2 * var(--gutter));
   min-height: 100vh;
+  min-height: 100svh;
   margin-inline: auto;
-  padding: clamp(72px, 11vh, 128px) var(--gutter) clamp(56px, 9vh, 104px);
+  padding: clamp(72px, 12vh, 128px) var(--gutter);
 }
 
-.identity {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  container-type: inline-size;
-}
-
-.name-wrap {
-  position: relative;
-}
-
-/* A display size, not a poster: 40px on a phone up to 68px on a wide screen. */
-.name {
-  color: var(--name);
-  font-size: clamp(2.5rem, 1.7rem + 2.6vw, 4.25rem);
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.035em;
-}
-
-.name-line {
-  display: block;
-  overflow: clip;
-  /* room for the glyphs inside the clip, given back to the layout */
-  padding-block: 0.06em;
-  margin-block: -0.06em;
-}
-
-.name-line > span {
-  display: block;
-}
-
-/* The decrypt (site.js, once a visit): the real name stays in place, in the
-   accessibility tree and in the layout, but transparent, while an aria-hidden
-   overlay cycles glyphs in one fixed slot per letter, then hands back. */
-.name-wrap.is-decrypting > .name {
-  color: transparent;
-}
-
-.name-scramble {
-  position: absolute;
+/* The line. With script it is one path the height of the window (site.js draws
+   it, and leans it a few pixels toward a pointer that comes close). Without
+   script a plain rule stands in its place. */
+.line {
+  position: fixed;
+  z-index: -1;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   pointer-events: none;
 }
 
-.scramble-slot {
-  position: absolute;
-  display: block;
-  color: color-mix(in srgb, var(--lamp) 80%, transparent);
-  letter-spacing: 0;
-  text-align: center;
-  white-space: pre;
+.line path {
+  fill: none;
+  stroke: var(--hair);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
 }
 
-.scramble-slot.is-locked {
-  color: var(--name);
+.stage::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(max(var(--gutter), 50% - 270px) + var(--axis));
+  width: 1px;
+  background: var(--hair);
 }
 
-/* The lit copy of the name: a window of light that rides the pointer's height.
-   The window moves one way and its content the other, by the same amount and on
-   the same curve, so the letters stay in register with the name below and only
-   the light travels. Transforms only, from two custom properties: --my (the
-   pointer) and --wy (the top of the name), both written by site.js. */
-.name-lit {
+.js .stage::before {
   display: none;
 }
 
-.js .name-lit {
-  display: block;
+.identity,
+.entry-row {
+  position: relative;
+  padding: 0 0 40px calc(var(--axis) + 26px);
+}
+
+.identity {
+  padding-bottom: 72px;
+}
+
+/* The mark: a ring on the line, filled for the name and for the entry the pointer
+   or the keyboard is on. --lean is how far the line has leaned at this height
+   (site.js), so the mark stays on it. */
+.identity::before,
+.entry-row::before {
+  content: "";
   position: absolute;
-  inset: 0 0 auto;
-  height: 220px;
-  overflow: hidden;
-  pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 38%, #000 62%, transparent);
-  mask-image: linear-gradient(to bottom, transparent, #000 38%, #000 62%, transparent);
-  opacity: 0;
-  transform: translate3d(0, calc(var(--my, -9999px) - var(--wy, 0px) - 110px), 0);
+  top: 11px;
+  left: calc(var(--axis) - 3.5px);
+  width: 7px;
+  height: 7px;
+  border: 1px solid color-mix(in oklab, var(--text-2) 70%, var(--bg));
+  border-radius: 50%;
+  background: var(--bg);
+  box-shadow: 0 0 0 3px var(--bg);
+  transform: translateX(var(--lean, 0px));
   transition:
-    opacity 600ms var(--ease),
-    transform 520ms var(--ease);
-  will-change: transform;
+    background-color 220ms var(--ease),
+    border-color 220ms var(--ease);
 }
 
-.name-lit-inner {
-  transform: translate3d(0, calc(var(--wy, 0px) + 110px - var(--my, -9999px)), 0);
-  transition: transform 520ms var(--ease);
-  will-change: transform;
+.identity::before,
+.entry-row:is(:hover, :has(.entry:focus-visible))::before {
+  border-color: var(--text);
+  background: var(--text);
 }
 
-.js.beam-on .name-lit {
-  opacity: 1;
+/* One size for the name and the titles: the name is set apart by its weight and
+   its filled mark, not by its scale. */
+.name,
+.entry-title {
+  display: block;
+  font-size: 20px;
+  line-height: 28px;
+  letter-spacing: -0.017em;
 }
 
-.name-lit .name {
-  color: var(--lit);
+.name {
+  font-weight: 600;
+}
+
+/* The shared title: as wide as its text, so its picture and the h1's are the
+   same shape when the transition morphs one into the other. */
+.entry-title {
+  width: fit-content;
+  max-width: 100%;
+  font-weight: 500;
+  text-wrap: balance;
 }
 
 .role {
-  margin-top: 0;
-  padding-top: 20px;
+  margin-top: 3px;
   color: var(--text-2);
-  font-size: 17px;
-  line-height: 1.5;
-  letter-spacing: -0.01em;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
-/* ---------- home: the timeline ----------
-   The entries on a vertical axis, newest at the top, under the year. Each entry is
-   a mark on the axis, its date in the column to the left, its title to the right;
-   its short description shows only on the entry that is lit, hovered or focused.
-   A new year label where the year changes. */
-
-.timeline {
-  --axis: 96px;
-  min-width: 0;
-}
-
+/* the year stands in the date column, above its first entry */
 .year {
-  /* sits on the axis, above the first entry */
-  width: var(--axis);
+  width: calc(var(--axis) - 20px);
   margin-bottom: 20px;
-  padding-right: 20px;
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  line-height: 20px;
+  line-height: 24px;
   text-align: right;
 }
 
@@ -442,135 +398,39 @@ pre {
 }
 
 .empty {
-  color: var(--text-3);
+  padding-left: calc(var(--axis) + 26px);
+  color: var(--text-2);
 }
 
-.tl {
-  position: relative;
-  display: grid;
-  grid-template-columns: var(--axis) minmax(0, 1fr);
-}
-
-/* the axis */
-.tl::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--axis) - 1px);
-  width: 1px;
-  background: linear-gradient(to bottom, var(--line-strong), var(--line-strong) 70%, transparent);
-  transform-origin: top;
-}
-
-/* a grid, so each entry is its own formatting context and the entry's negative
-   margin stays inside its row */
 .feed {
-  display: grid;
-  grid-column: 2;
   padding: 0;
   list-style: none;
 }
 
-/* --age: 0 for the newest entry, 1 for the oldest. Here by position, so it holds
-   without script; site.js sets it from the dates themselves. --i is the entry's
-   place in the entrance, set by site.js. --c is the centre line of the title's
-   first line, --pad the title's inset: the mark, the leader and the axis are all
-   placed from them, on whole pixels, so a 1px line never blurs and the three line
-   up at any size. */
-.entry-row {
-  --age: 1;
-  --i: 1;
-  --c: 15px;
-  --pad: 32px;
-  position: relative;
-  padding: 0 0 44px var(--pad);
-}
-
-.tl:first-of-type .entry-row:nth-child(1) {
-  --age: 0;
-}
-
-.tl:first-of-type .entry-row:nth-child(2) {
-  --age: 0.5;
-}
-
-/* the entry's mark on the axis */
-.entry-row::before {
-  content: "";
-  position: absolute;
-  top: calc(var(--c) - 5px);
-  left: -6px;
-  width: 11px;
-  height: 11px;
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
-  background: var(--bg);
-  transition:
-    transform 320ms var(--ease),
-    background-color 320ms var(--ease),
-    border-color 320ms var(--ease),
-    box-shadow 320ms var(--ease);
-}
-
-/* the leader: from just after the mark to just before the title */
-.entry-row::after {
-  content: "";
-  position: absolute;
-  top: var(--c);
-  left: 8px;
-  width: calc(var(--pad) - 16px);
-  height: 1px;
-  background: var(--line-strong);
-  transition:
-    background-color 320ms var(--ease),
-    box-shadow 320ms var(--ease);
-}
-
-/* Its date stands in the column left of the axis, tinted by age: the newest in the
-   lamp's colour, cooling to grey with time. Both ends pass AA on either theme, and
-   so does every mix between them. */
 .entry-date {
   position: absolute;
   top: 3px;
-  right: calc(100% + 20px);
-  color: color-mix(in oklab, var(--lamp) calc(100% - var(--age) * 100%), var(--text-3));
+  left: 0;
+  width: calc(var(--axis) - 20px);
+  color: var(--text-2);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
-  line-height: 30px;
+  line-height: 24px;
+  text-align: right;
   white-space: nowrap;
-  transition: color 320ms var(--ease);
 }
 
-/* The entry, with room around it for its glow; the negative margin keeps the
-   text on the column's line. A link and a 44px target at least. */
+/* A link and a 44px target at least. */
 .entry {
   display: block;
-  max-width: calc(100% + 28px);
   min-height: 44px;
-  margin: -10px -14px;
-  padding: 10px 14px;
-  border-radius: 12px;
   color: inherit;
   text-decoration: none;
 }
 
 .entry:focus-visible {
-  outline-offset: 2px;
-}
-
-/* The shared title: as wide as its text, so its picture and the h1's are the
-   same shape when the transition morphs one into the other. */
-.entry-title {
-  display: block;
-  width: fit-content;
-  max-width: 100%;
-  color: var(--text-prose);
-  font-size: 22px;
-  font-weight: 560;
-  line-height: 30px;
-  letter-spacing: -0.02em;
-  transition: color 320ms var(--ease);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 /* An entry that leaves the site (a project's repository) says so with an arrow,
@@ -590,7 +450,7 @@ pre {
 
 .entry-row:is(:hover, :has(.entry:focus-visible)) .entry-out,
 a:is(:hover, :focus-visible) > .link-out {
-  color: var(--lamp);
+  color: var(--text);
   transform: translate(2px, -2px);
 }
 
@@ -601,295 +461,57 @@ a:is(:hover, :focus-visible) > .link-out {
   }
 }
 
-/* Title and date only at rest. The short description shows under the entry the
-   light, the pointer or the keyboard is on: its space is kept, so nothing moves.
-   One line on a wide screen; it may wrap on a phone, never cut. */
-.entry-desc {
-  display: block;
-  max-width: 32em;
-  margin-top: 4px;
-  color: var(--text-2);
-  font-size: 15px;
-  line-height: 1.55;
-  opacity: 0;
-  transform: translateY(-3px);
-  transition:
-    opacity 320ms var(--ease),
-    transform 320ms var(--ease),
-    color 320ms var(--ease);
-}
-
-.entry-row:is(.is-lit, :hover, :has(.entry:focus-visible)) .entry-desc {
-  opacity: 1;
-  transform: none;
-}
-
-/* The light has reached the entry's height (site.js): its mark, its leader and
-   its date take the lamp. */
-.entry-row.is-lit::before {
-  border-color: var(--lamp);
-  background: var(--lamp);
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--lamp) 18%, transparent),
-    0 0 18px 2px var(--lit-glow);
-  transform: scale(1.2);
-}
-
-.entry-row.is-lit::after {
-  background: var(--lamp);
-}
-
-.entry-row.is-lit .entry-date {
-  color: var(--lamp);
-}
-
-/* Hover, and keyboard focus exactly the same: no card, only light. The entry's mark
-   and leader light up, its words brighten, and the others step back. Focus also
-   keeps its own outline, so it never depends on the light. */
-.entry-row:is(:hover, :has(.entry:focus-visible))::before {
-  border-color: var(--lamp);
-  background: var(--lamp);
-  box-shadow:
-    0 0 0 4px color-mix(in srgb, var(--lamp) 18%, transparent),
-    0 0 18px 2px var(--lit-glow);
-  transform: scale(1.2);
-}
-
-.entry-row:is(:hover, :has(.entry:focus-visible))::after {
-  background: var(--lamp);
-  box-shadow: 0 0 8px var(--lit-glow);
-}
-
-.entry-row:is(:hover, :has(.entry:focus-visible)) .entry-title {
-  color: var(--text);
-}
-
-.entry-row:is(:hover, :has(.entry:focus-visible)) .entry-desc {
-  color: var(--text-prose);
-}
-
-.entry-row:is(:hover, :has(.entry:focus-visible)) .entry-date {
-  color: var(--lamp);
-}
-
-/* the others: still AA, a step down each */
-.timeline:has(.entry-row:hover, .entry:focus-visible) .entry-row:not(:hover, :has(.entry:focus-visible)) .entry-title {
-  color: var(--text-2);
-}
-
-.timeline:has(.entry-row:hover, .entry:focus-visible) .entry-row:not(:hover, :has(.entry:focus-visible)) :is(.entry-desc, .entry-date) {
-  color: var(--text-3);
-}
-
-/* ---------- home: the light ----------
-   Everything here moves from two custom properties, --mx and --my, the pointer's
-   position, written once a frame at most by one pointer handler (site.js), with
-   no layout read in it. The motion itself is CSS: transforms with a short
-   transition, so the light glides after the pointer on the compositor.
-   - the spot: a soft glow under the pointer, across the whole page;
-   - the scan line: a hairline across the axis at the pointer's height;
-   - the bead: a point of light on the axis, with the date it is passing;
-   - the lit name (above).
-   The scan line and the bead show only while the pointer is on the timeline. On a
-   touch screen the light holds a fixed height while the page scrolls past it,
-   and the spot is off. Under reduced motion none of it runs. */
-
-.spot,
-.beam,
-.bead {
-  display: none;
-}
-
-.js .spot {
-  display: block;
-  position: fixed;
-  z-index: -1;
-  top: -360px;
-  left: -360px;
-  width: 720px;
-  height: 720px;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--spot), transparent);
-  pointer-events: none;
-  opacity: 0;
-  transform: translate3d(var(--mx, -9999px), var(--my, -9999px), 0);
-  transition:
-    opacity 600ms var(--ease),
-    transform 700ms var(--ease);
-  will-change: transform;
-}
-
-.js .beam {
-  display: block;
-  position: fixed;
-  z-index: -1;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 0;
-  pointer-events: none;
-  opacity: 0;
-  transform: translate3d(0, var(--my, -9999px), 0);
-  transition:
-    opacity 600ms var(--ease),
-    transform 260ms var(--ease);
-  will-change: transform;
-}
-
-.js .beam::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: var(--ax, 70%);
-  width: 520px;
-  height: 1px;
-  background: linear-gradient(90deg, var(--beam-line), transparent);
-}
-
-.js .bead {
-  display: block;
-  position: fixed;
-  z-index: 10;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-  opacity: 0;
-  transform: translate3d(var(--ax, -9999px), var(--my, -9999px), 0);
-  transition:
-    opacity 300ms var(--ease),
-    transform 260ms var(--ease);
-  will-change: transform;
-}
-
-.js.beam-on .spot {
-  opacity: 1;
-}
-
-/* the scan line and its bead: only while the pointer is on the timeline itself */
-.js.beam-on.on-timeline :is(.beam, .bead) {
-  opacity: 1;
-}
-
-/* off the axis, or on an entry (whose own mark takes the light) */
-.js.beam-on .bead:is(.is-off, .is-locked) {
-  opacity: 0;
-}
-
-@media (hover: none), (pointer: coarse) {
-  .js .spot {
-    display: none;
-  }
-}
-
-.bead::before {
-  content: "";
-  position: absolute;
-  top: -5px;
-  left: -5px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--lamp);
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--lamp) 20%, transparent),
-    0 0 14px 2px var(--lit-glow);
-}
-
-.bead-date {
-  position: absolute;
-  top: -10px;
-  right: 20px;
-  color: var(--lamp);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
 /* ---------- home: the entrance ----------
-   One choreography on a fresh load (site.js adds .intro): the name decrypts
-   (first visit) or rises into its lines (later ones), the axis draws down, each
-   entry appears as the axis reaches it, then the light comes on. Never when a page
-   transition brings the home back, never under reduced motion. */
+   Once, on a fresh load (site.js adds .intro): the line is drawn from the top and
+   each mark appears as it passes, with its words (--at, from site.js). Never when
+   a page transition brings the home back, never under reduced motion. */
 
 @media (prefers-reduced-motion: no-preference) {
-  .intro body::before {
-    animation: light-on 1600ms var(--ease) both;
+  .intro .line path {
+    animation: draw 1200ms cubic-bezier(0.3, 0, 0.1, 1) both;
   }
 
-  .intro .name-wrap:not(.no-rise) > .name .name-line > span {
-    animation: rise 1000ms var(--ease) both;
+  .intro :is(.identity, .entry-row)::before {
+    animation: tie 380ms var(--ease) var(--at, 600ms) both;
   }
 
-  .intro .name-wrap:not(.no-rise) > .name .name-line + .name-line > span {
-    animation-delay: 90ms;
-  }
-
-  .intro .role {
-    animation: fade-up 800ms var(--ease) 360ms both;
-  }
-
+  .intro :is(.identity, .entry-row) > *,
   .intro .year {
-    animation: fade 600ms var(--ease) 260ms both;
-  }
-
-  .intro .tl::before {
-    animation: draw 1100ms var(--ease) 300ms both;
-  }
-
-  .intro .entry-row {
-    animation: fade-in-x 700ms var(--ease) calc(300ms + var(--i) * 95ms) both;
-  }
-
-  .intro .entry-row::before {
-    animation: pop 500ms var(--ease) calc(300ms + var(--i) * 95ms) both;
-  }
-}
-
-@keyframes light-on {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes rise {
-  from {
-    transform: translateY(105%);
-  }
-}
-
-@keyframes fade {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
+    animation: arrive 700ms var(--ease) var(--at, 300ms) both;
   }
 }
 
 @keyframes draw {
   from {
-    transform: scaleY(0);
+    stroke-dashoffset: 1;
   }
 }
 
-@keyframes fade-in-x {
-  from {
-    opacity: 0;
-    transform: translateX(-8px);
-  }
-}
-
-@keyframes pop {
+@keyframes tie {
   from {
     transform: scale(0);
   }
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- entry pages: the line ----------
+   The same line, in the margin of the column: the entry is one stop on the
+   timeline. Part of the root image, so it stays put while a transition runs. */
+
+body:not([data-page="home"])::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 317px);
+  width: 1px;
+  background: var(--hair);
 }
 
 /* ---------- entry pages: the bar ---------- */
@@ -970,11 +592,9 @@ a:is(:hover, :focus-visible) > .link-out {
   padding: clamp(40px, 9vh, 96px) var(--gutter) 120px;
 }
 
-/* the meta line: only the date, behind the entry's mark from the axis */
+/* the meta line: only the date, beside the entry's mark on the line */
 .meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  position: relative;
   color: var(--text-2);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
@@ -982,14 +602,15 @@ a:is(:hover, :focus-visible) > .link-out {
 
 .meta::before {
   content: "";
-  flex: none;
-  width: 9px;
-  height: 9px;
+  position: absolute;
+  top: 50%;
+  left: -30px;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
   border-radius: 50%;
-  background: var(--lamp);
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--lamp) 18%, transparent),
-    0 0 14px 2px var(--lit-glow);
+  background: var(--text);
+  box-shadow: 0 0 0 3px var(--bg);
 }
 
 /* The other end of the shared title. */
@@ -1313,51 +934,62 @@ a:is(:hover, :focus-visible) > .link-out {
 
 /* ---------- small screens ---------- */
 
-@media (max-width: 880px) {
-  .stage {
-    grid-template-columns: minmax(0, 1fr);
-    min-height: 0;
-    padding-top: 88px;
+/* under 700px the reading column has no margin to spare: the line takes the
+   page's edge and the bar and the text make room for it */
+@media (max-width: 700px) {
+  body:not([data-page="home"])::before {
+    left: 13px;
   }
 
-  .role {
-    padding-top: 16px;
-  }
-
-  .timeline {
-    margin-top: 72px;
+  .bar,
+  .article {
+    padding-left: 40px;
   }
 }
 
-@media (max-width: 600px) {
-  .timeline {
-    --axis: 64px;
+/* no room for a column of dates: the line takes the left margin and each date
+   stands over its title */
+@media (max-width: 640px) {
+  .stage {
+    --axis: -26px;
+    align-content: start;
+    padding: 96px var(--gutter) 72px 56px;
+  }
+
+  .stage::before {
+    left: 30px;
+  }
+
+  .identity,
+  .entry-row {
+    padding-bottom: 32px;
+  }
+
+  .identity {
+    padding-bottom: 56px;
   }
 
   .year {
-    padding-right: 14px;
+    width: auto;
+    margin-bottom: 12px;
+    text-align: left;
   }
 
   .entry-row {
-    --c: 14px;
-    --pad: 24px;
+    display: flex;
+    flex-direction: column;
   }
 
-  .entry {
-    max-width: calc(100% + 20px);
-    margin-inline: -10px;
-    padding-inline: 10px;
-  }
-
-  .entry-title {
-    font-size: 20px;
-    line-height: 28px;
+  .entry-row::before {
+    top: 31px;
   }
 
   .entry-date {
-    top: 2px;
-    right: calc(100% + 14px);
-    line-height: 28px;
+    position: static;
+    order: -1;
+    width: auto;
+    line-height: 20px;
+    text-align: left;
   }
 }
 

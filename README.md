@@ -21,7 +21,7 @@ mix test           # run the test suite
 
 `mix site.build` also accepts `--drafts`, `--content DIR` and `--out DIR`.
 
-The home is the name, the position and a timeline of every entry, under a warm light that follows the pointer and lights the entry it reaches. Entries are one centred reading column. Dark first, with a light theme and a toggle.
+The home is the name, the position and every entry on one faint timeline, at one size, in ink with no accent colour; the line leans a few pixels toward a mouse that comes close. Entries are one centred reading column with the same line in the margin. Dark first, with a light theme and a toggle.
 
 Pages change with a calm, directional view transition: the clicked title lifts off the timeline into the entry's heading, and back. On an entry page a click on the side margins, or Escape, goes back home ([SPEC.md §7](SPEC.md#7-layout-and-pages), Transitions). All of it is in `assets/js/site.js`.
 
@@ -38,7 +38,7 @@ All words live in `content/`. The full model is in [SPEC.md §5](SPEC.md#5-conte
 | `content/notes/*.md` | notes |
 | `content/projects/*.md` | projects |
 
-There is one timeline, on the home, and it lists every essay, note and project. The folder an entry lives in sets its type, which only orders the timeline and picks the project template; it is not shown. It does not set the URL: every entry lives at `/<slug>/`, for example `/threat-modeling-with-claude-code/` or `/rhino/`. An optional `summary:` in the frontmatter is the short line the timeline shows under the title (else the `description`). A project with a `link` goes straight to it from the home; its own page is still built.
+There is one timeline, on the home, and it lists every essay, note and project. The folder an entry lives in sets its type, which only orders the timeline and picks the project template; it is not shown. It does not set the URL: every entry lives at `/<slug>/`, for example `/threat-modeling-with-claude-code/` or `/rhino/`. The timeline shows a date and a title only; an optional `summary:` in the frontmatter is still accepted but shown nowhere. A project with a `link` goes straight to it from the home; its own page is still built.
 
 A slug is the filename without `.md` and without a leading `YYYY-MM-DD-` prefix. Dates come from the `date` field, not the filename. Slugs are unique across **all** types, so an essay and a note cannot share one. A few are reserved because they would collide with a site path or a legacy redirect: `assets`, `404`, `404.html`, `home`, `index`, `index.html`, `llms`, `llms.txt`, `og`, `robots.txt`, `_headers`, `_redirects`, `blog`, `projects` and `resume`.
 

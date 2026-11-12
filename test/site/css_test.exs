@@ -1,8 +1,8 @@
 defmodule Site.CSSTest do
   @moduledoc """
   Invariants of `assets/css/site.css` worth pinning: the palette and its contrast,
-  the fonts, focus, reduced motion, the light only on the timeline, and that the
-  old design is gone. The page transitions have their own test.
+  the fonts, focus, reduced motion, the line and its marks, and that the old
+  designs are gone. The page transitions have their own test.
   """
 
   use ExUnit.Case, async: true
@@ -68,16 +68,17 @@ defmodule Site.CSSTest do
   end
 
   describe "the palette" do
-    test "every colour of the page is a light-dark pair on :root" do
+    test "every colour of the page is a light-dark pair on :root, and none is an accent" do
       root = rule!(":root")
 
       for name <-
-            ~w(--bg --line --line-strong --hover --text --text-prose --text-2 --text-3 --name --lamp --focus --lit --lit-glow --glow-hot --glow-core --glow-wide --spot --card --beam-line) do
+            ~w(--bg --hair --line --line-strong --hover --text --text-prose --text-2 --text-3 --focus --card) do
         assert root =~ ~r/#{name}: light-dark\(/, name
       end
 
-      assert pair("--bg") == {"#f7f7f6", "#0d0f14"}
-      assert pair("--lamp") == {"#9a5a00", "#f2c47c"}
+      assert pair("--bg") == {"#f4f4f1", "#0e0f12"}
+      assert pair("--hair") == {"#d6d6d1", "#292b31"}
+      assert pair("--focus") == pair("--text")
     end
 
     test "dark first; data-theme forces one, nothing else changes a colour" do
@@ -93,7 +94,7 @@ defmodule Site.CSSTest do
     test "every text colour passes AA on the page in both themes, the text AAA" do
       {bg_light, bg_dark} = pair("--bg")
 
-      for name <- ~w(--text --text-prose --text-2 --text-3 --name --lamp --focus --lit) do
+      for name <- ~w(--text --text-prose --text-2 --text-3 --focus) do
         {light, dark} = pair(name)
         assert contrast(light, bg_light) >= 4.5, "#{name} on the light page"
         assert contrast(dark, bg_dark) >= 4.5, "#{name} on the dark page"
@@ -104,11 +105,12 @@ defmodule Site.CSSTest do
       assert contrast(text_dark, bg_dark) >= 7
     end
 
-    test "the date tint mixes two colours that both pass, and the old palette is gone" do
-      assert rule!(".entry-date") =~
-               "color: color-mix(in oklab, var(--lamp) calc(100% - var(--age) * 100%), var(--text-3));"
+    test "dates are the one secondary grey, and the old palettes are gone" do
+      assert rule!(".entry-date") =~ "color: var(--text-2);"
+      assert rule!(".role") =~ "color: var(--text-2);"
 
-      for old <- ~w(#f4efe4 #262523 #6b675f #ddd6c8 #1e1d1b #ece6d9 #9a958b #34322f) do
+      for old <-
+            ~w(#f4efe4 #262523 #6b675f #ddd6c8 #1e1d1b #ece6d9 #9a958b #34322f #9a5a00 #f2c47c #fff3df #8a4f00) do
         refute @css =~ old, old
       end
     end
@@ -171,21 +173,21 @@ defmodule Site.CSSTest do
   end
 
   describe "focus and the keyboard" do
-    test "focus is always visible, in the lamp colour" do
+    test "focus is always visible, in ink" do
       assert rule!(":focus-visible") =~ "outline: 2px solid var(--focus);"
       refute @code =~ ~r/outline:\s*(none|0)\b/
     end
 
-    test "a focused entry looks exactly like a hovered one, description included" do
-      assert rule!(".entry-row:is(.is-lit, :hover, :has(.entry:focus-visible)) .entry-desc") =~
-               "opacity: 1;"
+    test "a focused entry looks exactly like a hovered one: its mark fills" do
+      filled =
+        rule!(".identity::before, .entry-row:is(:hover, :has(.entry:focus-visible))::before")
 
-      for part <- ["::before", "::after", " .entry-title", " .entry-date"] do
-        assert Enum.any?(rules(), fn {selector, _} ->
-                 selector == ".entry-row:is(:hover, :has(.entry:focus-visible))" <> part
-               end),
-               part
-      end
+      assert filled =~ "border-color: var(--text);"
+      assert filled =~ "background: var(--text);"
+
+      assert Enum.any?(rules(), fn {selector, _} ->
+               selector =~ ".entry-row:is(:hover, :has(.entry:focus-visible)) .entry-out"
+             end)
     end
 
     test "the entry is a 44px target, and the skip link shows on focus" do
@@ -194,17 +196,14 @@ defmodule Site.CSSTest do
       assert rule!(".skip-link:focus-visible") == "transform: none;"
     end
 
-    test "the description keeps its space at rest, so nothing moves when it shows" do
-      desc = rule!(".entry-desc")
-      assert desc =~ "display: block;"
-      assert desc =~ "opacity: 0;"
-      refute desc =~ "display: none"
+    test "the home shows a title and a date, never a description" do
+      refute @code =~ "entry-desc"
     end
   end
 
   describe "motion" do
     test "the entrance only plays for people who have not asked for less motion" do
-      entrance = media("@media (prefers-reduced-motion: no-preference) {\n  .intro body::before")
+      entrance = media("@media (prefers-reduced-motion: no-preference) {\n  .intro .line path")
       assert is_binary(entrance)
 
       # every animation outside the view transitions sits in that block
@@ -232,55 +231,56 @@ defmodule Site.CSSTest do
     end
   end
 
-  describe "the light" do
-    test "nothing of it without script, and nothing until site.js turns it on" do
-      assert rule!(".spot, .beam, .bead") == "display: none;"
-      assert rule!(".name-lit") == "display: none;"
+  describe "the line" do
+    test "with script it is one path; without, a plain rule stands in its place" do
+      line = rule!(".line")
+      assert line =~ "position: fixed;"
+      assert line =~ "pointer-events: none;"
+      assert rule!(".line path") =~ "stroke: var(--hair);"
 
-      for layer <- ~w(.spot .beam .bead) do
-        assert rule!(".js #{layer}") =~ "opacity: 0;", layer
+      stand_in = rule!(".stage::before")
+      assert stand_in =~ "position: fixed;"
+      assert stand_in =~ "background: var(--hair);"
+      assert rule!(".js .stage::before") == "display: none;"
+    end
+
+    test "the name and the entries hang on it by the same mark, which follows its lean" do
+      mark = rule!(".identity::before, .entry-row::before")
+      assert mark =~ "left: calc(var(--axis) - 3.5px);"
+      assert mark =~ "transform: translateX(var(--lean, 0px));"
+
+      # one size for the name and the titles
+      assert rule!(".name, .entry-title") =~ "font-size: 20px;"
+    end
+
+    test "an entry page carries the same line in its margin, and its mark by the date" do
+      line = rule!(~s|body:not([data-page="home"])::before|)
+      assert line =~ "position: fixed;"
+      assert line =~ "left: calc(50% - 317px);"
+      assert line =~ "background: var(--hair);"
+
+      assert rule!(".meta::before") =~ "background: var(--text);"
+    end
+
+    test "nothing of the lamp is left" do
+      for gone <-
+            ~w(.spot .beam .bead .name-lit .name-scramble .name-line --lamp --lit --glow --age is-lit beam-on) do
+        refute @code =~ gone, gone
       end
-
-      assert rule!(".js.beam-on .spot") == "opacity: 1;"
-      assert rule!(".js.beam-on .name-lit") == "opacity: 1;"
-    end
-
-    test "the scan line and the bead show only while the pointer is on the timeline" do
-      assert rule!(".js.beam-on.on-timeline :is(.beam, .bead)") == "opacity: 1;"
-      assert rule!(".js.beam-on .bead:is(.is-off, .is-locked)") == "opacity: 0;"
-
-      # nothing else ever shows them
-      shown =
-        for {selector, body} <- rules(),
-            selector =~ ~r/\.(beam|bead)(?![-\w])/,
-            body =~ "opacity: 1",
-            do: selector
-
-      assert shown == [".js.beam-on.on-timeline :is(.beam, .bead)"]
-    end
-
-    test "moves by transforms from custom properties only, and never on a touch screen" do
-      for layer <- ~w(.spot .beam .bead) do
-        body = rule!(".js #{layer}")
-        assert body =~ "transform: translate3d(", layer
-        assert body =~ "var(--my", layer
-        assert body =~ "pointer-events: none;", layer
-      end
-
-      assert media("@media (hover: none), (pointer: coarse)") =~ ".js .spot"
-    end
-
-    test "the decrypt hides the real name only while the overlay covers it" do
-      assert rule!(".name-wrap.is-decrypting > .name") == "color: transparent;"
-      assert rule!(".name-scramble") =~ "pointer-events: none;"
     end
   end
 
   describe "layout" do
-    test "the home is two columns on a wide screen and one under 880px" do
-      assert rule!(".stage") =~ "grid-template-columns: minmax(0, 1fr) minmax(0, 520px);"
-      assert media("@media (max-width: 880px)") =~ "grid-template-columns: minmax(0, 1fr);"
-      assert media("@media (max-width: 600px)") =~ "--axis: 64px;"
+    test "the home is one narrow column; on a phone the line takes the left margin" do
+      stage = rule!(".stage")
+      assert stage =~ "--axis: 96px;"
+      assert stage =~ "max-width: calc(540px + 2 * var(--gutter));"
+
+      phone = media("@media (max-width: 640px)")
+      assert phone =~ "--axis: -26px;"
+      assert phone =~ "order: -1;"
+
+      assert media("@media (max-width: 700px)") =~ "padding-left: 40px;"
     end
 
     test "an entry is one centred reading column" do

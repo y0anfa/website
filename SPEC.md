@@ -9,7 +9,7 @@ It shows who he is, what he thinks, and what he makes.
 
 - **Audience:** security peers and curious strangers. Not recruiters.
 - **Voice:** plain and precise. Short sentences, first person, no buzzwords, no exclamation marks, no emoji.
-- **Style:** bold but simple. Dark graphite and one warm lamp, set in Inter. Little content: the home is the name, the position and the entries, and nothing else.
+- **Style:** quiet and plain. Ink on one page, set in Inter, with no accent colour: ink, one grey for everything secondary, and a hairline. Little content: the home is the name, the position and the entries on one faint timeline, and nothing else.
 - **Language:** English.
 
 ## 2. Decisions
@@ -17,13 +17,13 @@ It shows who he is, what he thinks, and what he makes.
 | Topic | Decision |
 |---|---|
 | Pages | The home (name, position, timeline), one page per entry (essay, note or project), and the 404. There are no list pages (`/essays/`, `/notes/`, `/projects/`), no uses page, no cv page, no about page, no now page, no RSS, no colophon. |
-| Home | One poster: the name and the position on the left, the timeline on the right (stacked on a phone). No intro text, no contact line, no footer. |
-| Timeline | The only list on the site. Essays, notes and projects share it, newest first, on a vertical axis under the year. Each entry is a date, a title, and a short description shown only on the entry that is lit, hovered or focused. A project with a `link` goes straight to it. The type is not shown anywhere. |
+| Home | One narrow column in the middle of the page, on one line the height of the window. The name is its first mark, the position under it, then the entries. No intro text, no contact line, no footer. |
+| Timeline | The only list on the site. Essays, notes and projects share it, newest first, under the year. Each entry is a date and a title, at the size of the name. No summary or description is shown. A project with a `link` goes straight to it. The type is not shown anywhere. |
 | URLs | Flat: every entry lives at `/<slug>/`, whatever its type. The content folder sets the type (which only orders the timeline and picks the project template), not the URL. Slugs are unique across all types. The old Hugo URLs are redirected (§4). |
-| Signature | The light: a warm glow that follows the pointer over the home, rides the timeline, lights the entry it reaches and rakes across the name. A scan line crosses the axis while the pointer is on the timeline. The name decrypts once a visit. |
+| Signature | The line: one hairline that runs every page, the home's timeline and the margin of an entry. On the home it is still unless a mouse comes close: then it leans a few pixels toward it and eases back. Nothing else moves. |
 | Type | Inter (variable, self-hosted, with its optical-size axis) for all text and UI. JetBrains Mono 400, self-hosted, only for code. |
-| Color | Graphite and one warm lamp colour. Dark first, light as well: both follow the system, with a manual toggle. |
-| Motion | The light, the home's entrance, and the shared-title view transition between the home and an entry (§7). `prefers-reduced-motion` gets none of it: no decrypt, no light, no entrance, no navigation transition. |
+| Color | Monochrome: ink, one secondary grey and a hairline, on a near-white or near-black page. No accent colour. Dark first, light as well: both follow the system, with a manual toggle. (The favicon and the share images still carry the old lamp colour.) |
+| Motion | The line's lean, the home's entrance (the line is drawn, each mark appears as it passes), and the shared-title view transition between the home and an entry (§7). `prefers-reduced-motion` gets none of it: no lean, no entrance, no navigation transition. |
 | Page transitions | **The shared title**: the clicked title lifts off the axis and grows into the entry's h1, and settles back on its row on the way home; the content around it rises 12px as it arrives. A click on the side margins of an entry, or Escape, goes back home (§7). |
 | Build | Hand-rolled static generator in Elixir: EEx templates, MDEx for Markdown, YamlElixir for frontmatter. |
 | Hosting | Cloudflare Workers, assets-only, deployed by GitHub Actions with wrangler. |
@@ -52,7 +52,7 @@ It shows who he is, what he thinks, and what he makes.
 ├── assets/                    copied verbatim to dist/assets/
 │   ├── css/site.css
 │   ├── js/head.js             inlined into <head>; its sha256 goes in the CSP; applies the saved theme
-│   ├── js/site.js             the theme toggle, the page transitions, the home's light, decrypt and entrance, the margins and Escape (a deferred, render-blocking script on every page)
+│   ├── js/site.js             the theme toggle, the page transitions, the home's line and its entrance, the margins and Escape (a deferred, render-blocking script on every page)
 │   ├── js/404.js              fills the missing path on the 404 page
 │   ├── js/favicon.js          swaps the favicon to the sleeping one while the tab is hidden
 │   ├── fonts/InterVariable.woff2, InterVariable-Italic.woff2 + Inter-OFL.txt
@@ -100,7 +100,7 @@ A `<slug>.md` cannot collide with a page or a site file: `llms` and `llms.txt` a
 
 **Share images.** Every entry has a 1200×630 PNG at `dist/og/<slug>.png`, and the home has `dist/og/home.png` (`Site.OG`). Each page points at its own with `og:image` (absolute URL), `og:image:width` 1200, `og:image:height` 630 and `og:image:alt` (the page title); `twitter:card` is `summary_large_image`. The 404 has no image and keeps `twitter:card=summary`. An image is drawn as an SVG in the dark palette (§8) and rasterised at build time by `resvg`:
 
-- Background: `--bg` graphite, with the lamp glowing from the top left: the three radial gradients of the page's `body::before`, a little warmer. The same on every card.
+- Background: `--bg` graphite, with the lamp glowing from the top left: three radial gradients, the glow the pages themselves no longer have. The same on every card.
 - An entry: the lit mark (a lamp-coloured dot with its ring and glow) and the full date (`28 Mar 2026`) in `--text-2`, then the title in Inter Bold, `--text`, -0.03em, left-aligned. The title takes the largest of 96, 84, 72, 62 and 54px that fits in three lines (lines balanced); past three lines at 54px it ends with `…`. `Yoan Faure` bottom-left in `--name`, `yoanfaure.com` bottom-right in `--text-3`.
 - The home: the name from `home.md`, one word a line as on the page (up to 168px, -0.035em, `--name`), the position (`Security engineer at Riot`) under it in `--text-2`, and `yoanfaure.com` bottom-left.
 - Text is measured from the font file's glyph advances (`Site.OG.Text`, no kerning, so lines are never too wide) and a character the font lacks is dropped, never drawn as a box.
@@ -126,7 +126,7 @@ Markdown files with YAML frontmatter between `---` lines.
 ```yaml
 title: string        # required
 date: 2026-10-28     # required, ISO date
-summary: string      # optional; the short line on the home timeline (fallback: description)
+summary: string      # optional; kept in the timeline row, shown nowhere (fallback: description)
 description: string  # optional; meta description (fallback: first paragraph, plain text, ≤160 chars)
 draft: false         # optional; drafts are skipped unless `mix site.build --drafts`
 ```
@@ -173,7 +173,7 @@ The build fails loudly on a missing required field, a bad date, a field of the w
 
 Entries are essays, notes, and projects, and the timeline on the home is the only list. Sort by date desc, then type (essay, project, note), then title asc (`Site.Log`). Drafts never appear unless the build asks for them.
 
-- **Row** (`Site.Log.row/1`): the title; the summary (`summary`, else `description`); the date as `datetime` (`2026-10-29`), as shown (`29 Oct`), its month (`2026-10`) and its year; and where it goes: `/<slug>/`, or for a project with a `link`, that link and what a screen reader hears after the title (` (on GitHub)` when the host is `github.com`, else ` (external)`). Rows are numbered from 1 (`data-row`).
+- **Row** (`Site.Log.row/1`): the title; the summary (`summary`, else `description`; the home does not show it); the date as `datetime` (`2026-10-29`), as shown (`29 Oct`), its month (`2026-10`) and its year; and where it goes: `/<slug>/`, or for a project with a `link`, that link and what a screen reader hears after the title (` (on GitHub)` when the host is `github.com`, else ` (external)`). Rows are numbered from 1 (`data-row`).
 - **Years:** `Site.Log.years/1` groups the rows where the year changes. Each year is a `p.year` label (aria-hidden) and its own `ol.feed`; every date also carries its year for a screen reader.
 - **Markup:**
 
@@ -186,7 +186,6 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
       <li class="entry-row" data-row="1" data-month="2026-10">
         <a class="entry" href="/build-the-small-tool/">
           <span class="entry-title">Build the small tool</span>
-          <span class="entry-desc">A Slack agent in three days, not a vendor.</span>
         </a>
         <time class="entry-date" datetime="2026-10-29">29 Oct<span class="visually-hidden"> 2026</span></time>
       </li>
@@ -206,7 +205,7 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 - Two inline scripts: `head.js` (applies `localStorage.theme`, `light` or `dark`, to `data-theme` before the first paint, and nothing else) and `<script type="speculationrules">` (the constant in `Site.Speculation`: prerender same-origin page links, `href_matches: "/*"`, with `eagerness: "moderate"`, except `/*.md`, `/llms.txt`, `/assets/*` and `rel~=nofollow`). The CSP allows both by sha256 (§11).
 - One stylesheet, `/assets/css/site.css`. Then `<script defer blocking="render" src="/assets/js/site.js">`, render-blocking so its `pagereveal` listener and the `js` class exist before the first frame, and `favicon.js` (plus `404.js` on the 404) as plain `defer` scripts.
 - **Favicon.** `assets/favicon.svg` is the mark: a 32×32 graphite square with the timeline's axis and a lit entry on it (a lamp dot and its halo). `assets/favicon-sleep.svg` is the same square with the lamp out (a grey ring). `favicon.js` swaps the `link[rel=icon]` href to the sleeping one when the tab becomes hidden (`visibilitychange`) and back when it is visible.
-- **The lamp.** `body::before` paints three soft radial glows from the top of every page (warm, warmer, a cool wide one), part of the root image so they stay put during a transition. On entries and the 404 it is shorter and at 70%.
+- **The line on an entry.** `body::before` on every page but the home is a fixed 1px `--hair` rule in the margin of the reading column (`left: calc(50% - 317px)`; `13px` under 700px, where the bar and the column take a 40px left padding). It is part of the root image, so it stays put during a transition.
 
 **Home** (`home.html.eex`)
 
@@ -214,26 +213,20 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 <div class="corner"> a.corner-link LinkedIn · the theme toggle </div>
 <main id="main" class="stage">
   <section class="identity" aria-labelledby="name">
-    <div class="name-wrap">
-      <h1 class="name" id="name"> one span.name-line per word </h1>
-      <div class="name-lit" aria-hidden="true"> the same name, lit </div>
-    </div>
+    <h1 class="name" id="name">Yoan Faure</h1>
     <p class="role">Security engineer at <a class="text-link" href="https://tryriot.com" rel="noopener">Riot</a></p>
   </section>
   <section class="timeline" id="feed"> … (§6) </section>
 </main>
-<div class="spot"> <div class="beam"> <div class="bead"> (aria-hidden, empty: the light)
+<svg class="line" aria-hidden="true"><path pathLength="1"/></svg>
 ```
 
-- **Layout.** `.stage` is a grid, `minmax(0, 1fr) minmax(0, 520px)`, centred, at most 1040px plus gutters, as tall as the viewport, the two columns centred together. Under 880px it is one column, the timeline 72px under the position. The name is Inter 600, `clamp(2.5rem, 1.7rem + 2.6vw, 4.25rem)`, -0.035em, line-height 1, in `--name`. The position is 17px in `--text-2`.
-- **The timeline.** The axis is a 1px `--line-strong` line 96px in (64px under 600px), fading out at the bottom. Each entry has a mark on the axis (an 11px ring), a leader to its title, its date to the left of the axis (13px, tabular), and the title (22px, 560, -0.02em; 20px under 600px). The date is tinted by age: `--age` 0 (newest, the lamp's colour) to 1 (oldest, `--text-3`), mixed in oklab; `site.js` computes it from the dates, and CSS has a fallback by position. The description (15px, `--text-2`) keeps its space at rest with opacity 0, and shows on the entry that is lit, hovered or has keyboard focus (`:has(.entry:focus-visible)`), so nothing moves. Hover and focus are the same light: the mark fills with the lamp and glows, the leader and the date take the lamp, the title brightens, and the other entries step down one tone (still AA). The entry is a link of at least 44px. A project that leaves the site carries a small `↗` (aria-hidden) that leans toward where it goes on hover and focus, and a visually hidden ` (on GitHub)`.
-- **The light** (`site.js`, home only). Two custom properties, `--mx` and `--my`, written through the CSSOM once a frame at most, with no layout read in the handler; CSS moves everything with transforms.
-  - the spot: a 720px soft glow under the pointer, everywhere on the page (fine pointers only);
-  - the scan line: a hairline across the axis at the pointer's height, and the bead, a point of light on the axis: both only while the pointer is over the timeline itself (`on-timeline`). The bead reads out a date only over an empty month row, which the timeline does not draw, so over entries it hides and the entry's own mark takes the light;
-  - the lit entry: the entry at the light's height gets `is-lit`. With the pointer elsewhere, or off the page, the light rests on the newest entry (or, back from an entry, on the one we came from); on a touch screen it holds 42% of the viewport height while the page scrolls past;
-  - the lit name: an aria-hidden copy of the name in `--lit`, seen through a 220px window that follows the light's height, so the light rakes across the letters.
-- **The decrypt.** Once a visit (`sessionStorage.decrypted`), on a fresh load: the real h1 stays in place and in the accessibility tree but transparent, while an aria-hidden overlay puts one slot over each letter, at its measured place, cycles random glyphs in the lamp's colour and locks the letters left to right (about 0.6s), then removes itself.
-- **The entrance.** On a fresh load only (not when a transition brings the home back), `site.js` adds `.intro`: the name rises into its lines (or decrypts), the position fades up, the axis draws down, each entry slides in as the axis reaches it (`--i`, its place, from `site.js`), then the light comes on (`beam-on`, after 1150ms).
+- **Layout.** `.stage` is one column, 540px plus gutters, centred, as tall as the viewport, its content centred. `--axis` (96px) is where the line runs in it: dates to its left (right-aligned, 13px, tabular, `--text-2`), words to its right, 26px from it. Under 640px `--axis` is `-26px`: the line takes the left margin (30px from the edge), the year and the dates stand over the titles, and the content starts from the top.
+- **Rows.** The name (`.identity`) and every entry (`.entry-row`) are rows of the same shape. The name and the titles are one size: 20px, line-height 28px, -0.017em; the name is 600, a title 500. The position is 15px in `--text-2`, 3px under the name. The name's row has 72px under it, an entry 40px. An entry is a link of at least 44px. A project that leaves the site carries a small `↗` (aria-hidden) that leans toward where it goes on hover and focus, and a visually hidden ` (on GitHub)`.
+- **Marks.** Each row's `::before` is its mark on the line: a 7px ring (`--bg` inside, a border of `--text-2` at 70%), with a 3px `--bg` halo that cuts the line around it. The name's mark is filled with `--text`; so is the mark of the entry under the pointer or the keyboard focus (`:has(.entry:focus-visible)`). Nothing else changes on hover.
+- **The line** (`site.js`, home only). The `svg.line` is fixed over the whole window, behind the content; its one path is drawn at the axis, on the pixel grid, in `--hair`. It is still. When a mouse comes within 64px of it, the points of the line within about 84px above and below lean toward the pointer, most (about 6px) at a third of that reach and not at all when the pointer is on the line, so crossing it is one smooth pass; they follow with a 130ms time constant and never overshoot. Each row gets `--lean`, the line's lean at its mark's height, and the mark is translated by it, so it stays on the line; the words never move. A finger does nothing to it. Everything is written through the CSSOM once a frame at most, and only while the line moves.
+- **Without script** the path has nothing to draw: `.stage::before`, a fixed 1px `--hair` rule at the same place, stands in for it (hidden under `.js`).
+- **The entrance.** On a fresh load only (not when a transition brings the home back), `site.js` adds `.intro`: the line is drawn from the top in 1200ms, and each mark appears, with its words, as the line reaches it (`--at`, its moment, from `site.js`).
 - **The LinkedIn link.** The site's one contact, on the home only: a 16px monochrome glyph in the same 36px square as the toggle, just before it, muted (`--text-2`) and brightened on hover. Named `LinkedIn` for screen readers (`aria-label`, the glyph aria-hidden), `rel="me noopener"`. It shows without script.
 - **The theme toggle.** A 36px button with a sun and a moon (aria-hidden SVGs); the icon shows the theme a click switches to, and `site.js` labels it `Switch to light theme` or `Switch to dark theme`. Choosing what the system prefers forgets the choice (`localStorage.theme` removed), so the page follows the system again. The switch is one 280ms cross-fade (a view transition of type `theme`), at once under reduced motion or without view transitions. Without script the toggle is hidden.
 
@@ -252,7 +245,7 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 ```
 
 - **The bar.** 68px, as wide as 1200px plus gutters: the back link (a chevron, the name, and an `Esc` key hint shown only with a fine pointer) on the left, the toggle on the right.
-- **The column.** One centred reading measure, 580px plus gutters. The meta line is the full date only, 14px in `--text-2`, after a lit lamp dot. The h1 is `clamp(34px, 6.4vw, 54px)`, 600, -0.04em, line-height 1.04, as wide as its text. The text starts 40px under a `--line` rule: 17px, line-height 1.7, `--text-prose`, paragraphs 1.15em apart, h2 22px 600 with 2.3em above. Lists have `--text-3` markers; inline code and code blocks are JetBrains Mono on a faint card with a `--line` border; tables are ruled with `--line`; footnotes are 14px under a rule; heading anchors show a `#` on hover.
+- **The column.** One centred reading measure, 580px plus gutters. The meta line is the full date only, 14px in `--text-2`; its `::before` is the entry's mark, a 7px `--text` dot on the line in the margin. The h1 is `clamp(34px, 6.4vw, 54px)`, 600, -0.04em, line-height 1.04, as wide as its text. The text starts 40px under a `--line` rule: 17px, line-height 1.7, `--text-prose`, paragraphs 1.15em apart, h2 22px 600 with 2.3em above. Lists have `--text-3` markers; inline code and code blocks are JetBrains Mono on a faint card with a `--line` border; tables are ruled with `--line`; footnotes are 14px under a rule; heading anchors show a `#` on hover.
 - **A project** adds its tagline under the h1 (`p.lede`, 19px, `--text-2`) and a quiet line of facts (`p.facts`: status · stack · link, 14px, `--text-3`).
 - **The end.** 64px under the text, on a `--line` rule: `All entries` (back home) on the left, and on the right, 13px and quiet, `Markdown` (the twin, `/<slug>.md`) and `Ask Claude ↗` (`https://claude.ai/new?q=<prompt>`, `rel="noopener"`, same tab). The separator and the arrow are aria-hidden. The prompt is `Read https://yoanfaure.com/<slug>/ by Yoan Faure, a security engineer. Using only what is on that page, summarize the main argument in a few sentences, then tell me where you would push back.`; for a project the end is `summarize what the project does and why, then suggest one improvement.` It is URI-encoded (everything but unreserved characters, so a space is `%20`) in `Site.View.ask_url/1`, then HTML-escaped by the template.
 - There is no site footer on an entry either: no email, no LinkedIn, no build hash.
@@ -270,9 +263,9 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 
 - *Opt-in.* `@view-transition { navigation: auto; }` inside `prefers-reduced-motion: no-preference`, and `navigation: none` inside `reduce`. A browser without support navigates at once.
 - *Direction.* On `pageswap` (old page) and `pagereveal` (new page; also for a page restored from the back/forward cache or activated from a prerender, so the speculation rules still transition), `site.js` types the transition from the two URLs (`navigation.activation`): `forward` for home to an entry, `back` for an entry to the home, whatever started it. The old page also gets `leaving`, the new page `arriving`. Every other navigation gets no type and the browser's own cross-fade.
-- *Names.* Only the page that arrives names its content: `home-name` (`.identity`) and `home-year` (`.timeline`) on the home, `entry-body` (`.article`) on an entry. The old page names nothing, so it is never cut into tall pictures (a long essay named as one picture can come out as a white frame). The lamp, the corner and the bar stay in the root images.
-- *The shared title.* At most one element per page carries `view-transition-name: entry-title`, written through the CSSOM. Going in, `pageswap` names the clicked entry's `.entry-title` and `pagereveal` names the h1. Coming back, `pageswap` names the h1 and `pagereveal` finds the entry we came from, scrolls it into view (`block: "nearest"`, unless the URL has a hash), names it and rests the light on it. A title not fully on screen is not named, and the other side then treats its title as ordinary content (`:only-child`). Names are cleared when `viewTransition.finished` settles, when `pageswap` starts, and when a page is restored from the cache.
-- *Timing,* in tokens on `:root`: `--vt-enter: 480ms` with `cubic-bezier(0.2, 0, 0, 1)`, `--vt-exit: 160ms` with `cubic-bezier(0.3, 0, 0.8, 0.15)`, `--vt-stagger: 60ms`. New content uses `vt-in` (12px lower and transparent to its place); old content only fades. The new root fades in over the old one in `--vt-exit`. Back home, the timeline arrives a beat after the name. The title's two pictures fill their group and scale from its top left corner (`object-fit: contain`): going in, the row fades out in the first quarter and the heading fades in as that ends; coming back, the mirror image. The arriving h1 carries a halo of the page colour while it crosses the fading content. A hovered entry is captured without its glow.
+- *Names.* Only the page that arrives names its content: `home-name` (`.identity`) and `home-year` (`.timeline`) on the home, `entry-body` (`.article`) on an entry. The old page names nothing, so it is never cut into tall pictures (a long essay named as one picture can come out as a white frame). The line, the corner and the bar stay in the root images.
+- *The shared title.* At most one element per page carries `view-transition-name: entry-title`, written through the CSSOM. Going in, `pageswap` names the clicked entry's `.entry-title` and `pagereveal` names the h1. Coming back, `pageswap` names the h1 and `pagereveal` finds the entry we came from, scrolls it into view (`block: "nearest"`, unless the URL has a hash) and names it. A title not fully on screen is not named, and the other side then treats its title as ordinary content (`:only-child`). Names are cleared when `viewTransition.finished` settles, when `pageswap` starts, and when a page is restored from the cache.
+- *Timing,* in tokens on `:root`: `--vt-enter: 480ms` with `cubic-bezier(0.2, 0, 0, 1)`, `--vt-exit: 160ms` with `cubic-bezier(0.3, 0, 0.8, 0.15)`, `--vt-stagger: 60ms`. New content uses `vt-in` (12px lower and transparent to its place); old content only fades. The new root fades in over the old one in `--vt-exit`. Back home, the timeline arrives a beat after the name. The title's two pictures fill their group and scale from its top left corner (`object-fit: contain`): going in, the row fades out in the first quarter and the heading fades in as that ends; coming back, the mirror image. The arriving h1 carries a halo of the page colour while it crosses the fading content.
 - *White frames.* `html` and `::view-transition` have the page colour, as does the root group during a navigation; every arriving image is `opacity: 0` in its rule until its animation runs; no `plus-lighter`.
 - *Skipped transitions.* A browser skips a view transition when the page is hidden or not composited, and cancels it when two elements share a name. `site.js` handles the promises of every transition it is handed, never throws or logs, and clears its names whatever the outcome. (In a page that is not composited at all, Chrome can skip the arriving transition before the page sees it and log the skip itself; the design sample does the same.)
 
@@ -280,15 +273,14 @@ Entries are essays, notes, and projects, and the timeline on the home is the onl
 
 ```css
 /* light-dark(light, dark) on :root */
---bg:         #f7f7f6  #0d0f14     --text:       #15171c  #ecebe8
---text-prose: #2a2d34  #cfd0d3     --text-2:     #4d515a  #a2a6ae
---text-3:     #62666f  #80848d     --name:       #15171c  #d6d5d2
---lamp:       #9a5a00  #f2c47c     --lit:        #8a4f00  #fff3df
+--bg:         #f4f4f1  #0e0f12     --text:       #141518  #ecebe8
+--text-prose: #2a2d34  #cfd0d3     --text-2:     #595c62  #9c9fa6
+--text-3:     #62666f  #80848d     --hair:       #d6d6d1  #292b31
 --line:       rgb(20 22 28 / .09)  rgb(255 255 255 / .07)
 --line-strong rgb(20 22 28 / .18)  rgb(255 255 255 / .15)
 ```
 
-Plus the glows of the lamp (`--glow-hot`, `--glow-core`, `--glow-wide`, `--spot`, `--lit-glow`, `--beam-line`), `--hover` and `--card`, all `light-dark()` pairs. `--focus` is `--lamp`.
+Plus `--hover` and `--card`, both `light-dark()` pairs. `--focus` is the same pair as `--text`. There is no accent colour: `--hair` is the line, `--text-2` is every secondary text (dates, the position, meta), `--text-3` the smallest marks and arrows.
 
 - **Theming:** `:root` has `color-scheme: dark light`, so with no `data-theme` the system decides; `[data-theme=light|dark]` sets `color-scheme` and every `light-dark()` follows. There is one palette, no second set under a media query.
 - **Fonts:** Inter as a variable font (`InterVariable.woff2`, `InterVariable-Italic.woff2`, `font-weight: 100 900`) with `font-optical-sizing: auto`, and JetBrains Mono 400 only for `code` and `pre`. All `font-display: swap`, all self-hosted with their OFL licences in `assets/fonts/`.
@@ -298,20 +290,20 @@ Plus the glows of the lamp (`--glow-hot`, `--glow-core`, `--glow-wide`, `--spot`
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   ```
 
-- **Sizes** are in px, as designed: body 16px, line-height 1.6; the text of an entry 17px, line-height 1.7. Weights are 400, 500 (UI), 560 (timeline titles) and 600 (name, headings).
-- **Links:** `color: inherit`; in text, a 1px underline at 40% of the colour, 0.22em offset, that takes the lamp on hover. Focus-visible is a 2px solid outline in `--focus`, 3px off (2px on an entry). Selection is the lamp at 30%.
-- **Contrast:** every text colour (`--text`, `--text-prose`, `--text-2`, `--text-3`, `--name`, `--lamp`, `--lit`) keeps at least 4.5:1 on `--bg` in both themes, `--text` at least 7:1; so does every date tint between `--lamp` and `--text-3`. A test checks the pairs.
+- **Sizes** are in px, as designed: body 16px, line-height 1.6; the text of an entry 17px, line-height 1.7. Weights are 400, 500 (UI and timeline titles) and 600 (name, headings).
+- **Links:** `color: inherit`; in text, a 1px underline at 40% of the colour, 0.22em offset, that takes the full colour on hover. Focus-visible is a 2px solid outline in `--focus`, 3px off (2px on an entry). Selection is the text colour at 16%.
+- **Contrast:** every text colour (`--text`, `--text-prose`, `--text-2`, `--text-3`) keeps at least 4.5:1 on `--bg` in both themes, `--text` at least 7:1. A test checks the pairs.
 - **Layout guards:** no horizontal scroll down to 360px: code blocks scroll inside their box, headings and table cells break long words, the entry's negative margins stay inside the gutter.
 
 ## 9. Accessibility and reduced motion
 
 - Every page has a skip link, one h1, and landmarks (`main`; on entries a `header` bar and the article's `footer`). The timeline is an ordered list under a visually hidden h2; years are aria-hidden and every date carries its year for a screen reader.
-- Keyboard: Tab reaches the LinkedIn link, the toggle, the company link and every entry; focus is always visible and lights an entry exactly like hover, description included. Escape goes back home from an entry.
-- Decorative things are aria-hidden: the lit name, the decrypt overlay, the light, the toggle's icons, the LinkedIn glyph, the arrows, the separators and the `Esc` hint.
-- **Reduced motion:** no decrypt, no light (it stays off; hover and focus still brighten), no entrance, no navigation transition, no theme cross-fade, the arrows do not lean, and every remaining animation and transition is cut to 0.01ms.
-- **Without script:** the name, the position, the timeline and every entry read and link as normal; the description shows on hover and focus; the light, the lit name and the theme toggle (which needs script) are not shown.
+- Keyboard: Tab reaches the LinkedIn link, the toggle, the company link and every entry; focus is always visible and fills an entry's mark exactly like hover. Escape goes back home from an entry.
+- Decorative things are aria-hidden: the line, the toggle's icons, the LinkedIn glyph, the arrows, the separators and the `Esc` hint.
+- **Reduced motion:** no lean (the line is drawn and stays still), no entrance, no navigation transition, no theme cross-fade, the arrows do not lean, and every remaining animation and transition is cut to 0.01ms.
+- **Without script:** the name, the position, the timeline and every entry read and link as normal; a plain rule stands in for the line; the theme toggle (which needs script) is not shown.
 
-**Removed with the redesign:** the ASCII topographic field (`field.js`, its canvas and CSS, `lab/field.html` is left as it was), the git-log list and its commit hashes (and the git reading behind them), the beige palette, `theme.js` and `transitions.js` (both in `site.js` now), the site header and footer (email, LinkedIn, build hash), the home intro text, the terminal 404, and the contour lines and JetBrains Mono of the share images.
+**Removed with the redesigns:** the ASCII topographic field (`field.js`, its canvas and CSS, `lab/field.html` is left as it was), the git-log list and its commit hashes, the beige palette, `theme.js` and `transitions.js` (both in `site.js` now), the site header and footer, the home intro text, the terminal 404; then the lamp (the glow at the top of the page, the pointer's light, the scan line and its bead, the lit copy of the name, the decrypt), the amber accent, the two-column poster and its large name, the date tints, and the summaries on the home.
 
 ## 10. Build (Elixir)
 
@@ -329,7 +321,7 @@ Plus the glows of the lamp (`--glow-hot`, `--glow-core`, `--glow-wide`, `--spot`
 - **Deterministic:** no build timestamps; sorted iteration everywhere; identical output for identical sources and env.
 - **`mix site.verify`:** builds twice into temporary dirs, compares a SHA-256 over every file path and content, fails on mismatch, and prints the tree hash.
 - **`mix site.serve [--port 4000]`:** builds, serves `dist/` with Bandit and Plug, and applies the headers parsed from `dist/_headers`, so CSP violations show up locally exactly as in production. It polls `content/`, `templates/`, `assets/` and `lib/` mtimes every second and rebuilds on change (no file_system dep). Missing paths serve `404.html` with status 404, and `/x/` serves `/x/index.html`.
-- **Tests:** frontmatter parsing and validation (the `summary` field too), flat URLs, slugs (global uniqueness and reserved slugs), `_redirects`, escaping, timeline order, rows and years, no nav, no footer and no list pages, the home markup (name, position, timeline structure, the summary fallback, the external project link and its label, no drafts, the light layers), the entry, project and 404 markup, the CSS invariants (the palette and its contrast, the fonts, focus, the description reveal, the light only on the timeline, reduced-motion guards, no trace of the old design), CSP hashes (head.js and the speculation rules) and no inline style, the Markdown twins and `llms.txt`, the entry links and their escaping, the favicon pair and its script, the share images (size, palette, no metadata chunks, determinism, text wrapping, meta tags), the `stats` callouts, the page transitions in CSS, and `site.js` run under node with stubs when `node` is installed (direction and names, the margins, Escape and the back links, the theme toggle, the entrance), and a determinism smoke test, all using `test/fixtures/content`.
+- **Tests:** frontmatter parsing and validation (the `summary` field too), flat URLs, slugs (global uniqueness and reserved slugs), `_redirects`, escaping, timeline order, rows and years, no nav, no footer and no list pages, the home markup (name, position, timeline structure, no summary, the external project link and its label, no drafts, the line), the entry, project and 404 markup, the CSS invariants (the palette and its contrast, no accent, the fonts, focus, the line and its marks, reduced-motion guards, no trace of the old designs), CSP hashes (head.js and the speculation rules) and no inline style, the Markdown twins and `llms.txt`, the entry links and their escaping, the favicon pair and its script, the share images (size, palette, no metadata chunks, determinism, text wrapping, meta tags), the `stats` callouts, the page transitions in CSS, and `site.js` run under node with stubs when `node` is installed (direction and names, the margins, Escape and the back links, the theme toggle, the entrance), and a determinism smoke test, all using `test/fixtures/content`.
 
 ## 11. Security headers (`dist/_headers`)
 
@@ -357,7 +349,7 @@ Plus the glows of the lamp (`--glow-hot`, `--glow-core`, `--glow-wide`, `--spot`
 
 The two Cloudflare hosts are always in the CSP, because Web Analytics runs on automatic setup: Cloudflare injects `<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"…"}'></script>` into the HTML at the edge. The build never writes that tag, so no built page contains `beacon.min.js` or `data-cf-beacon`.
 The `/assets/fonts/*` rule covers every font file, so it lists no filenames. `dist/_redirects` (§4) sits next to `_headers`; Cloudflare reads both from the assets directory, and the build writes both.
-`site.js` needs no CSP change: it is a same-origin script, and everything it positions or names (the light's custom properties, the decrypt's slots, the transition names) is written through the CSSOM (`style.setProperty`), never as an inline style attribute, so `style-src` stays `'self'`. Fonts are self-hosted, so `font-src` and `style-src` stay `'self'`.
+`site.js` needs no CSP change: it is a same-origin script, and everything it positions or names (the line's path, each row's lean and moment, the transition names) is written through the CSSOM (`style.setProperty`), never as an inline style attribute, so `style-src` stays `'self'`. Fonts are self-hosted, so `font-src` and `style-src` stay `'self'`.
 **Never** use inline `style=""` attributes, inline `<style>`, inline event handlers, or any inline script other than head.js and the speculation rules.
 
 ## 12. Hosting and deploy
@@ -380,4 +372,4 @@ All drafts are Yoan's to edit.
 - **Drafts** (`draft: true`): *Security should unleash*, *Security pays in more than one currency*, *AI is a teammate*, *Comms is the staff skill*.
 - **Dropped at review:** the uses page and the cv page.
 
-The public timeline therefore has three entries, all in 2026: one note, one project and one essay.
+The public timeline therefore has three entries, all in 2026: one note, one project and one essay. Their `summary` lines are kept in the files but no longer shown on the home.
