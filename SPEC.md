@@ -59,7 +59,6 @@ It shows who he is, what he thinks, and what he makes.
 │   ├── fonts/JetBrainsMono-Regular.woff2 + JetBrainsMono-OFL.txt
 │   ├── favicon.svg            the mark: the timeline's line and one filled mark on the dark page colour
 │   └── favicon-sleep.svg      the same square with the mark emptied to a ring
-├── lab/                       playgrounds and design samples (never built or deployed)
 ├── wrangler.jsonc             the site Worker (yoanfaure.com)
 ├── redirect/                  worker.js + wrangler.jsonc: 301s yoanfau.re and www to yoanfaure.com
 ├── .github/workflows/deploy.yml
@@ -304,7 +303,7 @@ Plus `--hover` and `--card`, both `light-dark()` pairs. `--focus` is the same pa
 - **Reduced motion:** no lean (the line is drawn and stays still), no entrance, no navigation transition, no theme cross-fade, the arrows do not lean, and every remaining animation and transition is cut to 0.01ms.
 - **Without script:** the name, the position, the timeline and every entry read and link as normal; a plain rule stands in for the line; the theme toggle (which needs script) is not shown.
 
-**Removed with the redesigns:** the ASCII topographic field (`field.js`, its canvas and CSS, `lab/field.html` is left as it was), the git-log list and its commit hashes, the beige palette, `theme.js` and `transitions.js` (both in `site.js` now), the site header and footer, the home intro text, the terminal 404; then the lamp (the glow at the top of the page, the pointer's light, the scan line and its bead, the lit copy of the name, the decrypt), the amber accent, the two-column poster and its large name, the date tints, and the summaries on the home.
+**Removed with the redesigns:** the ASCII topographic field (`field.js`, its canvas and CSS, and later its playground in `lab/`), the git-log list and its commit hashes, the beige palette, `theme.js` and `transitions.js` (both in `site.js` now), the site header and footer, the home intro text, the terminal 404; then the lamp (the glow at the top of the page, the pointer's light, the scan line and its bead, the lit copy of the name, the decrypt), the amber accent, the two-column poster and its large name, the date tints, and the summaries on the home.
 
 ## 10. Build (Elixir)
 
