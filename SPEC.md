@@ -402,9 +402,10 @@ All drafts are Yoan's to edit.
 
 - **home.md:** the name, the description, and the intro used by `llms.txt`: the first paragraph, the career line `At Riot in Paris since 2025. Before: Worklife, Checkout.com.`, and the off-hours line.
 - **essays/2026-03-28-threat-modeling-with-claude-code.md:** migrated verbatim from `archive/hugo`, summary `A Claude Code skill that runs STRIDE.` It is at `/threat-modeling-with-claude-code/`; its old URL `/blog/threat-modeling-with-claude-code/` is redirected.
+- **essays/2026-11-13-policies-as-code.md:** security policies kept in git, summary `Security policies in git, built and shipped by CI.` It uses a `stats` row, a highlighted `yaml` block, one flowchart and one callout.
 - **notes/2026-10-29-build-the-small-tool.md:** summary `A Slack agent in three days, not a vendor.`
 - **projects/rhino.md:** workflows as code, a mini Airflow in Go, summary `Workflows as code. A mini Airflow in Go.` On the home it links to `https://github.com/y0anfa/rhino`; its page stays at `/rhino/`.
 - **Drafts** (`draft: true`): *Security should unleash*, *Security pays in more than one currency*, *AI is a teammate*, *Comms is the staff skill*.
 - **Dropped at review:** the uses page and the cv page.
 
-The public timeline therefore has three entries, all in 2026: one note, one project and one essay. Their `summary` lines are kept in the files but no longer shown on the home.
+The public timeline therefore has four entries, all in 2026: one note, one project and two essays. Their `summary` lines are kept in the files but no longer shown on the home.
