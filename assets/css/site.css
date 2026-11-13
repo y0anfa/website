@@ -984,6 +984,158 @@ body:not([data-page="home"])::before {
   font-weight: 600;
 }
 
+/* ---------- code, highlighted ----------
+   The build marks up each token with a class (Lumis, `l-…`); there are no inline
+   styles. Ink only, in four tones: names that matter in --text, the body of the
+   code in --text-prose, strings and values in --text-2, comments and punctuation
+   in --text-3. */
+
+.prose pre.lumis {
+  color: var(--text-prose);
+}
+
+.lumis :is([class^="l-keyword"], [class^="l-function"], [class^="l-module"], [class^="l-type"], [class^="l-tag"], [class^="l-constructor"]) {
+  color: var(--text);
+}
+
+.lumis :is([class^="l-string"], [class^="l-number"], [class^="l-boolean"], [class^="l-constant"], [class^="l-character"], [class^="l-attribute"]) {
+  color: var(--text-2);
+}
+
+.lumis :is([class^="l-comment"], [class^="l-punctuation"], [class^="l-operator"]) {
+  color: var(--text-3);
+}
+
+/* a diff keeps its two sides apart without colour: what is added is ink, what is
+   removed is struck through and quiet */
+.lumis [class^="l-diff-plus"] {
+  color: var(--text);
+}
+
+.lumis [class^="l-diff-minus"] {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+/* ---------- callouts (Markdown alerts: > [!NOTE]) ----------
+   A ruled box with its kind as a small title. No colour: a warning or a caution
+   has an ink rule on its left, the others a quiet one. */
+
+.markdown-alert {
+  padding: 14px 18px 15px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line-strong);
+  border-radius: 4px 12px 12px 4px;
+  background: var(--card);
+  font-size: 16px;
+}
+
+.markdown-alert:is(.markdown-alert-warning, .markdown-alert-caution, .markdown-alert-important) {
+  border-left-color: var(--text);
+}
+
+.markdown-alert > * {
+  margin: 0;
+}
+
+.markdown-alert > * + * {
+  margin-top: 0.7em;
+}
+
+.markdown-alert .markdown-alert-title {
+  margin-bottom: -0.3em;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ---------- diagrams (Markdown ```mermaid blocks) ----------
+   Drawn at build time as inline SVG with classes only (Site.Diagram). A diagram
+   wider than the column is scaled down to fit it; on a phone, where that would
+   make its words too small to read, it keeps its size and scrolls in its figure. */
+
+.diagram {
+  margin-block: 32px;
+  overflow-x: auto;
+}
+
+.diagram svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}
+
+.d-node {
+  fill: var(--card);
+  stroke: var(--text-3);
+  stroke-width: 1;
+}
+
+.d-label {
+  fill: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.d-edge,
+.d-life {
+  fill: none;
+  stroke: var(--text-3);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+}
+
+.d-dashed {
+  stroke-dasharray: 4 4;
+}
+
+.d-thick {
+  stroke-width: 2.25;
+}
+
+.d-head {
+  fill: var(--text-3);
+}
+
+.d-mask {
+  fill: var(--bg);
+}
+
+.d-edge-label,
+.d-group-label,
+.d-frame-label {
+  fill: var(--text-2);
+  font-size: 12px;
+}
+
+.d-group-label {
+  font-weight: 500;
+}
+
+.d-group,
+.d-frame {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.d-group,
+.d-life {
+  stroke-dasharray: 3 4;
+}
+
+.d-life {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+
+.d-note {
+  fill: var(--hover);
+  stroke: var(--line);
+}
+
 /* ---------- stat callouts (Markdown ```stats blocks) ----------
    A fenced block with the info string `stats` becomes <dl class="stats">: one
    <div> per `value | label` line, a big number over a small label, ruled like the
@@ -1199,6 +1351,11 @@ body:not([data-page="home"])::before {
     width: auto;
     line-height: 20px;
     text-align: left;
+  }
+
+  /* a wide diagram keeps its size and scrolls in its figure */
+  .diagram svg {
+    max-width: none;
   }
 }
 

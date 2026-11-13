@@ -517,7 +517,7 @@ defmodule Site.BuildTest do
 
       assert html =~ ~s(<h2 id="a-heading">)
       assert html =~ "<table>"
-      assert html =~ ~s(<pre><code class="language-sh">)
+      assert html =~ ~s(<pre class="lumis"><code class="language-bash")
       assert html =~ ~r{<footer class="article-end">\s*<a class="back" href="/" data-home>}
       assert html =~ ~r{</svg>\s*All entries\s*</a>}
 

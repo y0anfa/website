@@ -48,7 +48,13 @@ Frontmatter sits between `---` lines.
 - **projects:** `title`, `date`, `tagline` and `status` (required; `active`, `wip` or `archived`). `link` and `stack` are optional.
 - **home.md:** `title` and `description` (required), `tagline` (optional).
 
-Markdown uses GitHub-flavoured extensions: tables, strikethrough, autolinks, footnotes and heading ids. Raw HTML is not rendered. A fenced block with the info string `stats` becomes a row of stat callouts, one `value | label` per line (see [SPEC.md §5](SPEC.md#5-content-model)):
+Markdown uses GitHub-flavoured extensions: tables, strikethrough, autolinks, footnotes and heading ids. Raw HTML is not rendered.
+
+- **Code** is highlighted at build time, in greys only. Name the language on the fence: `bash` (or `sh`), `diff`, `dockerfile`, `elixir`, `go`, `hcl`, `javascript`, `json`, `python`, `rust`, `sql`, `toml`, `typescript` or `yaml`. Any other language is shown as plain text; to add one, add its `lumis_wasm_<language>` package to `mix.exs`.
+- **Callouts** are GitHub alerts: a quote that starts with `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]`. Words after the tag replace the title.
+- **Diagrams** are fenced blocks tagged `mermaid`, drawn at build time as inline SVG in the page's greys. Two kinds work: flowcharts (`graph TD` or `flowchart LR`, the usual node shapes, labelled arrows, one level of `subgraph`) and sequence diagrams (`sequenceDiagram`, participants, messages, notes, `loop`/`opt`/`alt`/`par` frames). Anything else stays a code block, so you see it did not parse. [SPEC.md §5](SPEC.md#5-content-model) lists the exact syntax.
+
+A fenced block with the info string `stats` becomes a row of stat callouts, one `value | label` per line (see [SPEC.md §5](SPEC.md#5-content-model)):
 
 ````
 ```stats

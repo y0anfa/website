@@ -41,17 +41,101 @@ defmodule Site.MarkdownTest do
     assert html("## A heading here\n") =~ ~s(<h2 id="a-heading-here">)
   end
 
-  test "code blocks are plain: no syntax colouring, no inline styles" do
-    out = html("```elixir\nIO.puts(\"<hi>\")\n```\n")
+  describe "code blocks" do
+    test "are highlighted with classes, never with inline styles" do
+      out = html("```elixir\n# say it\nIO.puts(\"<hi>\")\n```\n")
 
-    assert out =~ ~s(<pre><code class="language-elixir">)
-    assert out =~ "&lt;hi&gt;"
-    refute out =~ "style="
-    refute out =~ "<span"
+      assert out =~ ~s(<pre class="lumis"><code class="language-elixir")
+      assert out =~ ~s(<span class="l-comment"># say it</span>)
+      assert out =~ ~s(<span class="l-string">&quot;&lt;hi&gt;&quot;</span>)
+      refute out =~ "style="
+      refute out =~ "<hi>"
+    end
+
+    test "every language a post may use has its parser" do
+      for {lang, code} <- [
+            {"bash", "echo hi # c"},
+            {"diff", "- a\n+ b"},
+            {"dockerfile", "FROM scratch"},
+            {"elixir", "def f, do: 1"},
+            {"go", "func main() {}"},
+            {"hcl", "a = 1"},
+            {"javascript", "const a = 1"},
+            {"json", ~s({"a": 1})},
+            {"python", "def f(): pass"},
+            {"rust", "fn main() {}"},
+            {"sql", "select 1"},
+            {"toml", "a = 1"},
+            {"typescript", "const a: number = 1"},
+            {"yaml", "a: 1"}
+          ] do
+        out = html("```#{lang}\n#{code}\n```\n")
+        assert out =~ ~s(class="language-#{lang}"), lang
+        # a token span inside the line span: the parser ran
+        assert out =~ ~r/<span class="l-line"[^>]*>.*<span class="l-/s, lang
+      end
+    end
+
+    test "a language without a parser, or none, is plain text, escaped" do
+      for fence <- ["```cobol", "```"] do
+        out = html("#{fence}\nplain <b>\n```\n")
+        assert out =~ ~s(<pre class="lumis"><code class="language-plaintext")
+        assert out =~ "plain &lt;b&gt;"
+        refute out =~ ~s(class="l-keyword)
+      end
+    end
   end
 
-  test "an unlabelled code block is a bare pre/code" do
-    assert html("```\nplain\n```\n") =~ "<pre><code>plain\n</code></pre>"
+  describe "callouts" do
+    test "a GitHub alert becomes a titled box" do
+      out = html("> [!WARNING]\n> Never log the **token**.\n")
+
+      assert out =~ ~s(<div class="markdown-alert markdown-alert-warning">)
+      assert out =~ ~s(<p class="markdown-alert-title">Warning</p>)
+      assert out =~ "<p>Never log the <strong>token</strong>.</p>"
+    end
+
+    test "the five kinds, and a title of one's own" do
+      for kind <- ~w(note tip important warning caution) do
+        out = html("> [!#{String.upcase(kind)}]\n> x\n")
+        assert out =~ "markdown-alert-#{kind}", kind
+      end
+
+      assert html("> [!NOTE] Read this first\n> x\n") =~
+               ~s(<p class="markdown-alert-title">Read this first</p>)
+    end
+
+    test "a plain quote stays a quote, and markup in a callout stays text" do
+      assert html("> just a quote\n") =~ "<blockquote>"
+
+      out = html("> [!NOTE] <b>t</b>\n> <script>x</script>\n")
+      refute out =~ "<script"
+      refute out =~ "<b>"
+    end
+  end
+
+  describe "diagrams" do
+    test "a mermaid block is drawn as an inline SVG figure" do
+      out = html("before\n\n```mermaid\ngraph TD\n  A[One] --> B[Two]\n```\n\nafter\n")
+
+      assert out =~ ~r{<p>before</p>\s*<figure class="diagram"><svg }
+      assert out =~ ~r{</svg></figure>\s*<p>after</p>}
+      refute out =~ "language-mermaid"
+      refute out =~ "\u{E000}"
+    end
+
+    test "a diagram outside the subset stays a code block" do
+      out = html("```mermaid\npie title Pets\n  \"Dogs\" : 3\n```\n")
+
+      assert out =~ ~s(<pre class="lumis"><code class="language-mermaid")
+      assert out =~ "pie title Pets"
+      refute out =~ "<svg"
+    end
+
+    test "the first paragraph is still the summary when a diagram opens the entry" do
+      rendered = Markdown.render("```mermaid\ngraph TD\n  A --> B\n```\n\nThe words.\n")
+      assert rendered.summary == "The words."
+    end
   end
 
   describe "summary" do

@@ -48,7 +48,7 @@ defmodule Site.StatsTest do
       assert out =~ "<dt>&lt;b&gt;1&lt;/b&gt;</dt>"
 
       assert out =~
-               "<dd>a &lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;q&quot; 'r'</dd>"
+               "<dd>a &lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;q&quot; &#39;r&#39;</dd>"
     end
 
     test "never unescapes: an entity typed by the author is shown as typed" do
@@ -61,7 +61,7 @@ defmodule Site.StatsTest do
       source = "```stats\n91% | only read\nthis line has no bar\n```\n"
       out = html(source)
 
-      assert out =~ ~s(<pre><code class="language-stats">)
+      assert out =~ ~s(<pre class="lumis"><code class="language-plaintext")
       assert out =~ "this line has no bar"
       refute out =~ "<dl"
     end
@@ -69,7 +69,7 @@ defmodule Site.StatsTest do
     test "an empty value or label is not a stat" do
       for line <- ["| label only", "value only |", "  |  "] do
         out = html("```stats\n#{line}\n```\n")
-        assert out =~ ~s(<pre><code class="language-stats">), line
+        assert out =~ ~s(<pre class="lumis"><code class="language-plaintext"), line
         refute out =~ "<dl", line
       end
     end
@@ -77,7 +77,7 @@ defmodule Site.StatsTest do
     test "an empty block stays a plain code block" do
       out = html("```stats\n```\n")
 
-      assert out =~ ~s(<pre><code class="language-stats">)
+      assert out =~ ~s(<pre class="lumis"><code class="language-plaintext")
       refute out =~ "<dl"
     end
 
@@ -85,7 +85,7 @@ defmodule Site.StatsTest do
       out = html("```text\n1 | a\n```\n\n```Stats\n1 | a\n```\n\n```\n1 | a\n```\n")
 
       refute out =~ "<dl"
-      assert length(Regex.scan(~r/<pre>/, out)) == 3
+      assert length(Regex.scan(~r/<pre class="lumis">/, out)) == 3
     end
 
     test "extra words after the info string are ignored" do

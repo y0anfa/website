@@ -2,13 +2,16 @@ defmodule Site.Markdown do
   @moduledoc """
   Markdown rendering through MDEx.
 
-  GFM tables, strikethrough, autolinks and footnotes are on, headings get ids,
-  raw HTML is never rendered (`unsafe: false`, and escaped as text so nothing
-  vanishes silently), and there is no syntax highlighting: code blocks come out as
-  plain `<pre><code class="language-x">`.
+  GFM tables, strikethrough, autolinks, footnotes and alerts (`> [!NOTE]`) are on,
+  headings get ids, and raw HTML is never rendered (`unsafe: false`, and escaped
+  as text so nothing vanishes silently).
 
-  One fenced block gets special treatment: with the info string `stats`, each line
-  is `value | label` and the block becomes a row of stat callouts,
+  Code blocks are highlighted by Lumis with classes (`html_linked`), never inline
+  styles: `site.css` gives the classes their ink. A language without a parser
+  (mix.exs lists them) comes out as plain text.
+
+  Two fenced blocks are not code. With the info string `stats`, each line is
+  `value | label` and the block becomes a row of stat callouts,
 
       ```stats
       91% | only read or react
@@ -16,8 +19,10 @@ defmodule Site.Markdown do
       ```
 
   rendered as `<dl class="stats"><div><dt>91%</dt><dd>only read or react</dd></div>…</dl>`.
-  A block with a line that is not `value | label` stays a plain code block, so a
-  typo shows up as code instead of vanishing.
+  With the info string `mermaid`, the block is drawn as an inline SVG by
+  `Site.Diagram`. A block that does not parse (a line that is not `value | label`,
+  a diagram outside the subset) stays a code block, so a typo shows up as code
+  instead of vanishing.
   """
 
   @options [
@@ -26,10 +31,11 @@ defmodule Site.Markdown do
       strikethrough: true,
       autolink: true,
       footnotes: true,
+      alerts: true,
       header_id_prefix: ""
     ],
     render: [unsafe: false, escape: true],
-    syntax_highlight: nil
+    syntax_highlight: [formatter: {:html_linked, []}]
   ]
 
   @description_limit 160
@@ -43,34 +49,58 @@ defmodule Site.Markdown do
   @spec render(String.t()) :: rendered()
   def render(markdown) when is_binary(markdown) do
     document = MDEx.parse_document!(markdown, @options)
+    summary = document.nodes |> first_paragraph() |> truncate(@description_limit)
+    {document, blocks} = MDEx.traverse_and_update(document, [], &lift/2)
 
-    %{
-      html: document |> MDEx.to_html!(@options) |> stats(),
-      summary: document.nodes |> first_paragraph() |> truncate(@description_limit)
-    }
+    %{html: document |> MDEx.to_html!(@options) |> put_back(blocks), summary: summary}
   end
 
-  # Turns each `stats` code block of MDEx's HTML into a definition list. The text
-  # inside is already HTML-escaped by MDEx and is only trimmed and split here,
-  # never unescaped, so it goes back in as it came out.
-  defp stats(html) do
-    block = ~r{<pre><code class="language-stats">(.*?)</code></pre>}s
-    Regex.replace(block, html, &stats_block/2)
+  # A `stats` or `mermaid` block that parses is taken out of the document before
+  # it is rendered, and a paragraph holding one private-use marker is left in its
+  # place; its HTML goes back in where the marker comes out. The renderer never
+  # sees that HTML, so `unsafe: false` stays true for everything an author writes.
+  defp lift(%MDEx.CodeBlock{info: info, literal: literal} = block, blocks) do
+    built =
+      case info |> to_string() |> String.split() |> List.first() do
+        "stats" -> stats(literal)
+        "mermaid" -> Site.Diagram.render(literal)
+        _ -> :error
+      end
+
+    case built do
+      {:ok, html} ->
+        marker = "\u{E000}#{length(blocks)}\u{E000}"
+        {%MDEx.Paragraph{nodes: [%MDEx.Text{literal: marker}]}, [{marker, html} | blocks]}
+
+      :error ->
+        {block, blocks}
+    end
   end
 
-  defp stats_block(whole, body) do
-    rows = body |> String.split("\n") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+  defp lift(node, blocks), do: {node, blocks}
+
+  defp put_back(html, blocks) do
+    Enum.reduce(blocks, html, fn {marker, block}, html ->
+      String.replace(html, "<p>#{marker}</p>", block)
+    end)
+  end
+
+  # One `value | label` per line; both are escaped here, as the page's only way in.
+  defp stats(literal) do
+    rows = literal |> String.split("\n") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
     pairs = Enum.map(rows, &stat/1)
 
     if pairs != [] and :error not in pairs do
       items = Enum.map_join(pairs, fn {value, label} -> stat_item(value, label) end)
-      ~s(<dl class="stats">#{items}</dl>)
+      {:ok, ~s(<dl class="stats">#{items}</dl>)}
     else
-      whole
+      :error
     end
   end
 
-  defp stat_item(value, label), do: "<div><dt>#{value}</dt><dd>#{label}</dd></div>"
+  defp stat_item(value, label) do
+    "<div><dt>#{Site.HTML.escape(value)}</dt><dd>#{Site.HTML.escape(label)}</dd></div>"
+  end
 
   # `value | label`, split at the first bar; both sides must be non-empty.
   defp stat(row) do
